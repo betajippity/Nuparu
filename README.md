@@ -9,3 +9,4 @@ Nuparu currently consists of:
 * [GLFW](http://www.glfw.org/) 3.0.2 (OSX/Linux/Win)
 * [GLEW](http://glew.sourceforge.net/index.html) 1.10.0 (OSX/Linux/Win)
 * [jsoncpp](http://sourceforge.net/projects/jsoncpp/) 0.6.0 (OSX/Linux/Win)
+* [stb_image](https://code.google.com/p/stblib/) 1.33 (OSX/Linux/Win)
