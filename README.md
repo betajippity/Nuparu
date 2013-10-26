@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-Dependencies and foundation libraries for Takua.
+Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
@@ -10,3 +10,5 @@ Nuparu currently consists of:
 * [GLEW](http://glew.sourceforge.net/index.html) 1.10.0 (OSX/Linux/Win)
 * [jsoncpp](http://sourceforge.net/projects/jsoncpp/) 0.6.0 (OSX/Linux/Win)
 * [stb_image](https://code.google.com/p/stblib/) 1.33 (OSX/Linux/Win)
+* [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (OSX/Linux/Win)
+* [Eigen](eigen.tuxfamily.org/) 3.2.0 (OSX/Linux/Win)
