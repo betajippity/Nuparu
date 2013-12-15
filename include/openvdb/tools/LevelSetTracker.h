@@ -52,6 +52,8 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/Grid.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/tree/LeafManager.h>
 #include "Morphology.h"//for tools::dilateVoxels
 
 namespace openvdb {
@@ -70,10 +72,12 @@ public:
     typedef typename TreeType::ValueType         ValueType;
     typedef typename tree::LeafManager<TreeType> LeafManagerType; // leafs + buffers
     typedef typename LeafManagerType::RangeType  RangeType;
+    typedef typename LeafManagerType::LeafRange  LeafRange;
     typedef typename LeafManagerType::BufferType BufferType;
     BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
 
     /// Main constructor
+    /// @throw RuntimeError if the grid is not a level set
     LevelSetTracker(GridT& grid, InterruptT* interrupt = NULL);
 
     /// Shallow copy constructor called by tbb::parallel_for() threads during filtering
