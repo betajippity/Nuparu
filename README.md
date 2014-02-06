@@ -13,5 +13,6 @@ Nuparu currently consists of:
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (OSX/Linux/Win)
 * [Eigen](eigen.tuxfamily.org/) 3.2.0 (OSX/Linux/Win)
 * [OpenVDB](http://www.openvdb.org/) 2.1.0 (OSX)
+* [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX)
 
 Note: OpenVDB's dependencies are dynamically linked, so OpenVDB requires [Ilmbase/OpenEXR](http://www.openexr.com/) and [Intel TBB](https://www.threadingbuildingblocks.org/) to be installed.
