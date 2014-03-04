@@ -32,14 +32,15 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief Defines a simple, multithreaded level-set ray tracer,
+/// @brief Defines two simple but multithreaded renders, a level-set
+/// ray tracer and a volume render. To support these renders we also define
 /// perspective and orthographic cameras (both designed to mimic a Houdini camera),
-/// a Film class and some rather naive shaders
+/// a Film class and some rather naive shaders.
 ///
-/// @note These classes are included mainly to illustrate how to ray-trace
-/// OpenVDB volumes.  They are not intended for production-quality rendering.
-///
-/// @todo Add a volume renderer
+/// @note These classes are included mainly as reference implementations for
+/// ray-tracing of OpenVDB volumes. In other words they are not intended for 
+/// production-quality rendering, but could be used for fast pre-visualiztion 
+/// or as a startingpoint for a more serious render.
 
 #ifndef OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
@@ -49,7 +50,9 @@
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/tools/RayIntersector.h>
+#include <openvdb/tools/Interpolation.h>
 #include <boost/scoped_ptr.hpp>
+#include <boost/scoped_array.hpp> 
 #include <vector>
 
 #ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
@@ -89,7 +92,7 @@ inline void rayTrace(const GridT&,
                      bool threaded = true);
 
 
-//////////////////////////////////////// RAYTRACER ////////////////////////////////////////
+///////////////////////////////LEVEL SET RAY TRACER ///////////////////////////////////////
 
 /// @brief A (very) simple multithreaded ray tracer specifically for narrow-band level sets.
 /// @details Included primarily as a reference implementation.
@@ -148,8 +151,7 @@ public:
     void setPixelSamples(size_t pixelSamples, unsigned int seed = 0);
 
     /// @brief Perform the actual (potentially multithreaded) ray-tracing.
-    void render(bool threaded = true);
-    OPENVDB_DEPRECATED void trace(bool threaded = true) { this->render(threaded); }
+    void render(bool threaded = true) const;
 
     /// @brief Public method required by tbb::parallel_for.
     /// @warning Never call it directly.
@@ -164,6 +166,85 @@ private:
     size_t                              mSubPixels;
 };// LevelSetRayTracer
 
+
+///////////////////////////////VOLUME RENDER ///////////////////////////////////////
+
+/// @brief A (very) simple multithreaded volume render specifically for scalar density.
+/// @details Included primarily as a reference implementation.
+/// @note It will only compile if the IntersectorT is templated on a Grid with a 
+/// floating-point voxel type.    
+template <typename IntersectorT, typename SamplerT = tools::BoxSampler>
+class VolumeRender
+{
+public:
+
+    typedef typename IntersectorT::GridType  GridType;
+    typedef typename IntersectorT::RayType   RayType;
+    typedef typename GridType::ValueType     ValueType;
+    typedef typename GridType::ConstAccessor AccessorType;
+    typedef tools::GridSampler<AccessorType, SamplerT> SamplerType;
+    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+
+    /// @brief Constructor taking an intersector and a base camera.
+    VolumeRender(const IntersectorT& inter, BaseCamera& camera);
+
+    /// @brief Copy constructor which creates a thread-safe clone
+    VolumeRender(const VolumeRender& other);
+
+    /// @brief Perform the actual (potentially multithreaded) volume rendering.
+    void render(bool threaded=true) const;
+
+    /// @brief Set the camera derived from the abstract BaseCamera class.
+    void setCamera(BaseCamera& camera) { mCamera = &camera; }
+
+    /// @brief Set the intersector that performs the actual
+    /// intersection of the rays against the volume.
+    void setIntersector(const IntersectorT& inter);
+    
+    /// @brief Set the vector components of a directional light source
+    /// @throw ArithmeticError if input is a null vector.
+    void setLightDir(Real x, Real y, Real z) { mLightDir = Vec3R(x,y,z).unit(); }
+
+    /// @brief Set the color of the direcitonal light source.
+    void setLightColor(Real r, Real g, Real b) { mLightColor = Vec3R(r,g,b); }
+
+    /// @brief Set the integration step-size in voxel units for the primay ray.
+    void setPrimaryStep(Real primaryStep) { mPrimaryStep = primaryStep; }
+
+    /// @brief Set the integration step-size in voxel units for the primay ray.
+    void setShadowStep(Real shadowStep) { mShadowStep  = shadowStep; }
+
+    /// @brief Set Scattering coefficients.
+    void setScattering(Real x, Real y, Real z) { mScattering = Vec3R(x,y,z); }
+
+    /// @brief Set absorption coefficients.
+    void setAbsorption(Real x, Real y, Real z) { mAbsorption = Vec3R(x,y,z); }
+
+    /// @brief Set parameter that imitates multi-scattering. A value
+    /// of zero implies no multi-scattering. 
+    void setLightGain(Real gain) { mLightGain = gain; }
+
+    /// @brief Set the cut-off value for density and transmittance.
+    void setCutOff(Real cutOff) { mCutOff = cutOff; }
+
+    /// @brief Print parameters, statistics, memory usage and other information.
+    /// @param os            a stream to which to write textual information
+    /// @param verboseLevel  1: print parameters only; 2: include grid
+    ///                      statistics; 3: include memory usage
+    void print(std::ostream& os = std::cout, int verboseLevel = 1);
+
+    /// @brief Public method required by tbb::parallel_for.
+    /// @warning Never call it directly.
+    void operator()(const tbb::blocked_range<size_t>& range) const;
+    
+private:
+
+    AccessorType mAccessor;
+    BaseCamera*  mCamera;
+    boost::scoped_ptr<IntersectorT> mPrimary, mShadow;
+    Real  mPrimaryStep, mShadowStep, mCutOff, mLightGain;
+    Vec3R mLightDir, mLightColor, mAbsorption, mScattering;
+};//VolumeRender    
 
 //////////////////////////////////////// FILM ////////////////////////////////////////
 
@@ -209,7 +290,6 @@ public:
     {
         this->fill(bg);
     }
-    ~Film() { delete mPixels; }
 
     const RGBA& pixel(size_t w, size_t h) const
     {
@@ -228,7 +308,7 @@ public:
     void fill(const RGBA& rgb=RGBA(0)) { for (size_t i=0; i<mSize; ++i) mPixels[i] = rgb; }
     void checkerboard(const RGBA& c1=RGBA(0.3f), const RGBA& c2=RGBA(0.6f), size_t size=32)
     {
-        RGBA *p = mPixels;
+        RGBA *p = mPixels.get();
         for (size_t j = 0; j < mHeight; ++j) {
             for (size_t i = 0; i < mWidth; ++i, ++p) {
                 *p = ((i & size) ^ (j & size)) ? c1 : c2;
@@ -239,8 +319,9 @@ public:
     void savePPM(const std::string& fileName)
     {
         std::string name(fileName + ".ppm");
-        unsigned char* tmp = new unsigned char[3*mSize], *q = tmp;
-        RGBA* p = mPixels;
+        boost::scoped_array<unsigned char> buffer(new unsigned char[3*mSize]);
+        unsigned char *tmp = buffer.get(), *q = tmp;
+        RGBA* p = mPixels.get();
         size_t n = mSize;
         while (n--) {
             *q++ = static_cast<unsigned char>(255.0f*(*p  ).r);
@@ -256,7 +337,6 @@ public:
 
         os << "P6\n" << mWidth << " " << mHeight << "\n255\n";
         os.write((const char *)&(*tmp), 3*mSize*sizeof(unsigned char));
-        delete [] tmp;
     }
 
 #ifdef OPENVDB_TOOLS_RAYTRACER_USE_EXR
@@ -293,11 +373,11 @@ public:
     size_t width()       const { return mWidth; }
     size_t height()      const { return mHeight; }
     size_t numPixels()   const { return mSize; }
-    const RGBA* pixels() const { return mPixels; }
+    const RGBA* pixels() const { return mPixels.get(); }
 
 private:
     size_t mWidth, mHeight, mSize;
-    RGBA*  mPixels;
+    boost::scoped_array<RGBA> mPixels;
 };// Film
 
 
@@ -484,12 +564,6 @@ public:
     /// @param nml Normal in world space at the intersection point.
     /// @param dir Direction of the ray in world space.
     virtual Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const Vec3R& dir) const = 0;
-
-    /// @brief Deprecated, use the method above instead.
-    OPENVDB_DEPRECATED Film::RGBA operator()(const Vec3R& xyz, const Vec3R& nml, const RayT& ray) const
-      {
-          return (*this)(xyz, nml, ray.dir());
-      }
     virtual BaseShader* copy() const = 0;
 };
 
@@ -607,7 +681,7 @@ inline void rayTrace(const GridT&,
 }
 
 
-////////////////////////////////////////
+//////////////////////////////////////// LevelSetRayTracer ////////////////////////////////////////
 
 
 template<typename GridT, typename IntersectorT>
@@ -714,7 +788,7 @@ setPixelSamples(size_t pixelSamples, unsigned int seed)
 
 template<typename GridT, typename IntersectorT>
 inline void LevelSetRayTracer<GridT, IntersectorT>::
-render(bool threaded)
+render(bool threaded) const
 {
     tbb::blocked_range<size_t> range(0, mCamera->height());
     threaded ? tbb::parallel_for(range, *this) : (*this)(range);
@@ -739,6 +813,133 @@ operator()(const tbb::blocked_range<size_t>& range) const
             bg = c*frac;
         }//loop over image height
     }//loop over image width
+}
+
+//////////////////////////////////////// VolumeRender ////////////////////////////////////////
+
+template<typename IntersectorT, typename SampleT>
+inline VolumeRender<IntersectorT, SampleT>::
+VolumeRender(const IntersectorT& inter, BaseCamera& camera)
+    : mAccessor(inter.grid().getConstAccessor())
+    , mCamera(&camera)
+    , mPrimary(new IntersectorT(inter))
+    , mShadow(new IntersectorT(inter))
+    , mPrimaryStep(1.0)
+    , mShadowStep(3.0)
+    , mCutOff(0.005)
+    , mLightGain(0.2)
+    , mLightDir(Vec3R(0.3, 0.3, 0).unit())
+    , mLightColor(0.7, 0.7, 0.7)
+    , mAbsorption(0.1)
+    , mScattering(1.5)
+{
+}
+
+template<typename IntersectorT, typename SampleT>
+inline VolumeRender<IntersectorT, SampleT>::
+VolumeRender(const VolumeRender& other)
+    : mAccessor(other.mAccessor)
+    , mCamera(other.mCamera)
+    , mPrimary(new IntersectorT(*(other.mPrimary)))
+    , mShadow(new IntersectorT(*(other.mShadow)))
+    , mPrimaryStep(other.mPrimaryStep)
+    , mShadowStep(other.mShadowStep)
+    , mCutOff(other.mCutOff)
+    , mLightGain(other.mLightGain)
+    , mLightDir(other.mLightDir)
+    , mLightColor(other.mLightColor)
+    , mAbsorption(other.mAbsorption)
+    , mScattering(other.mScattering)
+{
+}
+
+template<typename IntersectorT, typename SampleT>
+inline void VolumeRender<IntersectorT, SampleT>::
+print(std::ostream& os, int verboseLevel)
+{
+    if (verboseLevel>0) {
+        os << "\nPrimary step: " <<  mPrimaryStep
+           << "\nShadow step: " << mShadowStep
+           << "\nCutoff: " << mCutOff
+           << "\nLightGain: " << mLightGain
+           << "\nLightDir: " << mLightDir
+           << "\nLightColor: " << mLightColor
+           << "\nAbsorption: " << mAbsorption
+           << "\nScattering: " << mScattering << std::endl;
+    }
+    mPrimary->print(os, verboseLevel);
+}
+
+template<typename IntersectorT, typename SampleT>
+inline void VolumeRender<IntersectorT, SampleT>::
+setIntersector(const IntersectorT& inter)
+{
+    mPrimary.reset(new IntersectorT(inter));
+    mShadow.reset( new IntersectorT(inter));
+}
+
+template<typename IntersectorT, typename SampleT>
+inline void VolumeRender<IntersectorT, SampleT>::
+render(bool threaded) const
+{
+    tbb::blocked_range<size_t> range(0, mCamera->height());
+    threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+}
+
+template<typename IntersectorT, typename SampleT>
+inline void VolumeRender<IntersectorT, SampleT>::
+operator()(const tbb::blocked_range<size_t>& range) const
+{
+    SamplerType sampler(mAccessor, mShadow->grid().transform());//light-weight wrapper
+        
+    // Any variable prefixed with p (or s) means it's associate with a primay (or shadow) ray
+    const Vec3R extinction = -mScattering-mAbsorption, One(1.0);
+    const Vec3R lightAmp = mLightColor*mScattering/(mScattering+mAbsorption);
+    const Real sGain = mLightGain;//in-scattering along shadow ray 
+    const Real pStep = mPrimaryStep;//Integration step along primary ray in voxel units
+    const Real sStep = mShadowStep;//Integration step along shadow ray in voxel units
+    const Real cutoff = mCutOff;//Cutoff for density and transmittance
+    
+    RayType sRay(Vec3R(0), mLightDir);//Shadow ray
+    for (size_t j=range.begin(), je = range.end(); j<je; ++j) {
+        for (size_t i=0, ie = mCamera->width(); i<ie; ++i) {
+            Film::RGBA& bg = mCamera->pixel(i, j);
+            bg.a = bg.r = bg.g = bg.b = 0;
+            RayType pRay = mCamera->getRay(i, j);// Primary ray
+            if( !mPrimary->setWorldRay(pRay)) continue;
+            Vec3R pTrans(1.0), pLumi(0.0);
+            Real pT0, pT1;
+            while (mPrimary->march(pT0, pT1)) {
+                for (Real pT = pStep*ceil(pT0/pStep); pT <= pT1; pT += pStep) {
+                    Vec3R pPos = mPrimary->getWorldPos(pT);
+                    const Real density = sampler.wsSample(pPos);
+                    if (density < cutoff) continue;
+                    const Vec3R dT = math::Exp(extinction * density * pStep);
+                    Vec3R sTrans(1.0);
+                    sRay.setEye(pPos);
+                    if( !mShadow->setWorldRay(sRay)) continue;
+                    Real sT0, sT1;
+                    while (mShadow->march(sT0, sT1)) {
+                        for (Real sT = sStep*ceil(sT0/sStep); sT <= sT1; sT+= sStep) {
+                            const Real d = sampler.wsSample(mShadow->getWorldPos(sT));
+                            if (d < cutoff) continue;
+                            sTrans *= math::Exp(extinction * d * sStep/(1.0+sT*sGain));
+                            if (sTrans.lengthSqr()<cutoff) goto Luminance;//Terminate sRay 
+                        }//Integration over shadow segment
+                    }// Shadow ray march
+                Luminance:
+                    pLumi += lightAmp * sTrans * pTrans * (One-dT);
+                    pTrans *= dT;
+                    if (pTrans.lengthSqr()<cutoff) goto Pixel;  // Terminate Ray
+                }//Integration over primary segment
+            }// Primary ray march
+        Pixel:
+            bg.r = pLumi[0];
+            bg.g = pLumi[1];
+            bg.b = pLumi[2];
+            bg.a = 1.0f - pTrans.sum()/3.0f;
+        }//Horizontal pixel scan    
+    }//Vertical pixel scan
 }
 
 } // namespace tools

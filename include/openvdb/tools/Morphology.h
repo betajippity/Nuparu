@@ -39,6 +39,7 @@
 #include <openvdb/tree/TreeIterator.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
+#include "ValueTransformer.h" // for foreach()
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -352,32 +353,40 @@ template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
 dilateVoxels(tree::LeafManager<TreeType>& manager, int count)
 {
-    Morphology<TreeType> m(&manager);
-    m.dilateVoxels(count);
+    if (count > 0 ) { 
+        Morphology<TreeType> m(&manager);
+        m.dilateVoxels(count);
+    }
 }
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
 dilateVoxels(TreeType& tree, int count)
 {
-    Morphology<TreeType> m(tree);
-    m.dilateVoxels(count);
+    if (count > 0 ) { 
+        Morphology<TreeType> m(tree);
+        m.dilateVoxels(count);
+    }
 }
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
 erodeVoxels(tree::LeafManager<TreeType>& manager, int count)
 {
-    Morphology<TreeType> m(&manager);
-    m.erodeVoxels(count);
+    if (count > 0 ) { 
+        Morphology<TreeType> m(&manager);
+        m.erodeVoxels(count);
+    }
 }
 
 template<typename TreeType>
 OPENVDB_STATIC_SPECIALIZATION inline void
 erodeVoxels(TreeType& tree, int count)
 {
-    Morphology<TreeType> m(tree);
-    m.erodeVoxels(count);
+    if (count > 0 ) { 
+        Morphology<TreeType> m(tree);
+        m.erodeVoxels(count);
+    }
 }
 
 

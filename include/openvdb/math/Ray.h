@@ -78,12 +78,20 @@ public:
 
     inline void setMaxTime(RealT t1) { assert(t1>0); mT1 = t1; }
 
-    inline void setTimes(RealT t0, RealT t1) { assert(t0>0 && t1>0);mT0 = t0; mT1 = t1; }
+    inline void setTimes(RealT t0 = math::Delta<RealT>::value(),
+                         RealT t1 = std::numeric_limits<RealT>::max())
+    {
+        assert(t0>0 && t1>0);
+        mT0 = t0;
+        mT1 = t1;
+    }
 
     inline void scaleTimes(RealT scale) {  assert(scale>0); mT0 *= scale; mT1 *= scale; }
     
-    inline void reset(const Vec3Type& eye, const Vec3Type& direction,
-                      RealT t0 = 0, RealT t1 = std::numeric_limits<RealT>::max())
+    inline void reset(const Vec3Type& eye,
+                      const Vec3Type& direction,
+                      RealT t0 = math::Delta<RealT>::value(),
+                      RealT t1 = std::numeric_limits<RealT>::max())
     {
         this->setEye(eye);
         this->setDir(direction);
@@ -381,6 +389,9 @@ public:
     /// depending on the constructor used.
     /// @note Incurs no computational overhead.
     inline RealType time() const { return mT0; }
+
+    /// @brief Return the maximum time (parameterized along the Ray).
+    inline RealType maxTime() const { return mT1; }
 
     /// @brief Return the time (parameterized along the Ray) of the
     /// second (i.e. next) hit of a tree node of size 2^Log2Dim.
