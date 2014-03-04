@@ -15,5 +15,6 @@ Nuparu currently consists of:
 * [OpenVDB](http://www.openvdb.org/) 2.1.0 (OSX)
 * [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX)
 * [RMSD](http://boscoh.com/code/), with minor modifications for C++ (OSX/Linux/Win)
+* [OpenEXR](http://www.openexr.com) 2.1.0 (OSX)
 
 Note: OpenVDB's dependencies are dynamically linked, so OpenVDB requires [Ilmbase/OpenEXR](http://www.openexr.com/) and [Intel TBB](https://www.threadingbuildingblocks.org/) to be installed.
