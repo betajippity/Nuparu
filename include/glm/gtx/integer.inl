@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// OpenGL Mathematics Copyright (c) 2005 - 2014 G-Truc Creation (www.g-truc.net)
+// OpenGL Mathematics Copyright (c) 2005 - 2013 G-Truc Creation (www.g-truc.net)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Created : 2005-12-24
 // Updated : 2011-10-13
@@ -38,7 +38,7 @@ namespace glm
 	}
 
 // Henry Gordon Dietz: http://aggregate.org/MAGIC/
-namespace detail
+namespace _detail
 {
 	GLM_FUNC_QUALIFIER unsigned int ones32(unsigned int x)
 	{
@@ -55,18 +55,19 @@ namespace detail
 	}
 
 	template <>
-	struct compute_log2<false>
+	struct _compute_log2<detail::float_or_int_value::GLM_INT>
 	{
 		template <typename T>
 		GLM_FUNC_QUALIFIER T operator() (T const & Value) const
 		{
 #if(GLM_COMPILER & (GLM_COMPILER_VC | GLM_COMPILER_GCC))
-			return Value <= static_cast<T>(1) ? T(0) : T(32) - nlz(Value - T(1));
+			return Value <= T(1) ? T(0) : T(32) - nlz(Value - T(1));
 #else
 			return T(32) - nlz(Value - T(1));
 #endif
 		}
 	};
+
 }//namespace _detail
 
 	// Henry Gordon Dietz: http://aggregate.org/MAGIC/
@@ -99,30 +100,30 @@ namespace detail
 		return Result;
 	}
 
-	template <typename T, precision P>
-	GLM_FUNC_QUALIFIER detail::tvec2<T, P> factorial(
-		detail::tvec2<T, P> const & x)
+	template <typename valType>
+	GLM_FUNC_QUALIFIER detail::tvec2<valType> factorial(
+		detail::tvec2<valType> const & x)
 	{
-		return detail::tvec2<T, P>(
+		return detail::tvec2<valType>(
 			factorial(x.x),
 			factorial(x.y));
 	}
 
-	template <typename T, precision P>
-	GLM_FUNC_QUALIFIER detail::tvec3<T, P> factorial(
-		detail::tvec3<T, P> const & x)
+	template <typename valType>
+	GLM_FUNC_QUALIFIER detail::tvec3<valType> factorial(
+		detail::tvec3<valType> const & x)
 	{
-		return detail::tvec3<T, P>(
+		return detail::tvec3<valType>(
 			factorial(x.x),
 			factorial(x.y),
 			factorial(x.z));
 	}
 
-	template <typename T, precision P>
-	GLM_FUNC_QUALIFIER detail::tvec4<T, P> factorial(
-		detail::tvec4<T, P> const & x)
+	template <typename valType>
+	GLM_FUNC_QUALIFIER detail::tvec4<valType> factorial(
+		detail::tvec4<valType> const & x)
 	{
-		return detail::tvec4<T, P>(
+		return detail::tvec4<valType>(
 			factorial(x.x),
 			factorial(x.y),
 			factorial(x.z),
@@ -170,31 +171,31 @@ namespace detail
 	// Hackers Delight: http://www.hackersdelight.org/HDcode/nlz.c.txt
 	GLM_FUNC_QUALIFIER unsigned int nlz(unsigned int x) 
 	{
-		int y, m, n;
+	   int y, m, n;
 
-		y = -int(x >> 16);      // If left half of x is 0,
-		m = (y >> 16) & 16;  // set n = 16.  If left half
-		n = 16 - m;          // is nonzero, set n = 0 and
-		x = x >> m;          // shift x right 16.
+	   y = -int(x >> 16);      // If left half of x is 0,
+	   m = (y >> 16) & 16;  // set n = 16.  If left half
+	   n = 16 - m;          // is nonzero, set n = 0 and
+	   x = x >> m;          // shift x right 16.
 							// Now x is of the form 0000xxxx.
-		y = x - 0x100;       // If positions 8-15 are 0,
-		m = (y >> 16) & 8;   // add 8 to n and shift x left 8.
-		n = n + m;
-		x = x << m;
+	   y = x - 0x100;       // If positions 8-15 are 0,
+	   m = (y >> 16) & 8;   // add 8 to n and shift x left 8.
+	   n = n + m;
+	   x = x << m;
 
-		y = x - 0x1000;      // If positions 12-15 are 0,
-		m = (y >> 16) & 4;   // add 4 to n and shift x left 4.
-		n = n + m;
-		x = x << m;
+	   y = x - 0x1000;      // If positions 12-15 are 0,
+	   m = (y >> 16) & 4;   // add 4 to n and shift x left 4.
+	   n = n + m;
+	   x = x << m;
 
-		y = x - 0x4000;      // If positions 14-15 are 0,
-		m = (y >> 16) & 2;   // add 2 to n and shift x left 2.
-		n = n + m;
-		x = x << m;
+	   y = x - 0x4000;      // If positions 14-15 are 0,
+	   m = (y >> 16) & 2;   // add 2 to n and shift x left 2.
+	   n = n + m;
+	   x = x << m;
 
-		y = x >> 14;         // Set y = 0, 1, 2, or 3.
-		m = y & ~(y >> 1);   // Set m = 0, 1, 2, or 2 resp.
-		return unsigned(n + 2 - m);
+	   y = x >> 14;         // Set y = 0, 1, 2, or 3.
+	   m = y & ~(y >> 1);   // Set m = 0, 1, 2, or 2 resp.
+	   return unsigned(n + 2 - m);
 	}
 
 #endif//(GLM_COMPILER)

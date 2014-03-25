@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////////
 /// OpenGL Mathematics (glm.g-truc.net)
 ///
-/// Copyright (c) 2005 - 2014 G-Truc Creation (www.g-truc.net)
+/// Copyright (c) 2005 - 2013 G-Truc Creation (www.g-truc.net)
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
 /// in the Software without restriction, including without limitation the rights
@@ -26,9 +26,6 @@
 /// @author Christophe Riccio
 ///////////////////////////////////////////////////////////////////////////////////
 
-#include "../trigonometric.hpp"
-#include <limits>
-
 namespace glm
 {
 	// sec
@@ -38,7 +35,7 @@ namespace glm
 		genType const & angle
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'sec' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'sec' only accept floating-point values");
 
 		return genType(1) / glm::cos(angle);
 	}
@@ -52,7 +49,7 @@ namespace glm
 		genType const & angle
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'csc' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'csc' only accept floating-point values");
 
 		return genType(1) / glm::sin(angle);
 	}
@@ -66,7 +63,7 @@ namespace glm
 		genType const & angle
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'cot' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'cot' only accept floating-point values");
 
 		return genType(1) / glm::tan(angle);
 	}
@@ -80,7 +77,7 @@ namespace glm
 		genType const & x
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'asec' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'asec' only accept floating-point values");
 	
 		return acos(genType(1) / x);
 	}
@@ -94,7 +91,7 @@ namespace glm
 		genType const & x
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'acsc' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'acsc' only accept floating-point values");
 
 		return asin(genType(1) / x);
 	}
@@ -108,7 +105,7 @@ namespace glm
 		genType const & x
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'acot' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'acot' only accept floating-point values");
 
 		genType const pi_over_2 = genType(3.1415926535897932384626433832795 / 2.0);
 		return pi_over_2 - atan(x);
@@ -123,7 +120,7 @@ namespace glm
 		genType const & angle
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'sech' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'sech' only accept floating-point values");
 
 		return genType(1) / glm::cosh(angle);
 	}
@@ -137,7 +134,7 @@ namespace glm
 		genType const & angle
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'csch' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'csch' only accept floating-point values");
 
 		return genType(1) / glm::sinh(angle);
 	}
@@ -151,7 +148,7 @@ namespace glm
 		genType const & angle
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'coth' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'coth' only accept floating-point values");
 
 		return glm::cosh(angle) / glm::sinh(angle);
 	}
@@ -165,7 +162,7 @@ namespace glm
 		genType const & x
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'asech' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'asech' only accept floating-point values");
 
 		return acosh(genType(1) / x);
 	}
@@ -179,7 +176,7 @@ namespace glm
 		genType const & x
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'acsch' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'acsch' only accept floating-point values");
 
 		return asinh(genType(1) / x);
 	}
@@ -193,7 +190,7 @@ namespace glm
 		genType const & x
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'acoth' only accept floating-point values");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'acoth' only accept floating-point values");
 
 		return atanh(genType(1) / x);
 	}

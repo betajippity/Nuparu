@@ -22,7 +22,7 @@
 ///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef GLM_GTX_constants
-#define GLM_GTX_constants
+#define GLM_GTX_constants GLM_VERSION
 
 #include "../gtc/constants.hpp"
 

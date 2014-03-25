@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////////
 /// OpenGL Mathematics (glm.g-truc.net)
 ///
-/// Copyright (c) 2005 - 2014 G-Truc Creation (www.g-truc.net)
+/// Copyright (c) 2005 - 2013 G-Truc Creation (www.g-truc.net)
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
 /// in the Software without restriction, including without limitation the rights
@@ -31,15 +31,13 @@ namespace glm
 	template <typename genType>
 	GLM_FUNC_QUALIFIER genType row
 	(
-		genType const & m,
-		length_t const & index,
+		genType const & m, 
+		int index, 
 		typename genType::row_type const & x
 	)
 	{
-		assert(index >= 0 && index < m[0].length());
-
 		genType Result = m;
-		for(length_t i = 0; i < m.length(); ++i)
+		for(typename genType::size_type i = 0; i < genType::row_size(); ++i)
 			Result[i][index] = x[i];
 		return Result;
 	}
@@ -47,14 +45,12 @@ namespace glm
 	template <typename genType>
 	GLM_FUNC_QUALIFIER typename genType::row_type row
 	(
-		genType const & m,
-		length_t const & index
+		genType const & m, 
+		int index
 	)
 	{
-		assert(index >= 0 && index < m[0].length());
-
 		typename genType::row_type Result;
-		for(length_t i = 0; i < m.length(); ++i)
+		for(typename genType::size_type i = 0; i < genType::row_size(); ++i)
 			Result[i] = m[i][index];
 		return Result;
 	}
@@ -62,13 +58,11 @@ namespace glm
 	template <typename genType>
 	GLM_FUNC_QUALIFIER genType column
 	(
-		genType const & m,
-		length_t const & index,
+		genType const & m, 
+		int index, 
 		typename genType::col_type const & x
 	)
 	{
-		assert(index >= 0 && index < m.length());
-
 		genType Result = m;
 		Result[index] = x;
 		return Result;
@@ -77,12 +71,10 @@ namespace glm
 	template <typename genType>
 	GLM_FUNC_QUALIFIER typename genType::col_type column
 	(
-		genType const & m,
-		length_t const & index
+		genType const & m, 
+		int index
 	)
 	{
-		assert(index >= 0 && index < m.length());
-
 		return m[index];
 	}
 }//namespace glm

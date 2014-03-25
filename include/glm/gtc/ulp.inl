@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////////
 /// OpenGL Mathematics (glm.g-truc.net)
 ///
-/// Copyright (c) 2005 - 2014 G-Truc Creation (www.g-truc.net)
+/// Copyright (c) 2005 - 2013 G-Truc Creation (www.g-truc.net)
 /// Permission is hereby granted, free of charge, to any person obtaining a copy
 /// of this software and associated documentation files (the "Software"), to deal
 /// in the Software without restriction, including without limitation the rights
@@ -33,10 +33,8 @@
 /// is preserved.
 ///////////////////////////////////////////////////////////////////////////////////
 
-#include "../detail/type_int.hpp"
 #include <cmath>
 #include <cfloat>
-#include <limits>
 
 #if(GLM_COMPILER & GLM_COMPILER_VC)
 #	pragma warning(push)
@@ -60,34 +58,34 @@ typedef union
 	} parts;
 } ieee_double_shape_type;
 
-#define GLM_EXTRACT_WORDS(ix0,ix1,d)		\
-	do {									\
-		ieee_double_shape_type ew_u;		\
-		ew_u.value = (d);					\
-		(ix0) = ew_u.parts.msw;				\
-		(ix1) = ew_u.parts.lsw;				\
+#define GLM_EXTRACT_WORDS(ix0,ix1,d)                                \
+	do {                                                            \
+	  ieee_double_shape_type ew_u;                                  \
+	  ew_u.value = (d);                                             \
+	  (ix0) = ew_u.parts.msw;                                       \
+	  (ix1) = ew_u.parts.lsw;                                       \
 	} while (0)
 
-#define GLM_GET_FLOAT_WORD(i,d)				\
-	do {									\
-		ieee_float_shape_type gf_u;			\
-		gf_u.value = (d);					\
-		(i) = gf_u.word;					\
+#define GLM_GET_FLOAT_WORD(i,d)                                     \
+	do {                                                            \
+	  ieee_float_shape_type gf_u;                                   \
+	  gf_u.value = (d);                                             \
+	  (i) = gf_u.word;                                              \
 	} while (0)
 
-#define GLM_SET_FLOAT_WORD(d,i)				\
-	do {									\
-		ieee_float_shape_type sf_u;			\
-		sf_u.word = (i);					\
-		(d) = sf_u.value;					\
+#define GLM_SET_FLOAT_WORD(d,i)                                     \
+	do {                                                            \
+	  ieee_float_shape_type sf_u;                                   \
+	  sf_u.word = (i);                                              \
+	  (d) = sf_u.value;                                             \
 	} while (0)
 
-#define GLM_INSERT_WORDS(d,ix0,ix1)			\
-	do {									\
-		ieee_double_shape_type iw_u;		\
-		iw_u.parts.msw = (ix0);				\
-		iw_u.parts.lsw = (ix1);				\
-		(d) = iw_u.value;					\
+#define GLM_INSERT_WORDS(d,ix0,ix1)                                 \
+	do {                                                            \
+	  ieee_double_shape_type iw_u;                                  \
+	  iw_u.parts.msw = (ix0);                                       \
+	  iw_u.parts.lsw = (ix1);                                       \
+	  (d) = iw_u.value;                                             \
 	} while (0)
 
 namespace glm{
@@ -100,28 +98,28 @@ namespace detail
 
 		GLM_GET_FLOAT_WORD(hx, x);
 		GLM_GET_FLOAT_WORD(hy, y);
-		ix = hx&0x7fffffff;		// |x|
-		iy = hy&0x7fffffff;		// |y|
+		ix = hx&0x7fffffff;             // |x|
+		iy = hy&0x7fffffff;             // |y|
 
-		if((ix>0x7f800000) ||	// x is nan 
-			(iy>0x7f800000))	// y is nan 
+		if((ix>0x7f800000) ||   // x is nan 
+			(iy>0x7f800000))     // y is nan 
 			return x+y;
-		if(x==y) return y;		// x=y, return y
-		if(ix==0) {				// x == 0
+		if(x==y) return y;              // x=y, return y
+		if(ix==0) {                             // x == 0
 			GLM_SET_FLOAT_WORD(x,(hy&0x80000000)|1);// return +-minsubnormal
 			t = x*x;
-			if(t==x) return t; else return x;	// raise underflow flag
+			if(t==x) return t; else return x;   // raise underflow flag
 		}
-		if(hx>=0) {				// x > 0 
-			if(hx>hy) {			// x > y, x -= ulp
+		if(hx>=0) {                             // x > 0 
+			if(hx>hy) {                         // x > y, x -= ulp
 				hx -= 1;
-			} else {			// x < y, x += ulp
+			} else {                            // x < y, x += ulp
 				hx += 1;
 			}
-		} else {				// x < 0
-			if(hy>=0||hx>hy){	// x < y, x -= ulp
+		} else {                                // x < 0
+			if(hy>=0||hx>hy){                   // x < y, x -= ulp
 				hx -= 1;
-			} else {			// x > y, x += ulp
+			} else {                            // x > y, x += ulp
 				hx += 1;
 			}
 		}
@@ -214,11 +212,11 @@ namespace glm
 		return GLM_NEXT_AFTER_DBL(x, std::numeric_limits<double>::max());
 	}
 
-	template<typename T, precision P, template<typename, precision> class vecType>
-	GLM_FUNC_QUALIFIER vecType<T, P> next_float(vecType<T, P> const & x)
+	template<typename T, template<typename> class vecType>
+	GLM_FUNC_QUALIFIER vecType<T> next_float(vecType<T> const & x)
 	{
-		vecType<T, P> Result;
-		for(length_t i = 0; i < Result.length(); ++i)
+		vecType<T> Result;
+		for(std::size_t i = 0; i < Result.length(); ++i)
 			Result[i] = next_float(x[i]);
 		return Result;
 	}
@@ -233,11 +231,11 @@ namespace glm
 		return GLM_NEXT_AFTER_DBL(x, std::numeric_limits<double>::min());
 	}
 
-	template<typename T, precision P, template<typename, precision> class vecType>
-	GLM_FUNC_QUALIFIER vecType<T, P> prev_float(vecType<T, P> const & x)
+	template<typename T, template<typename> class vecType>
+	GLM_FUNC_QUALIFIER vecType<T> prev_float(vecType<T> const & x)
 	{
-		vecType<T, P> Result;
-		for(length_t i = 0; i < Result.length(); ++i)
+		vecType<T> Result;
+		for(std::size_t i = 0; i < Result.length(); ++i)
 			Result[i] = prev_float(x[i]);
 		return Result;
 	}
@@ -246,16 +244,16 @@ namespace glm
 	GLM_FUNC_QUALIFIER T next_float(T const & x, uint const & ulps)
 	{
 		T temp = x;
-		for(uint i = 0; i < ulps; ++i)
+		for(std::size_t i = 0; i < ulps; ++i)
 			temp = next_float(temp);
 		return temp;
 	}
 
-	template<typename T, precision P, template<typename, precision> class vecType>
-	GLM_FUNC_QUALIFIER vecType<T, P> next_float(vecType<T, P> const & x, vecType<uint, P> const & ulps)
+	template<typename T, template<typename> class vecType>
+	GLM_FUNC_QUALIFIER vecType<T> next_float(vecType<T> const & x, vecType<uint> const & ulps)
 	{
-		vecType<T, P> Result;
-		for(uint i = 0; i < Result.length(); ++i)
+		vecType<T> Result;
+		for(std::size_t i = 0; i < Result.length(); ++i)
 			Result[i] = next_float(x[i], ulps[i]);
 		return Result;
 	}
@@ -264,16 +262,16 @@ namespace glm
 	GLM_FUNC_QUALIFIER T prev_float(T const & x, uint const & ulps)
 	{
 		T temp = x;
-		for(uint i = 0; i < ulps; ++i)
+		for(std::size_t i = 0; i < ulps; ++i)
 			temp = prev_float(temp);
 		return temp;
 	}
 
-	template<typename T, precision P, template<typename, precision> class vecType>
-	GLM_FUNC_QUALIFIER vecType<T, P> prev_float(vecType<T, P> const & x, vecType<uint, P> const & ulps)
+	template<typename T, template<typename> class vecType>
+	GLM_FUNC_QUALIFIER vecType<T> prev_float(vecType<T> const & x, vecType<uint> const & ulps)
 	{
-		vecType<T, P> Result;
-		for(length_t i = 0; i < Result.length(); ++i)
+		vecType<T> Result;
+		for(std::size_t i = 0; i < Result.length(); ++i)
 			Result[i] = prev_float(x[i], ulps[i]);
 		return Result;
 	}
@@ -286,7 +284,7 @@ namespace glm
 		if(x < y)
 		{
 			T temp = x;
-			while(temp != y)// && ulp < std::numeric_limits<std::size_t>::max())
+			while(temp != y && ulp < std::numeric_limits<std::size_t>::max())
 			{
 				++ulp;
 				temp = next_float(temp);
@@ -295,7 +293,7 @@ namespace glm
 		else if(y < x)
 		{
 			T temp = y;
-			while(temp != x)// && ulp < std::numeric_limits<std::size_t>::max())
+			while(temp != x && ulp < std::numeric_limits<std::size_t>::max())
 			{
 				++ulp;
 				temp = next_float(temp);
@@ -309,11 +307,11 @@ namespace glm
 		return ulp;
 	}
 
-	template<typename T, precision P, template<typename, precision> class vecType>
-	GLM_FUNC_QUALIFIER vecType<uint, P> float_distance(vecType<T, P> const & x, vecType<T, P> const & y)
+	template<typename T, template<typename> class vecType>
+	GLM_FUNC_QUALIFIER vecType<uint> float_distance(vecType<T> const & x, vecType<T> const & y)
 	{
-		vecType<uint, P> Result;
-		for(length_t i = 0; i < Result.length(); ++i)
+		vecType<uint> Result;
+		for(std::size_t i = 0; i < Result.length(); ++i)
 			Result[i] = float_distance(x[i], y[i]);
 		return Result;
 	}

@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-// OpenGL Mathematics Copyright (c) 2005 - 2014 G-Truc Creation (www.g-truc.net)
+// OpenGL Mathematics Copyright (c) 2005 - 2013 G-Truc Creation (www.g-truc.net)
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Created : 2006-01-04
 // Updated : 2011-10-14
@@ -16,7 +16,7 @@ namespace glm
 		genType const & x
 	)
 	{
-		GLM_STATIC_ASSERT(std::numeric_limits<genType>::is_iec559, "'fastSqrt' only accept floating-point input");
+		GLM_STATIC_ASSERT(detail::type<genType>::is_float, "'fastSqrt' only accept floating-point input");
 
 		return genType(1) / fastInverseSqrt(x);
 	}
@@ -24,25 +24,21 @@ namespace glm
 	VECTORIZE_VEC(fastSqrt)
 
 	// fastInversesqrt
-	template <>
-	GLM_FUNC_QUALIFIER float fastInverseSqrt<float>(float const & x)
-	{
-		return detail::compute_inversesqrt<detail::tvec1, float, lowp>::call(detail::tvec1<float, lowp>(x)).x;
-	}
-
-	template <>
-	GLM_FUNC_QUALIFIER double fastInverseSqrt<double>(double const & x)
-	{
-		return detail::compute_inversesqrt<detail::tvec1, double, lowp>::call(detail::tvec1<double, lowp>(x)).x;
-	}
-
-	template <template <class, precision> class vecType, typename T, precision P>
-	GLM_FUNC_QUALIFIER vecType<T, P> fastInverseSqrt
+	template <typename genType>
+	GLM_FUNC_QUALIFIER genType fastInverseSqrt
 	(
-		vecType<T, P> const & x
+		genType const & x
 	)
 	{
-		return detail::compute_inversesqrt<vecType, T, P>::call(x);
+		genType tmp = x;
+		float xhalf = 0.5f * float(tmp);
+		uint i = *(uint*)&x;
+		i = 0x5f375a86 - (i >> 1);
+		//x = *(float*)&i;
+		//x = *((float*)(char*)&i);
+		tmp = detail::uif(i).f;
+		tmp = tmp * (1.5f - xhalf * tmp * tmp);
+		return genType(tmp);
 	}
 
 	VECTORIZE_VEC(fastInverseSqrt)
@@ -57,30 +53,30 @@ namespace glm
 		return abs(x);
 	}
 
-	template <typename valType, precision P>
+	template <typename valType>
 	GLM_FUNC_QUALIFIER valType fastLength
 	(
-		detail::tvec2<valType, P> const & x
+		detail::tvec2<valType> const & x
 	)
 	{
 		valType sqr = x.x * x.x + x.y * x.y;
 		return fastSqrt(sqr);
 	}
 
-	template <typename valType, precision P>
+	template <typename valType>
 	GLM_FUNC_QUALIFIER valType fastLength
 	(
-		detail::tvec3<valType, P> const & x
+		detail::tvec3<valType> const & x
 	)
 	{
 		valType sqr = x.x * x.x + x.y * x.y + x.z * x.z;
 		return fastSqrt(sqr);
 	}
 
-	template <typename valType, precision P>
+	template <typename valType>
 	GLM_FUNC_QUALIFIER valType fastLength
 	(
-		detail::tvec4<valType, P> const & x
+		detail::tvec4<valType> const & x
 	)
 	{
 		valType sqr = x.x * x.x + x.y * x.y + x.z * x.z + x.w * x.w;
@@ -108,30 +104,30 @@ namespace glm
 		return x > genType(0) ? genType(1) : -genType(1);
 	}
 
-	template <typename valType, precision P>
-	GLM_FUNC_QUALIFIER detail::tvec2<valType, P> fastNormalize
+	template <typename valType>
+	GLM_FUNC_QUALIFIER detail::tvec2<valType> fastNormalize
 	(
-		detail::tvec2<valType, P> const & x
+		detail::tvec2<valType> const & x
 	)
 	{
 		valType sqr = x.x * x.x + x.y * x.y;
 		return x * fastInverseSqrt(sqr);
 	}
 
-	template <typename valType, precision P>
-	GLM_FUNC_QUALIFIER detail::tvec3<valType, P> fastNormalize
+	template <typename valType>
+	GLM_FUNC_QUALIFIER detail::tvec3<valType> fastNormalize
 	(
-		detail::tvec3<valType, P> const & x
+		detail::tvec3<valType> const & x
 	)
 	{
 		valType sqr = x.x * x.x + x.y * x.y + x.z * x.z;
 		return x * fastInverseSqrt(sqr);
 	}
 
-	template <typename valType, precision P>
-	GLM_FUNC_QUALIFIER detail::tvec4<valType, P> fastNormalize
+	template <typename valType>
+	GLM_FUNC_QUALIFIER detail::tvec4<valType> fastNormalize
 	(
-		detail::tvec4<valType, P> const & x
+		detail::tvec4<valType> const & x
 	)
 	{
 		valType sqr = x.x * x.x + x.y * x.y + x.z * x.z + x.w * x.w;
