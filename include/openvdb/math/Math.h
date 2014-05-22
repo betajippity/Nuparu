@@ -128,15 +128,6 @@ template<> struct Delta<double>   { static double value() { return 1e-9; } };
 
 // ==========> Random Values <==================
 
-/// Initialize the random number generator.
-/// @deprecated Use math::Random01 or Boost.Random instead.
-OPENVDB_DEPRECATED inline void randSeed(unsigned int seed) { srand(seed); }
-
-/// Return a random number in the interval [0,1]
-/// @deprecated Use math::Random01 or Boost.Random instead.
-OPENVDB_DEPRECATED inline double randUniform() { return (double)(rand() / (RAND_MAX + 1.0)); }
-
-
 /// @brief Simple generator of random numbers over the range [0, 1)
 /// @details Thread-safe as long as each thread has its own Rand01 instance
 template<typename FloatType = double, typename EngineType = boost::mt19937>
@@ -256,12 +247,12 @@ inline int64_t Abs(int64_t i)
 #ifdef _MSC_VER
     return (i < int64_t(0) ? -i : i);
 #else
-    return abs(i);
+    return labs(i);
 #endif
 }
 inline float Abs(float x) { return fabs(x); }
 inline double Abs(double x) { return fabs(x); }
-inline long double Abs(long double x) { return fabs(x); }
+inline long double Abs(long double x) { return fabsl(x); }
 inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
 // On OSX size_t and uint64_t are different types
@@ -622,13 +613,15 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 }
 
 
-////////////////////////////////////////
 // ============> Exp <==================
 
+/// Return @f$ e^x @f$.
 template<typename Type>
 inline Type Exp(const Type& x) { return std::exp(x); }
-    
+
+
 ////////////////////////////////////////
+
 
 /// Return the sign of the given value as an integer (either -1, 0 or 1).
 template <typename Type>

@@ -53,6 +53,9 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
+template<typename, Index, typename> struct SameInternalConfig; // forward declaration
+
+
 template<typename _ChildNodeType, Index Log2Dim>
 class InternalNode
 {
@@ -80,6 +83,15 @@ public:
             OtherValueType>::Type, Log2Dim> Type;
     };
 
+    /// @brief SameConfiguration<OtherNodeType>::value is @c true if and only if OtherNodeType
+    /// is the type of an InternalNode with the same dimensions as this node and whose
+    /// ChildNodeType has the same configuration as this node's ChildNodeType.
+    template<typename OtherNodeType>
+    struct SameConfiguration {
+        static const bool value =
+            SameInternalConfig<ChildNodeType, Log2Dim, OtherNodeType>::value;
+    };
+
 
     InternalNode() {}
 
@@ -90,6 +102,10 @@ public:
     /// Deep copy constructor
     InternalNode(const InternalNode&);
 
+    /// Value conversion copy constructor
+    template<typename OtherChildNodeType>
+    explicit InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other);
+
     /// Topology copy constructor
     template<typename OtherChildNodeType>
     InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
@@ -98,8 +114,7 @@ public:
     /// Topology copy constructor
     template<typename OtherChildNodeType>
     InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
-                 const ValueType& offValue, const ValueType& onValue,
-                 TopologyCopy);
+                 const ValueType& offValue, const ValueType& onValue, TopologyCopy);
 
     virtual ~InternalNode();
 
@@ -123,7 +138,11 @@ protected:
         ChildIter(const MaskIterT& iter, NodeT* parent): SparseIteratorBase<
             MaskIterT, ChildIter<NodeT, ChildT, MaskIterT, TagT>, NodeT, ChildT>(iter, parent) {}
 
-        ChildT& getItem(Index pos) const { return *(this->parent().getChildNode(pos)); }
+        ChildT& getItem(Index pos) const
+        {
+            assert(this->parent().isChildMaskOn(pos));
+            return *(this->parent().getChildNode(pos));
+        }
 
         // Note: setItem() can't be called on const iterators.
         void setItem(Index pos, const ChildT& c) const { this->parent().resetChildNode(pos, &c); }
@@ -165,9 +184,13 @@ protected:
 
         bool getItem(Index pos, ChildT*& child, NonConstValueT& value) const
         {
-            child = this->parent().getChildNode(pos);
-            if (!child) value = this->parent().mNodes[pos].getValue();
-            return (child != NULL);
+            if (this->parent().isChildMaskOn(pos)) {
+                child = this->parent().getChildNode(pos);
+                return true;
+            }
+            child = NULL;
+            value = this->parent().mNodes[pos].getValue();
+            return false;
         }
 
         // Note: setItem() can't be called on const iterators.
@@ -235,9 +258,6 @@ public:
 
     /// Return the grid index coordinates of this node's local origin.
     const Coord& origin() const { return mOrigin; }
-    /// @brief Return the grid index coordinates of this node's local origin.
-    /// @deprecated Use origin() instead.
-    OPENVDB_DEPRECATED Coord getOrigin() const { return mOrigin; }
     /// Set the grid index coordinates of this node's local origin.
     void setOrigin(const Coord& origin) { mOrigin = origin; }
 
@@ -257,7 +277,6 @@ public:
     /// If visitVoxels is false LeafNodes will be approximated as dense, i.e. with all
     /// voxels active. Else the individual active voxels are visited to produce a tight bbox.
     void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
-    OPENVDB_DEPRECATED void evalActiveVoxelBoundingBox(CoordBBox& bbox) const;
 
     /// @brief Return the bounding box of this node, i.e., the full index space
     /// spanned by the node regardless of its content.
@@ -502,12 +521,12 @@ public:
     template<typename CombineOp>
     void combine(const ValueType& value, bool valueIsActive, CombineOp&);
 
-    template<typename CombineOp>
-    void combine2(const InternalNode& other0, const InternalNode& other1, CombineOp&);
-    template<typename CombineOp>
-    void combine2(const ValueType& value, const InternalNode& other, bool valIsActive, CombineOp&);
-    template<typename CombineOp>
-    void combine2(const InternalNode& other, const ValueType& val, bool valIsActive, CombineOp&);
+    template<typename CombineOp, typename OtherNodeType /*= InternalNode*/>
+    void combine2(const InternalNode& other0, const OtherNodeType& other1, CombineOp&);
+    template<typename CombineOp, typename OtherNodeType /*= InternalNode*/>
+    void combine2(const ValueType& value, const OtherNodeType& other, bool valIsActive, CombineOp&);
+    template<typename CombineOp, typename OtherValueType>
+    void combine2(const InternalNode& other, const OtherValueType&, bool valIsActive, CombineOp&);
 
     /// @brief Calls the templated functor BBoxOp with bounding box
     /// information for all active tiles and leaf nodes in this node.
@@ -683,8 +702,13 @@ protected:
         typename ChildAllIterT, typename OtherChildAllIterT>
     static inline void doVisit2(NodeT&, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
 
+    ///@{
+    /// @brief Returns a pointer to the child node at the linear offset n. 
+    /// @warning This protected method assumes that a child node exists at
+    /// the specified linear offset!
     ChildNodeType* getChildNode(Index n);
     const ChildNodeType* getChildNode(Index n) const;
+    ///@}
 
 
     UnionType mNodes[NUM_VALUES];
@@ -692,6 +716,24 @@ protected:
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
 }; // class InternalNode
+
+
+////////////////////////////////////////
+
+
+//@{
+/// Helper metafunction used to implement InternalNode::SameConfiguration
+/// (which, as an inner class, can't be independently specialized)
+template<typename ChildT1, Index Dim1, typename NodeT2>
+struct SameInternalConfig {
+    static const bool value = false;
+};
+
+template<typename ChildT1, Index Dim1, typename ChildT2>
+struct SameInternalConfig<ChildT1, Dim1, InternalNode<ChildT2, Dim1> > {
+    static const bool value = ChildT1::template SameConfiguration<ChildT2>::value;
+};
+//@}
 
 
 ////////////////////////////////////////
@@ -732,6 +774,32 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode& other):
         }
     }
 }
+
+
+// Copy-construct from a node with the same configuration but a different ValueType.
+template<typename ChildT, Index Log2Dim>
+template<typename OtherChildNodeType>
+inline
+InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other)
+    : mChildMask(other.mChildMask)
+    , mValueMask(other.mValueMask)
+    , mOrigin(other.mOrigin)
+{
+    struct Local {
+        /// @todo Consider using a value conversion functor passed as an argument instead.
+        static inline ValueType
+        convertValue(const typename OtherChildNodeType::ValueType& val) { return ValueType(val); }
+    };
+
+    for (Index i = 0; i < NUM_VALUES; ++i) {
+        if (other.mChildMask.isOff(i)) {
+            mNodes[i].setValue(Local::convertValue(other.mNodes[i].getValue()));
+        } else {
+            mNodes[i].setChild(new ChildNodeType(*(other.mNodes[i].getChild())));
+        }
+    }
+}
+
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildNodeType>
@@ -878,17 +946,6 @@ InternalNode<ChildT, Log2Dim>::memUsage() const
     return sum;
 }
 
-// Deprecated
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::evalActiveVoxelBoundingBox(CoordBBox& bbox) const
-{
-    if (bbox.isInside(this->getNodeBoundingBox())) return;
-
-    for (ValueOnCIter i = this->cbeginValueOn(); i; ++i) bbox.expand(i.getCoord(), ChildT::DIM);
-
-    for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) i->evalActiveVoxelBoundingBox(bbox);
-}
 
 template<typename ChildT, Index Log2Dim>
 inline void
@@ -896,9 +953,12 @@ InternalNode<ChildT, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visit
 {
     if (bbox.isInside(this->getNodeBoundingBox())) return;
 
-    for (ValueOnCIter i = this->cbeginValueOn(); i; ++i) bbox.expand(i.getCoord(), ChildT::DIM);
-
-    for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) i->evalActiveBoundingBox(bbox, visitVoxels);
+    for (ValueOnCIter i = this->cbeginValueOn(); i; ++i) {
+        bbox.expand(i.getCoord(), ChildT::DIM);
+    }
+    for (ChildOnCIter i = this->cbeginChildOn(); i; ++i) {
+        i->evalActiveBoundingBox(bbox, visitVoxels);
+    }
 }
 
 
@@ -2367,12 +2427,12 @@ InternalNode<ChildT, Log2Dim>::combine(const ValueType& value, bool valueIsActiv
 
 
 template<typename ChildT, Index Log2Dim>
-template<typename CombineOp>
+template<typename CombineOp, typename OtherNodeType>
 inline void
-InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other0, const InternalNode& other1,
+InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other0, const OtherNodeType& other1,
     CombineOp& op)
 {
-    CombineArgs<ValueType> args;
+    CombineArgs<ValueType, typename OtherNodeType::ValueType> args;
 
     for (Index i = 0; i < NUM_VALUES; ++i) {
         if (other0.isChildMaskOff(i) && other1.isChildMaskOff(i)) {
@@ -2384,12 +2444,12 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other0, const Intern
             this->makeChildNodeEmpty(i, args.result());
             mValueMask.set(i, args.resultIsActive());
         } else {
-            ChildNodeType* otherChild = other0.isChildMaskOn(i)
-                ? other0.mNodes[i].getChild() : other1.mNodes[i].getChild();
-            assert(otherChild);
             if (this->isChildMaskOff(i)) {
                 // Add a new child with the same coordinates, etc. as the other node's child.
-                this->setChildNode(i, new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
+                const Coord& childOrigin = other0.isChildMaskOn(i)
+                    ? other0.mNodes[i].getChild()->origin()
+                    : other1.mNodes[i].getChild()->origin();
+                this->setChildNode(i, new ChildNodeType(childOrigin, mNodes[i].getValue()));
             }
 
             if (other0.isChildMaskOff(i)) {
@@ -2414,12 +2474,12 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other0, const Intern
 
 
 template<typename ChildT, Index Log2Dim>
-template<typename CombineOp>
+template<typename CombineOp, typename OtherNodeType>
 inline void
-InternalNode<ChildT, Log2Dim>::combine2(const ValueType& value, const InternalNode& other,
+InternalNode<ChildT, Log2Dim>::combine2(const ValueType& value, const OtherNodeType& other,
     bool valueIsActive, CombineOp& op)
 {
-    CombineArgs<ValueType> args;
+    CombineArgs<ValueType, typename OtherNodeType::ValueType> args;
 
     for (Index i = 0; i < NUM_VALUES; ++i) {
         if (other.isChildMaskOff(i)) {
@@ -2431,12 +2491,11 @@ InternalNode<ChildT, Log2Dim>::combine2(const ValueType& value, const InternalNo
             this->makeChildNodeEmpty(i, args.result());
             mValueMask.set(i, args.resultIsActive());
         } else {
-            ChildNodeType* otherChild = other.mNodes[i].getChild();
+            typename OtherNodeType::ChildNodeType* otherChild = other.mNodes[i].getChild();
             assert(otherChild);
             if (this->isChildMaskOff(i)) {
                 // Add a new child with the same coordinates, etc.
                 // as the other node's child.
-                /// @todo Could the other node's ChildNodeType be different from this node's?
                 this->setChildNode(i, new ChildNodeType(*otherChild));
             }
             // Combine the other node's child with a constant value
@@ -2448,12 +2507,12 @@ InternalNode<ChildT, Log2Dim>::combine2(const ValueType& value, const InternalNo
 
 
 template<typename ChildT, Index Log2Dim>
-template<typename CombineOp>
+template<typename CombineOp, typename OtherValueType>
 inline void
-InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const ValueType& value,
+InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const OtherValueType& value,
     bool valueIsActive, CombineOp& op)
 {
-    CombineArgs<ValueType> args;
+    CombineArgs<ValueType, OtherValueType> args;
 
     for (Index i = 0; i < NUM_VALUES; ++i) {
         if (other.isChildMaskOff(i)) {
@@ -2469,7 +2528,8 @@ InternalNode<ChildT, Log2Dim>::combine2(const InternalNode& other, const ValueTy
             assert(otherChild);
             if (this->isChildMaskOff(i)) {
                 // Add a new child with the same coordinates, etc. as the other node's child.
-                this->setChildNode(i, new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
+                this->setChildNode(i,
+                    new ChildNodeType(otherChild->origin(), mNodes[i].getValue()));
             }
             // Combine the other node's child with a constant value
             // and write the result into child i.
@@ -2810,7 +2870,8 @@ template<typename ChildT, Index Log2Dim>
 inline ChildT*
 InternalNode<ChildT, Log2Dim>::getChildNode(Index n)
 {
-    return (this->isChildMaskOn(n) ? mNodes[n].getChild() : NULL);
+    assert(this->isChildMaskOn(n));
+    return mNodes[n].getChild();
 }
 
 
@@ -2818,7 +2879,8 @@ template<typename ChildT, Index Log2Dim>
 inline const ChildT*
 InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 {
-    return (this->isChildMaskOn(n) ? mNodes[n].getChild() : NULL);
+    assert(this->isChildMaskOn(n));
+    return mNodes[n].getChild();
 }
 
 } // namespace tree

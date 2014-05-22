@@ -1,6 +1,8 @@
 Nuparu
 ======
 
+v0.1.14.21a
+
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
@@ -12,9 +14,10 @@ Nuparu currently consists of:
 * [stb_image](https://code.google.com/p/stblib/) 1.33 (OSX/Linux/Win)
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (OSX/Linux/Win)
 * [Eigen](eigen.tuxfamily.org/) 3.2.0 (OSX/Linux/Win)
-* [OpenVDB](http://www.openvdb.org/) 2.1.0 (OSX)
+* [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX)
 * [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX)
 * [RMSD](http://boscoh.com/code/), with minor modifications for C++ (OSX/Linux/Win)
 * [OpenEXR](http://www.openexr.com) 2.1.0 (OSX)
+* [TBB](https://www.threadingbuildingblocks.org/) 4.2 Update 4 (OSX)
 
-Note: OpenVDB requires [Intel TBB](https://www.threadingbuildingblocks.org/), but TBB is only available as a dynamically linked library. All other libraries in this collection are entirely statically linked.
+Note: OpenVDB requires [TBB](https://www.threadingbuildingblocks.org/), but TBB is only available as a dynamically linked library. All other libraries in this collection are entirely statically linked.
