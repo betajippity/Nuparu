@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.1.14.21a
+v0.1.14.21b
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -17,7 +17,12 @@ Nuparu currently consists of:
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX)
 * [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX)
 * [RMSD](http://boscoh.com/code/), with minor modifications for C++ (OSX/Linux/Win)
-* [OpenEXR](http://www.openexr.com) 2.1.0 (OSX)
-* [TBB](https://www.threadingbuildingblocks.org/) 4.2 Update 4 (OSX)
+* [OpenEXR](http://www.openexr.com) 2.1.0 (OSX/Win)
+* [TBB](https://www.threadingbuildingblocks.org/) 4.2 Update 4 (OSX/Win)
+* [Zlib](http://www.zlib.net/) 1.2.8 (Win)
 
-Note: OpenVDB requires [TBB](https://www.threadingbuildingblocks.org/), but TBB is only available as a dynamically linked library. All other libraries in this collection are entirely statically linked.
+Notes: 
+
+* On OSX, all libraries except for TBB are statically linked
+* On Windows, all libraries except for TBB are statically linked
+* Since OSX ships with Zlib by default, Nuparu does not include Zlib for OSX
