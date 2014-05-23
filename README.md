@@ -27,6 +27,6 @@ Notes:
 * On OSX, all libraries except for TBB are statically linked
 * On Windows, all libraries except for TBB are statically linked
 * Since OSX ships with Zlib by default, Nuparu does not include Zlib for OSX
-* Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included
+* Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included. The components of Boost included are header-only.
 * OpenVDB has a slight modification in Coord.h for Windows support
 * RMSD has minor modifications for C++ support
