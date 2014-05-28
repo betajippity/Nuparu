@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.1.14.21c
+v0.1.14.22
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -15,7 +15,7 @@ Nuparu currently consists of:
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (OSX/Linux/Win)
 * [Eigen](eigen.tuxfamily.org/) 3.2.0 (OSX/Linux/Win)
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX/Win)
-* [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX)
+* [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX/Win)
 * [RMSD](http://boscoh.com/code/) (OSX/Linux/Win)
 * [OpenEXR](http://www.openexr.com) 2.1.0 (OSX/Win)
 * [TBB](https://www.threadingbuildingblocks.org/) 4.2 Update 4 (OSX/Win)
@@ -30,3 +30,4 @@ Notes:
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included. The components of Boost included are header-only.
 * OpenVDB has a slight modification in Coord.h for Windows support
 * RMSD has minor modifications for C++ support
+* All Windows libraries are built using /MT with Visual Studio 2012
