@@ -7,7 +7,7 @@ Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
-* [GLM](http://glm.g-truc.net/0.9.4/index.html) 0.9.4.5 (OSX/Linux/Win)
+* [GLM](http://glm.g-truc.net/0.9.4/index.html) 0.9.5.3 (OSX/Linux/Win)
 * [GLFW](http://www.glfw.org/) 3.0.2 (OSX/Linux/Win)
 * [GLEW](http://glew.sourceforge.net/index.html) 1.10.0 (OSX/Linux/Win)
 * [jsoncpp](http://sourceforge.net/projects/jsoncpp/) 0.6.0 (OSX/Linux/Win)
@@ -31,3 +31,4 @@ Notes:
 * OpenVDB has a slight modification in Coord.h for Windows support
 * RMSD has minor modifications for C++ support
 * All Windows libraries are built using /MT with Visual Studio 2012
+* Licenses for each library are included in each library's include/ directory
