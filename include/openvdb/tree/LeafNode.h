@@ -1242,13 +1242,13 @@ LeafNode<T,Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
     // Read in the value mask.
     mValueMask.load(is);
 
-    int8_t numBuffers = 1;
+    std::int8_t numBuffers = 1;
     if (io::getFormatVersion(is) < OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         // Read in the origin.
         is.read(reinterpret_cast<char*>(&mOrigin), sizeof(Coord::ValueType) * 3);
 
         // Read in the number of buffers, which should now always be one.
-        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(int8_t));
+        is.read(reinterpret_cast<char*>(&numBuffers), sizeof(std::int8_t));
     }
 
     io::readCompressedValues(is, mBuffer.mData, SIZE, mValueMask, fromHalf);

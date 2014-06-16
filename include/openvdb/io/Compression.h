@@ -278,12 +278,12 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const MaskT& valueMask, bool fromHalf)
 {
     // Get the stream's compression settings.
-    const uint32_t compression = getDataCompression(is);
+    const std::uint32_t compression = getDataCompression(is);
     const bool
         zipped = compression & COMPRESS_ZIP,
         maskCompressed = compression & COMPRESS_ACTIVE_MASK;
 
-    int8_t metadata = NO_MASK_AND_ALL_VALS;
+    std::int8_t metadata = NO_MASK_AND_ALL_VALS;
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         // Read the flag that specifies what, if any, additional metadata
         // (selection mask and/or inactive value(s)) is saved.
@@ -389,7 +389,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     };
 
     // Get the stream's compression settings.
-    const uint32_t compress = getDataCompression(os);
+    const std::uint32_t compress = getDataCompression(os);
     const bool
         zip = compress & COMPRESS_ZIP,
         maskCompress = compress & COMPRESS_ACTIVE_MASK;
@@ -398,7 +398,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     ValueT* tempBuf = srcBuf;
     boost::scoped_array<ValueT> scopedTempBuf;
 
-    int8_t metadata = NO_MASK_AND_ALL_VALS;
+    std::int8_t metadata = NO_MASK_AND_ALL_VALS;
 
     if (!maskCompress) {
         os.write(reinterpret_cast<const char*>(&metadata), /*bytes=*/1);

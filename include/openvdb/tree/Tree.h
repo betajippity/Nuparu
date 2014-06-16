@@ -2130,7 +2130,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     os << "  Min value: " << minVal << "\n";
     os << "  Max value: " << maxVal << "\n";
 
-    const uint64_t
+    const std::uint64_t
         leafCount = *nodeCount.rbegin(),
         numActiveVoxels = this->activeVoxelCount(),
         numActiveLeafVoxels = this->activeLeafVoxelCount();
@@ -2138,12 +2138,12 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     os << "  Number of active voxels:       " << util::formattedInt(numActiveVoxels) << "\n";
 
     Coord dim(0, 0, 0);
-    uint64_t totalVoxels = 0;
+    std::uint64_t totalVoxels = 0;
     if (numActiveVoxels) { // nonempty
         CoordBBox bbox;
         this->evalActiveVoxelBoundingBox(bbox);
         dim = bbox.extents();
-        totalVoxels = dim.x() * uint64_t(dim.y()) * dim.z();
+        totalVoxels = dim.x() * std::uint64_t(dim.y()) * dim.z();
 
         os << "  Bounding box of active voxels: " << bbox << "\n";
         os << "  Dimensions of active voxels:   "
@@ -2165,7 +2165,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     if (verboseLevel == 2) return;
 
     // Memory footprint in bytes
-    const uint64_t
+    const std::uint64_t
         actualMem = this->memUsage(),
         denseMem = sizeof(ValueType) * totalVoxels,
         voxelsMem = sizeof(ValueType) * numActiveLeafVoxels;

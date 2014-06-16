@@ -207,7 +207,7 @@ public:
     /// Length of the vector
     T length() const
     {
-        return static_cast<T>(sqrt(double(
+        return static_cast<T>(std::sqrt(double(
             this->mm[0]*this->mm[0] +
             this->mm[1]*this->mm[1] +
             this->mm[2]*this->mm[2])));
