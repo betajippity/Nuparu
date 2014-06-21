@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.1.14.24
+v0.1.14.25
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -24,13 +24,13 @@ Nuparu currently consists of:
 
 Notes: 
 
-* On OSX, all libraries except for TBB are statically linked
-* On Windows, all libraries except for TBB are statically linked
+* On OSX, all binary libraries except for TBB are statically linked
+* On Windows, all binary libraries except for TBB are statically linked
 * Since OSX ships with Zlib by default, Nuparu does not include Zlib for OSX
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included. The components of Boost included are header-only.
 * OpenVDB has a slight modification in Coord.h for Windows support
 * RMSD has minor modifications for C++ support
-* All OSX libraries are built with OSX 10.9's default Clang (Apple LLVM 5.1) and link against OSX 10.9's default libc++ 
-* All Windows libraries are built using /MT with Visual Studio 2012
-* All libraries on all platforms are built for x86-64
+* All binary OSX libraries are built with OSX 10.9's default Clang (Apple LLVM 5.1). Both libc++ and libstd++ versions are provided.
+* All binary Windows libraries are built using /MT with Visual Studio 2012
+* All binary libraries on all platforms are built for x86-64
 * Licenses for each library are included in each library's include/ directory
