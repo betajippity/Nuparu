@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.1.15.03
+v0.1.15.09
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -21,7 +21,7 @@ Nuparu currently consists of:
 * [TBB](https://www.threadingbuildingblocks.org/) 4.3 Initial Release (OSX/Win)
 * [Zlib](http://www.zlib.net/) 1.2.8 (Win)
 * [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
-* [Embree](https://embree.github.io) 2.4 (OSX)
+* [Embree](https://embree.github.io) 2.4 (OSX/Win)
 
 Notes: 
 
@@ -32,6 +32,6 @@ Notes:
 * OpenVDB has a slight modification in Coord.h for Windows support
 * RMSD has minor modifications for C++ support
 * All binary OSX libraries are built with OSX's Clang variant (Apple LLVM 5.1 or greater) using libc++.
-* All binary Windows libraries are built using /MT with Visual Studio 2012
+* All binary Windows libraries are built using /MT with Visual Studio 2013, except for OpenVDB, which is build using /MT with Visual Studio 2012. OpenVDB will be updated soon.
 * All binary libraries on all platforms are built for x86-64
 * Licenses for each library are included in each library's include/ directory
