@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -95,7 +95,7 @@ namespace internal {
                 my_try_put_task = f;
             }
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        typedef std::vector<sender<T> *> predecessor_vector_type;
+        typedef typename receiver<T>::predecessor_list_type predecessor_list_type;
         /*override*/size_t predecessor_count() {
             spin_mutex::scoped_lock l(my_pred_mutex);
             return my_built_predecessors.edge_count();
@@ -108,7 +108,7 @@ namespace internal {
             spin_mutex::scoped_lock l(my_pred_mutex);
             my_built_predecessors.delete_edge(p);
         }
-        /*override*/void copy_predecessors( predecessor_vector_type &v) {
+        /*override*/void copy_predecessors( predecessor_list_type &v) {
             spin_mutex::scoped_lock l(my_pred_mutex);
             return my_built_predecessors.copy_edges(v);
         }
@@ -157,7 +157,7 @@ namespace internal {
         typedef receiver<output_type> successor_type;
         typedef indexer_node_FE<InputTuple, output_type,StructTypes> input_ports_type;
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        typedef std::vector<successor_type *> successor_vector_type;
+        typedef typename sender<output_type>::successor_list_type successor_list_type;
 #endif
 
     private:
@@ -180,7 +180,7 @@ namespace internal {
                 task *bypass_t;
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
                 size_t cnt_val;
-                successor_vector_type *succv;
+                successor_list_type *succv;
 #endif
             };
             indexer_node_base_operation(const output_type* e, op_type t) :
@@ -285,7 +285,7 @@ namespace internal {
             return op_data.cnt_val;
         }
 
-        void copy_successors( successor_vector_type &v) {
+        void copy_successors( successor_list_type &v) {
             indexer_node_base_operation op_data(blt_succ_cpy);
             op_data.succv = &v;
             my_aggregator.execute(&op_data);

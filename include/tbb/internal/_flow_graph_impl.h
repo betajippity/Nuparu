@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -291,7 +291,7 @@ namespace internal {
         }
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        typedef std::vector<T *> predecessor_vector_type;
+        typedef typename edge_container<T>::edge_list_type predecessor_list_type;
         void internal_add_built_predecessor( T &n ) {
             typename my_mutex_type::scoped_lock lock( my_mutex );
             my_built_predecessors.add_edge(n);
@@ -302,7 +302,7 @@ namespace internal {
             my_built_predecessors.delete_edge(n);
         }
 
-        void copy_predecessors( predecessor_vector_type &v) {
+        void copy_predecessors( predecessor_list_type &v) {
             typename my_mutex_type::scoped_lock lock( my_mutex );
             my_built_predecessors.copy_edges(v);
         }
@@ -498,7 +498,7 @@ namespace internal {
 
     public:
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        typedef std::vector<pointer_type> successor_vector_type;
+        typedef typename edge_container<receiver<T> >::edge_list_type successor_list_type;
         void internal_add_built_successor( receiver<T> &r) {
             typename my_mutex_type::scoped_lock l(my_mutex, true);
             my_built_successors.add_edge( r );
@@ -509,7 +509,7 @@ namespace internal {
             my_built_successors.delete_edge(r);
         }
 
-        void copy_successors( successor_vector_type &v) {
+        void copy_successors( successor_list_type &v) {
             typename my_mutex_type::scoped_lock l(my_mutex, false);
             my_built_successors.copy_edges(v);
         }
@@ -570,11 +570,13 @@ namespace internal {
         typedef spin_rw_mutex my_mutex_type;
         my_mutex_type my_mutex;
 
+        typedef receiver<continue_msg> successor_type;
         typedef receiver<continue_msg> *pointer_type;
         typedef std::list< pointer_type > my_successors_type;
         my_successors_type my_successors;
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        edge_container<receiver<continue_msg> > my_built_successors;
+        edge_container<successor_type> my_built_successors;
+        typedef edge_container<successor_type>::edge_list_type successor_list_type;
 #endif
 
         sender<continue_msg> *my_owner;
@@ -582,18 +584,17 @@ namespace internal {
     public:
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        typedef std::vector<pointer_type> successor_vector_type;
-        void internal_add_built_successor( receiver<continue_msg> &r) {
+        void internal_add_built_successor( successor_type &r) {
             my_mutex_type::scoped_lock l(my_mutex, true);
             my_built_successors.add_edge( r );
         }
 
-        void internal_delete_built_successor( receiver<continue_msg> &r) {
+        void internal_delete_built_successor( successor_type &r) {
             my_mutex_type::scoped_lock l(my_mutex, true);
             my_built_successors.delete_edge(r);
         }
 
-        void copy_successors( successor_vector_type &v) {
+        void copy_successors( successor_list_type &v) {
             my_mutex_type::scoped_lock l(my_mutex, false);
             my_built_successors.copy_edges(v);
         }
@@ -615,7 +616,7 @@ namespace internal {
 
         virtual ~successor_cache() {}
 
-        void register_successor( receiver<continue_msg> &r ) {
+        void register_successor( successor_type &r ) {
             my_mutex_type::scoped_lock l(my_mutex, true);
             my_successors.push_back( &r );
             if ( my_owner && r.is_continue_receiver() ) {
@@ -623,7 +624,7 @@ namespace internal {
             }
         }
 
-        void remove_successor( receiver<continue_msg> &r ) {
+        void remove_successor( successor_type &r ) {
             my_mutex_type::scoped_lock l(my_mutex, true);
             for ( my_successors_type::iterator i = my_successors.begin();
                   i != my_successors.end(); ++i ) {

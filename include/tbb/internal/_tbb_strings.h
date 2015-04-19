@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -63,3 +63,4 @@ TBB_STRING_RESOURCE(FLOW_OUTPUT_PORT_9, "output_port_9")
 TBB_STRING_RESOURCE(FLOW_OBJECT_NAME, "object_name")
 TBB_STRING_RESOURCE(FLOW_NULL, "null")
 TBB_STRING_RESOURCE(FLOW_INDEXER_NODE, "indexer_node")
+TBB_STRING_RESOURCE(FLOW_COMPOSITE_NODE, "composite_node")

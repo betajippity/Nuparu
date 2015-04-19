@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -52,6 +52,7 @@
 #include "task.h"
 #include "aligned_space.h"
 #include "atomic.h"
+#include "internal/_template_helpers.h"
 
 #if defined(_MSC_VER) && !defined(__INTEL_COMPILER)
     // Workaround for overzealous compiler warnings
@@ -272,8 +273,9 @@ template <typename Partition>
 struct adaptive_partition_type_base : partition_type_base<Partition> {
     size_t my_divisor;
     depth_t my_max_depth;
+    static const unsigned factor = 1;
     adaptive_partition_type_base() : my_max_depth(__TBB_INIT_DEPTH) {
-        my_divisor = tbb::internal::get_initial_auto_partitioner_divisor() / 4;
+        my_divisor = tbb::internal::get_initial_auto_partitioner_divisor() / 4 * Partition::factor;
         __TBB_ASSERT(my_divisor, "initial value of get_initial_auto_partitioner_divisor() is not valid");
     }
     adaptive_partition_type_base(adaptive_partition_type_base &src, split) {
@@ -299,8 +301,12 @@ struct adaptive_partition_type_base : partition_type_base<Partition> {
     }
     adaptive_partition_type_base(adaptive_partition_type_base &src, const proportional_split& split_obj) {
         my_max_depth = src.my_max_depth;
+#if __TBB_ENABLE_RANGE_FEEDBACK
         my_divisor = size_t(float(src.my_divisor) * float(split_obj.right())
                             / float(split_obj.left() + split_obj.right()));
+#else
+        my_divisor = split_obj.right() * Partition::factor;
+#endif
         src.my_divisor -= my_divisor;
     }
     bool check_being_stolen( task &t) { // part of old should_execute_range()
@@ -329,27 +335,21 @@ struct adaptive_partition_type_base : partition_type_base<Partition> {
     depth_t max_depth() { return my_max_depth; }
 };
 
-//! Helper that enables one or the other code branches (see example in is_range_divisible_in_proportion)
-template<bool C, typename T = void> struct enable_if { typedef T type; };
-template<typename T> struct enable_if<false, T> { };
-
-//! Class determines whether template parameter has static boolean
-//! constant 'is_divisible_in_proportion' initialized with value of
-//! 'true' or not.
-/** If template parameter has such field that has been initialized
- *  with non-zero value then class field will be set to 'true',
- *  otherwise - 'false'
+//! Class determines whether template parameter has static boolean constant
+//! 'is_splittable_in_proportion' initialized with value of 'true' or not.
+/** If template parameter has such field that has been initialized with non-zero
+ *  value then class field will be set to 'true', otherwise - 'false'
  */
 template <typename Range>
-class is_range_divisible_in_proportion {
+class is_splittable_in_proportion {
 private:
     typedef char yes[1];
     typedef char no [2];
 
-    template <typename range_type> static yes& decide(typename enable_if<range_type::is_divisible_in_proportion>::type *);
+    template <typename range_type> static yes& decide(typename enable_if<range_type::is_splittable_in_proportion>::type *);
     template <typename range_type> static no& decide(...);
 public:
-    // equals to 'true' if and only if static const variable 'is_divisible_in_proportion' of template parameter
+    // equals to 'true' if and only if static const variable 'is_splittable_in_proportion' of template parameter
     // initialized with the value of 'true'
     static const bool value = (sizeof(decide<Range>(0)) == sizeof(yes));
 };
@@ -357,7 +357,6 @@ public:
 //! Provides default methods for affinity (adaptive) partition objects.
 class affinity_partition_type : public adaptive_partition_type_base<affinity_partition_type> {
     static const unsigned factor_power = 4;
-    static const unsigned factor = 1<<factor_power;  // number of slots in affinity array per task
     enum {
         start = 0,
         run,
@@ -369,17 +368,16 @@ class affinity_partition_type : public adaptive_partition_type_base<affinity_par
     size_t my_begin;
     tbb::internal::affinity_id* my_array;
 public:
+    static const unsigned factor = 1 << factor_power; // number of slots in affinity array per task
     typedef proportional_split split_type;
 
     affinity_partition_type( tbb::internal::affinity_partitioner_base_v3& ap )
-        : adaptive_partition_type_base<affinity_partition_type>(),
-          my_delay(start)
+        : adaptive_partition_type_base<affinity_partition_type>(), my_delay(start)
 #ifdef __TBB_USE_MACHINE_TIME_STAMPS
         , my_dst_tsc(0)
 #endif
-        {
+    {
         __TBB_ASSERT( (factor&(factor-1))==0, "factor must be power of two" );
-        my_divisor *= factor;
         ap.resize(factor);
         my_array = ap.my_array;
         my_begin = 0;
@@ -407,21 +405,23 @@ public:
         size_t total_divisor = my_divisor + p.my_divisor;
         __TBB_ASSERT(total_divisor % factor == 0, NULL);
         my_divisor = (my_divisor + factor/2) & (0u - factor);
+#if __TBB_ENABLE_RANGE_FEEDBACK
         if (!my_divisor)
             my_divisor = factor;
         else if (my_divisor == total_divisor)
             my_divisor = total_divisor - factor;
+#endif
         p.my_divisor = total_divisor - my_divisor;
         __TBB_ASSERT(my_divisor && p.my_divisor, NULL);
         my_begin = p.my_begin + p.my_divisor;
     }
     void set_affinity( task &t ) {
         if( my_divisor ) {
-            if( !my_array[my_begin] ) {
+            if( !my_array[my_begin] )
                 // TODO: consider code reuse for static_paritioner
-                my_array[my_begin] = affinity_id(my_begin / factor + 1);
-            }
-            t.set_affinity( my_array[my_begin] );
+                t.set_affinity( affinity_id(my_begin / factor + 1) );
+            else
+                t.set_affinity( my_array[my_begin] );
         }
     }
     void note_affinity( task::affinity_id id ) {
@@ -468,7 +468,7 @@ public:
 #endif
     template <typename Range>
     split_type get_split() {
-        if (is_range_divisible_in_proportion<Range>::value) {
+        if (is_splittable_in_proportion<Range>::value) {
             size_t size = my_divisor / factor;
 #if __TBB_NONUNIFORM_TASK_CREATION
             size_t right = (size + 2) / 3;

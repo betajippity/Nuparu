@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@
 #define TBB_VERSION_MINOR 3
 
 // Engineering-focused interface version
-#define TBB_INTERFACE_VERSION 8000
+#define TBB_INTERFACE_VERSION 8004
 #define TBB_INTERFACE_VERSION_MAJOR TBB_INTERFACE_VERSION/1000
 
 // The oldest major interface version still supported
@@ -132,11 +132,12 @@ typedef void(*assertion_handler_type)( const char* filename, int line, const cha
 
 #if TBB_USE_ASSERT
 
-     #define __TBB_ASSERT_NS(predicate,message,ns) ((predicate)?((void)0) : ns::assertion_failure(__FILE__,__LINE__,#predicate,message))
     //! Assert that x is true.
+    #define __TBB_ASSERT_NS(predicate,message,ns) ((predicate)?((void)0) : ns::assertion_failure(__FILE__,__LINE__,#predicate,message))
     /** If x is false, print assertion failure message.
         If the comment argument is not NULL, it is printed as part of the failure message.
         The comment argument has no other effect. */
+
 #if __TBBMALLOC_BUILD
 namespace rml { namespace internal {
     #define __TBB_ASSERT(predicate,message) __TBB_ASSERT_NS(predicate,message,rml::internal)
@@ -144,7 +145,6 @@ namespace rml { namespace internal {
 namespace tbb {
     #define __TBB_ASSERT(predicate,message) __TBB_ASSERT_NS(predicate,message,tbb)
 #endif
-
     #define __TBB_ASSERT_EX __TBB_ASSERT
 
     //! Set assertion handler and return previous value of it.
@@ -161,6 +161,7 @@ namespace tbb {
 #else
 } // namespace tbb
 #endif
+
 #else /* !TBB_USE_ASSERT */
 
     //! No-op version of __TBB_ASSERT.
@@ -206,40 +207,6 @@ namespace tbb {
  * So it can be different than the value of TBB_INTERFACE_VERSION obtained at compile time.
  */
 extern "C" int __TBB_EXPORTED_FUNC TBB_runtime_interface_version();
-
-//! Dummy type that distinguishes splitting constructor from copy constructor.
-/**
- * See description of parallel_for and parallel_reduce for example usages.
- * @ingroup algorithms
- */
-class split {
-};
-
-//! Type enables transmission of splitting proportion from partitioners to range objects
-/**
- * In order to make use of such facility Range objects must implement
- * splitting constructor with this type passed and initialize static
- * constant boolean field 'is_divisible_in_proportion' with the value
- * of 'true'
- */
-class proportional_split {
-public:
-    proportional_split(size_t _left = 1, size_t _right = 1) : my_left(_left), my_right(_right) { }
-    proportional_split(split) : my_left(1), my_right(1) { }
-
-    size_t left() const { return my_left; }
-    size_t right() const { return my_right; }
-
-    void set_proportion(size_t _left, size_t _right) {
-        my_left = _left;
-        my_right = _right;
-    }
-
-    // used when range does not support proportional split
-    operator split() const { return split(); }
-private:
-    size_t my_left, my_right;
-};
 
 /**
  * @cond INTERNAL
@@ -400,8 +367,9 @@ inline bool is_power_of_two_factor(argument_integer_type arg, divisor_integer_ty
 }
 
 //! Utility template function to prevent "unused" warnings by various compilers.
-template<typename T>
-void suppress_unused_warning( const T& ) {}
+template<typename T1> void suppress_unused_warning( const T1& ) {}
+template<typename T1, typename T2> void suppress_unused_warning( const T1&, const T2& ) {}
+template<typename T1, typename T2, typename T3> void suppress_unused_warning( const T1&, const T2&, const T3& ) {}
 
 // Struct to be used as a version tag for inline functions.
 /** Version tag can be necessary to prevent loader on Linux from using the wrong
@@ -411,6 +379,42 @@ struct version_tag_v3 {};
 typedef version_tag_v3 version_tag;
 
 } // internal
+
+//! Dummy type that distinguishes splitting constructor from copy constructor.
+/**
+ * See description of parallel_for and parallel_reduce for example usages.
+ * @ingroup algorithms
+ */
+class split {
+};
+
+//! Type enables transmission of splitting proportion from partitioners to range objects
+/**
+ * In order to make use of such facility Range objects must implement
+ * splitting constructor with this type passed and initialize static
+ * constant boolean field 'is_splittable_in_proportion' with the value
+ * of 'true'
+ */
+class proportional_split: internal::no_assign {
+public:
+    proportional_split(size_t _left = 1, size_t _right = 1) : my_left(_left), my_right(_right) { }
+
+    size_t left() const { return my_left; }
+    size_t right() const { return my_right; }
+
+    // used when range does not support proportional split
+    operator split() const { return split(); }
+
+#if __TBB_ENABLE_RANGE_FEEDBACK
+    void set_proportion(size_t _left, size_t _right) {
+        my_left = _left;
+        my_right = _right;
+    }
+#endif
+private:
+    size_t my_left, my_right;
+};
+
 } // tbb
 
 // Following is a set of classes and functions typically used in compile-time "metaprogramming".
@@ -469,12 +473,42 @@ struct select_size_t_constant {
 
 #if __TBB_CPP11_RVALUE_REF_PRESENT
 using std::move;
+using std::forward;
 #elif defined(_LIBCPP_NAMESPACE)
-// libc++ defines "pre-C++11 move" similarly to our; use it to avoid name conflicts in some cases.
+// libc++ defines "pre-C++11 move and forward" similarly to ours; use it to avoid name conflicts in some cases.
 using std::_LIBCPP_NAMESPACE::move;
+using std::_LIBCPP_NAMESPACE::forward;
 #else
+// It is assumed that cv qualifiers, if any, are part of the deduced type.
 template <typename T>
 T& move( T& x ) { return x; }
+template <typename T>
+T& forward( T& x ) { return x; }
+#endif /* __TBB_CPP11_RVALUE_REF_PRESENT */
+
+// Helper macros to simplify writing templates working with both C++03 and C++11.
+#if __TBB_CPP11_RVALUE_REF_PRESENT
+#define  __TBB_FORWARDING_REF(A) A&&
+#else
+// It is assumed that cv qualifiers, if any, are part of a deduced type.
+// Thus this macro should not be used in public interfaces.
+#define  __TBB_FORWARDING_REF(A) A&
+#endif
+#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT
+#define __TBB_PARAMETER_PACK ...
+#define __TBB_PACK_EXPANSION(A) A...
+#else
+#define __TBB_PARAMETER_PACK 
+#define __TBB_PACK_EXPANSION(A) A
+#endif /* __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT */
+
+#if __TBB_CPP11_DECLTYPE_PRESENT
+#if __TBB_CPP11_DECLVAL_BROKEN
+// Ad-hoc implementation of std::declval
+template <class T> __TBB_FORWARDING_REF(T) declval() /*noexcept*/;
+#else
+using std::declval;
+#endif
 #endif
 
 template <bool condition>

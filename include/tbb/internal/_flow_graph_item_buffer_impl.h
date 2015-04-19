@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -64,7 +64,7 @@ namespace internal {
             return my_array[i & (my_array_size - 1) ];
         }
 
-        bool my_item_valid(size_type i) { return item(i).second != no_item; }
+        bool my_item_valid(size_type i) { return (i < my_tail) && (i >= my_head) && (item(i).second != no_item); }
         bool my_item_reserved(size_type i) { return item(i).second == reserved_item; }
 
         // object management in buffer
@@ -209,7 +209,7 @@ namespace internal {
         // we want to retain the values of the head and tail.
         void clean_up_buffer(bool reset_pointers) {
             if (my_array) {
-                for( size_type i=0; i<my_array_size; ++i ) {
+                for( size_type i=my_head; i<my_tail; ++i ) {
                     if(my_item_valid(i))
                         destroy_item(i);
                 }

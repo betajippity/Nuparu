@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -67,7 +67,7 @@ namespace internal {
         typedef sender<Input> predecessor_type;
 
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        typedef std::vector<predecessor_type *> predecessor_vector_type;
+        typedef typename receiver<input_type>::predecessor_list_type predecessor_list_type;
 #endif
 
         //! Constructor for function_input_base
@@ -144,7 +144,7 @@ namespace internal {
             return op_data.cnt_val;
         }
 
-        /*override*/ void copy_predecessors(predecessor_vector_type &v) {
+        /*override*/ void copy_predecessors(predecessor_list_type &v) {
             my_operation op_data(blt_pred_cpy);
             op_data.predv = &v;
             my_aggregator.execute(&op_data);
@@ -188,7 +188,7 @@ namespace internal {
                 predecessor_type *r;
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
                 size_t cnt_val;
-                predecessor_vector_type *predv;
+                predecessor_list_type *predv;
 #endif  /* TBB_PREVIEW_FLOW_GRAPH_FEATURES */
             };
             tbb::task *bypass_t;
@@ -666,7 +666,7 @@ namespace internal {
         typedef receiver<output_type> successor_type;
         typedef broadcast_cache<output_type> broadcast_cache_type;
 #if TBB_PREVIEW_FLOW_GRAPH_FEATURES
-        typedef std::vector<successor_type *> successor_vector_type;
+        typedef typename sender<output_type>::successor_list_type successor_list_type;
 #endif
         
         function_output() { my_successors.set_owner(this); }
@@ -699,7 +699,7 @@ namespace internal {
             return successors().successor_count();
         }
 
-        /*override*/ void  copy_successors( successor_vector_type &v) {
+        /*override*/ void  copy_successors( successor_list_type &v) {
             successors().copy_successors(v);
         }
 #endif  /* TBB_PREVIEW_FLOW_GRAPH_FEATURES */

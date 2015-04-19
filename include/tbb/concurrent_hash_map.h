@@ -1,5 +1,5 @@
 /*
-    Copyright 2005-2014 Intel Corporation.  All Rights Reserved.
+    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
 
     This file is part of Threading Building Blocks. Threading Building Blocks is free software;
     you can redistribute it and/or modify it under the terms of the GNU General Public License
@@ -32,6 +32,7 @@
 #include <iterator>
 #include <utility>      // Need std::pair
 #include <cstring>      // Need std::memset
+#include <algorithm>    // Need std::swap
 
 #if !TBB_USE_EXCEPTIONS && _MSC_VER
     #pragma warning (pop)
