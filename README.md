@@ -18,12 +18,12 @@ Nuparu currently consists of:
 * [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX/Win)
 * [RMSD](http://boscoh.com/code/) (OSX/Linux/Win)
 * [OpenEXR](http://www.openexr.com) 2.1.0 (OSX/Win)
-* [TBB](https://www.threadingbuildingblocks.org/) 4.3 Initial Release (OSX/Win)
+* [TBB](https://www.threadingbuildingblocks.org/) 4.3 Update 4 (OSX/Win)
 * [Zlib](http://www.zlib.net/) 1.2.8 (Win)
 * [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
 * [Embree](https://embree.github.io) 2.4 (OSX/Win)
 
-Notes: 
+Notes:
 
 * On OSX, all binary libraries except for TBB are statically linked
 * On Windows, all binary libraries except for TBB are statically linked
