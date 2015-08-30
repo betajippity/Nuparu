@@ -1,14 +1,14 @@
 Nuparu
 ======
 
-v0.1.15.09
+v0.1.15.35
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
 * [GLM](http://glm.g-truc.net/0.9.4/index.html) 0.9.5.3 (OSX/Linux/Win)
-* [GLFW](http://www.glfw.org/) 3.0.2 (OSX/Linux/Win)
+* [GLFW](http://www.glfw.org/) 3.1.1 (OSX/Linux/Win)
 * [GLEW](http://glew.sourceforge.net/index.html) 1.10.0 (OSX/Linux/Win)
 * [jsoncpp](http://sourceforge.net/projects/jsoncpp/) 0.6.0 (OSX/Linux/Win)
 * [stb_image](https://code.google.com/p/stblib/) 1.33 (OSX/Linux/Win)
