@@ -29,6 +29,11 @@
     - known compiler/platform issues
 **/
 
+/* This macro marks incomplete code or comments describing ideas which are considered for the future.
+ * See also for plain comment with TODO and FIXME marks for small improvement opportunities.
+ */
+#define __TBB_TODO 0
+
 /*Check which standard library we use on OS X.*/
 /*__TBB_SYMBOL is defined only while processing exported symbols list where C++ is not allowed.*/
 #if !defined(__TBB_SYMBOL) && __APPLE__
@@ -203,7 +208,7 @@
     #define __TBB_INITIALIZER_LISTS_PRESENT           (_MSC_VER >= 1800)
     #define __TBB_CONSTEXPR_PRESENT                   0
     #define __TBB_DEFAULTED_AND_DELETED_FUNC_PRESENT  (_MSC_VER >= 1800)
-    #define __TBB_NOEXCEPT_PRESENT                    0 /*for _MSC_VER == 1800*/
+    #define __TBB_NOEXCEPT_PRESENT                    (_MSC_VER >= 1900)
     #define __TBB_CPP11_STD_BEGIN_END_PRESENT         (_MSC_VER >= 1700)
     #define __TBB_CPP11_AUTO_PRESENT                  (_MSC_VER >= 1600)
     #define __TBB_CPP11_DECLTYPE_PRESENT              (_MSC_VER >= 1600)
@@ -233,7 +238,7 @@
 #define __TBB_CPP11_IS_COPY_CONSTRUCTIBLE_PRESENT   (__GXX_EXPERIMENTAL_CXX0X__ && __TBB_GCC_VERSION >= 40700 || __TBB_CPP11_TYPE_PROPERTIES_PRESENT)
 
 // In GCC and MSVC, implementation of std::move_if_noexcept is not aligned with noexcept
-#define __TBB_MOVE_IF_NOEXCEPT_PRESENT          (__GXX_EXPERIMENTAL_CXX0X__ && __TBB_GCC_VERSION >= 40700 || _MSC_VER >= 1800 || __clang__ && _LIBCPP_VERSION && __TBB_NOEXCEPT_PRESENT)
+#define __TBB_MOVE_IF_NOEXCEPT_PRESENT           (__GXX_EXPERIMENTAL_CXX0X__ && __TBB_GCC_VERSION >= 40700 || _MSC_VER >= 1900 || __clang__ && _LIBCPP_VERSION && __TBB_NOEXCEPT_PRESENT)
 //TODO: Probably more accurate way is to analyze version of stdlibc++ via__GLIBCXX__ instead of __TBB_GCC_VERSION
 #define __TBB_ALLOCATOR_TRAITS_PRESENT              (__cplusplus >= 201103L && _LIBCPP_VERSION  || _MSC_VER >= 1700 ||                                             \
                                                      __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GCC_VERSION >= 40700 && !(__TBB_GCC_VERSION == 40700 && __TBB_DEFINE_MIC) \
@@ -261,7 +266,8 @@
 /* Actually ICC supports gcc __sync_* intrinsics starting 11.1,
  * but 64 bit support for 32 bit target comes in later ones*/
 /* TODO: change the version back to 4.1.2 once macro __TBB_WORD_SIZE become optional */
-#if __TBB_GCC_VERSION >= 40306 || __INTEL_COMPILER >= 1200
+/* Assumed that all clang versions have these gcc compatible intrinsics. */
+#if __TBB_GCC_VERSION >= 40306 || __INTEL_COMPILER >= 1200 || __clang__
     /** built-in atomics available in GCC since 4.1.2 **/
     #define __TBB_GCC_BUILTIN_ATOMICS_PRESENT 1
 #endif
@@ -542,7 +548,7 @@
     #define __TBB_SSE_STACK_ALIGNMENT_BROKEN 0
 #endif
 
-#if __GNUC__==4 && __GNUC_MINOR__==3 && __GNUC_PATCHLEVEL__==0
+#if __TBB_GCC_VERSION==40300 && !__INTEL_COMPILER && !__clang__
     /* GCC of this version may rashly ignore control dependencies */
     #define __TBB_GCC_OPTIMIZER_ORDERING_BROKEN 1
 #endif
@@ -612,7 +618,7 @@
     #define __TBB_GCC_CAS8_BUILTIN_INLINING_BROKEN 1
 #endif
 
-#if __TBB_x86_32 && (__linux__ || __APPLE__ || _WIN32 || __sun || __ANDROID__) &&  (__INTEL_COMPILER || (__GNUC__==3 && __GNUC_MINOR__==3 ) || __SUNPRO_CC)
+#if __TBB_x86_32 && (__linux__ || __APPLE__ || _WIN32 || __sun || __ANDROID__) &&  (__INTEL_COMPILER || (__GNUC__==3 && __GNUC_MINOR__==3 )||(__MINGW32__ ) && (__GNUC__==4 && __GNUC_MINOR__==5 ) || __SUNPRO_CC)
     // Some compilers for IA-32 fail to provide 8-byte alignment of objects on the stack,
     // even if the object specifies 8-byte alignment.  On such platforms, the IA-32 implementation
     // of 64 bit atomics (e.g. atomic<long long>) use different tactics depending upon
@@ -641,6 +647,8 @@
 
 #define __TBB_CPP11_DECLVAL_BROKEN (_MSC_VER == 1600 || (__GNUC__ && __TBB_GCC_VERSION < 40500) )
 
+// Intel C++ compiler has difficulties with copying std::pair with VC11 std::reference_wrapper being a const member
+#define __TBB_COPY_FROM_NON_CONST_REF_BROKEN (_MSC_VER == 1700 && __INTEL_COMPILER && __INTEL_COMPILER < 1600)
 //The implicit upcasting of the tuple of a reference of a derived class to a base class fails on icc 13.X 
 //if the system's gcc environment is 4.8
 #if (__INTEL_COMPILER >=1300 && __INTEL_COMPILER <=1310) && __TBB_GCC_VERSION>=40700 && __GXX_EXPERIMENTAL_CXX0X__
@@ -659,7 +667,9 @@
 #define __TBB_ALLOCATOR_CONSTRUCT_VARIADIC      (__TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT)
 
 #define __TBB_VARIADIC_PARALLEL_INVOKE          (TBB_PREVIEW_VARIADIC_PARALLEL_INVOKE && __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT && __TBB_CPP11_RVALUE_REF_PRESENT)
-#define __TBB_PREVIEW_COMPOSITE_NODE            (TBB_PREVIEW_FLOW_GRAPH_NODES && __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT \
-                                                 && __TBB_CPP11_RVALUE_REF_PRESENT && __TBB_CPP11_AUTO_PRESENT) \
-                                                 && __TBB_CPP11_VARIADIC_TUPLE_PRESENT && !__TBB_UPCAST_OF_TUPLE_OF_REF_BROKEN
+#define __TBB_FLOW_GRAPH_CPP11_FEATURES         (__TBB_CPP11_VARIADIC_TEMPLATES_PRESENT \
+                                                && __TBB_CPP11_RVALUE_REF_PRESENT && __TBB_CPP11_AUTO_PRESENT) \
+                                                && __TBB_CPP11_VARIADIC_TUPLE_PRESENT && !__TBB_UPCAST_OF_TUPLE_OF_REF_BROKEN
+#define __TBB_PREVIEW_ASYNC_NODE TBB_PREVIEW_FLOW_GRAPH_NODES
+#define __TBB_PREVIEW_OPENCL_NODE              __TBB_FLOW_GRAPH_CPP11_FEATURES && TBB_PREVIEW_FLOW_GRAPH_NODES
 #endif /* __TBB_tbb_config_H */

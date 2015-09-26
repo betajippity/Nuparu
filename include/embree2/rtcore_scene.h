@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2014 Intel Corporation                                    //
+// Copyright 2009-2015 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -50,24 +50,42 @@ enum RTCAlgorithmFlags
   RTC_INTERSECT4 = (1 << 1),    //!< enables the rtcIntersect4 and rtcOccluded4 functions for this scene
   RTC_INTERSECT8 = (1 << 2),    //!< enables the rtcIntersect8 and rtcOccluded8 functions for this scene
   RTC_INTERSECT16 = (1 << 3),   //!< enables the rtcIntersect16 and rtcOccluded16 functions for this scene
+  RTC_INTERPOLATE = (1 << 4),   //!< enables the rtcInterpolate function for this scene
 };
 
 /*! \brief Defines an opaque scene type */
 typedef struct __RTCScene {}* RTCScene;
 
+/*! Creates a new scene. 
+   WARNING: This function is deprecated, use rtcDeviceNewScene instead.
+*/
+RTCORE_API RTCORE_DEPRECATED RTCScene rtcNewScene (RTCSceneFlags flags, RTCAlgorithmFlags aflags);
+
 /*! Creates a new scene. */
-RTCORE_API RTCScene rtcNewScene (RTCSceneFlags flags, RTCAlgorithmFlags aflags);
+RTCORE_API RTCScene rtcDeviceNewScene (RTCDevice device, RTCSceneFlags flags, RTCAlgorithmFlags aflags);
+
+/*! \brief Type of progress callback function. */
+typedef bool (*RTCProgressMonitorFunc)(void* ptr, const double n);
+RTCORE_DEPRECATED typedef RTCProgressMonitorFunc RTC_PROGRESS_MONITOR_FUNCTION;
+
+/*! \brief Sets the progress callback function which is called during hierarchy build of this scene. */
+RTCORE_API void rtcSetProgressMonitorFunction(RTCScene scene, RTCProgressMonitorFunc func, void* ptr);
 
 /*! Commits the geometry of the scene. After initializing or modifying
  *  geometries, commit has to get called before tracing
  *  rays. */
 RTCORE_API void rtcCommit (RTCScene scene);
 
-/*! Commits the geometry of the scene. The calling threads will be used
- *  internally as a worker threads. The function will wait until
- *  'numThreads' threads have called this function. After initializing
- *  or modifying geometries, commit has to get called before
- *  tracing rays. */
+/*! Commits the geometry of the scene. The calling threads will be
+ *  used internally as a worker threads on some implementations. The
+ *  function will wait until 'numThreads' threads have called this
+ *  function and all threads return from the function after the scene
+ *  commit is finished. The application threads will not be used as
+ *  worker threads when the TBB tasking system is enabled (which is
+ *  the default). On CPUs, we recommend also using TBB inside your
+ *  application to share threads. We recommend using the
+ *  rtcCommitThread feature to share threads on the Xeon Phi
+ *  coprocessor. */
 RTCORE_API void rtcCommitThread(RTCScene scene, unsigned int threadID, unsigned int numThreads);
 
 /*! Intersects a single ray with the scene. The ray has to be aligned

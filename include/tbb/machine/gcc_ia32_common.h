@@ -53,6 +53,18 @@ static inline void __TBB_machine_pause( int32_t delay ) {
 #define __TBB_Pause(V) __TBB_machine_pause(V)
 #endif /* !__TBB_Pause */
 
+namespace tbb { namespace internal { typedef uint64_t machine_tsc_t; } }
+static inline tbb::internal::machine_tsc_t __TBB_machine_time_stamp() {
+#if __INTEL_COMPILER
+    return _rdtsc();
+#else
+    tbb::internal::uint32_t hi, lo;
+    __asm__ __volatile__("rdtsc" : "=d"(hi), "=a"(lo));
+    return (tbb::internal::machine_tsc_t( hi ) << 32) | lo;
+#endif
+}
+#define __TBB_time_stamp() __TBB_machine_time_stamp()
+
 // API to retrieve/update FPU control setting
 #ifndef __TBB_CPU_CTL_ENV_PRESENT
 #define __TBB_CPU_CTL_ENV_PRESENT 1

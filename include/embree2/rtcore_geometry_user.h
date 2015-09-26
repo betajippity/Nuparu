@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2014 Intel Corporation                                    //
+// Copyright 2009-2015 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -86,11 +86,6 @@ typedef void (*RTCOccludedFunc16) (const void* valid, /*! pointer to valid mask 
  *  of the set to intersect. */
 RTCORE_API unsigned rtcNewUserGeometry (RTCScene scene,        /*!< the scene the user geometry set is created in */
                                         size_t numGeometries   /*!< the number of geometries contained in the set */);
-
-/*! Set data pointer for intersect and occluded functions. Invokations
- *  of the various user intersect and occluded functions get passed
- *  this data pointer when called. */
-RTCORE_API void rtcSetUserData (RTCScene scene, unsigned geomID, void* ptr);
 
 /*! Sets the bounding function to calculate bounding boxes of the user
  *  geometry items when building spatial index structures. The

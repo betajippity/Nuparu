@@ -239,7 +239,7 @@ namespace internal {
             //and 2 is the minimal index for which it's true
             __TBB_ASSERT(element_index, "there should be no need to call "
                                         "is_first_element_in_segment for 0th element" );
-            return is_power_of_two_factor( element_index, 2 );
+            return is_power_of_two_at_least( element_index, 2 );
         }
 
         //! An operation on an n-element array starting at begin.

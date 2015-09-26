@@ -43,7 +43,7 @@
 #endif
 #if __TBB_DEFINE_MIC
 #define __TBB_NONUNIFORM_TASK_CREATION 1
-#ifdef __TBB_machine_time_stamp
+#ifdef __TBB_time_stamp
 #define __TBB_USE_MACHINE_TIME_STAMPS 1
 #define __TBB_task_duration() __TBB_STATIC_THRESHOLD
 #endif // __TBB_machine_time_stamp
@@ -363,7 +363,7 @@ class affinity_partition_type : public adaptive_partition_type_base<affinity_par
         pass
     } my_delay;
 #ifdef __TBB_USE_MACHINE_TIME_STAMPS
-    machine_tsc_t my_dst_tsc;
+    tbb::internal::machine_tsc_t my_dst_tsc;
 #endif
     size_t my_begin;
     tbb::internal::affinity_id* my_array;
@@ -444,10 +444,10 @@ public:
 #ifndef __TBB_USE_MACHINE_TIME_STAMPS
             my_delay = pass;
 #else
-            my_dst_tsc = __TBB_machine_time_stamp() + __TBB_task_duration();
+            my_dst_tsc = __TBB_time_stamp() + __TBB_task_duration();
             my_delay = run;
         } else if( run == my_delay ) {
-            if( __TBB_machine_time_stamp() < my_dst_tsc ) {
+            if( __TBB_time_stamp() < my_dst_tsc ) {
                 __TBB_ASSERT(my_max_depth > 0, NULL);
                 return false;
             }

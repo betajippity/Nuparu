@@ -45,10 +45,6 @@
 #include <sched.h>
 #define __TBB_Yield() sched_yield()
 
-// low-level timing intrinsic and its type
-#define __TBB_machine_time_stamp() _rdtsc()
-typedef uint64_t machine_tsc_t;
-
 /** Specifics **/
 #define __TBB_STEALING_ABORT_ON_CONTENTION 1
 #define __TBB_YIELD2P 1

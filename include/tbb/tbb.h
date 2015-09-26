@@ -51,6 +51,9 @@
 #include "critical_section.h"
 #include "enumerable_thread_specific.h"
 #include "flow_graph.h"
+#if TBB_PREVIEW_GLOBAL_CONTROL
+#include "global_control.h"
+#endif
 #include "mutex.h"
 #include "null_mutex.h"
 #include "null_rw_mutex.h"

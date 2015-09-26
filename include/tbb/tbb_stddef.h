@@ -23,10 +23,10 @@
 
 // Marketing-driven product version
 #define TBB_VERSION_MAJOR 4
-#define TBB_VERSION_MINOR 3
+#define TBB_VERSION_MINOR 4
 
 // Engineering-focused interface version
-#define TBB_INTERFACE_VERSION 8004
+#define TBB_INTERFACE_VERSION 9000
 #define TBB_INTERFACE_VERSION_MAJOR TBB_INTERFACE_VERSION/1000
 
 // The oldest major interface version still supported
@@ -130,22 +130,13 @@
 //! Type for an assertion handler
 typedef void(*assertion_handler_type)( const char* filename, int line, const char* expression, const char * comment );
 
-#if TBB_USE_ASSERT
-
-    //! Assert that x is true.
-    #define __TBB_ASSERT_NS(predicate,message,ns) ((predicate)?((void)0) : ns::assertion_failure(__FILE__,__LINE__,#predicate,message))
-    /** If x is false, print assertion failure message.
-        If the comment argument is not NULL, it is printed as part of the failure message.
-        The comment argument has no other effect. */
-
 #if __TBBMALLOC_BUILD
 namespace rml { namespace internal {
-    #define __TBB_ASSERT(predicate,message) __TBB_ASSERT_NS(predicate,message,rml::internal)
+ #define __TBB_ASSERT_RELEASE(predicate,message) ((predicate)?((void)0) : rml::internal::assertion_failure(__FILE__,__LINE__,#predicate,message))
 #else
 namespace tbb {
-    #define __TBB_ASSERT(predicate,message) __TBB_ASSERT_NS(predicate,message,tbb)
+ #define __TBB_ASSERT_RELEASE(predicate,message) ((predicate)?((void)0) : tbb::assertion_failure(__FILE__,__LINE__,#predicate,message))
 #endif
-    #define __TBB_ASSERT_EX __TBB_ASSERT
 
     //! Set assertion handler and return previous value of it.
     assertion_handler_type __TBB_EXPORTED_FUNC set_assertion_handler( assertion_handler_type new_handler );
@@ -162,6 +153,16 @@ namespace tbb {
 } // namespace tbb
 #endif
 
+#if TBB_USE_ASSERT
+
+    //! Assert that x is true.
+    /** If x is false, print assertion failure message.
+        If the comment argument is not NULL, it is printed as part of the failure message.
+        The comment argument has no other effect. */
+    #define __TBB_ASSERT(predicate,message) __TBB_ASSERT_RELEASE(predicate,message)
+
+    #define __TBB_ASSERT_EX __TBB_ASSERT
+
 #else /* !TBB_USE_ASSERT */
 
     //! No-op version of __TBB_ASSERT.
@@ -174,8 +175,8 @@ namespace tbb {
 //! The namespace tbb contains all components of the library.
 namespace tbb {
 
-#if _MSC_VER && _MSC_VER<1600
     namespace internal {
+#if _MSC_VER && _MSC_VER<1600
         typedef __int8 int8_t;
         typedef __int16 int16_t;
         typedef __int32 int32_t;
@@ -184,9 +185,7 @@ namespace tbb {
         typedef unsigned __int16 uint16_t;
         typedef unsigned __int32 uint32_t;
         typedef unsigned __int64 uint64_t;
-    } // namespace internal
 #else /* Posix */
-    namespace internal {
         using ::int8_t;
         using ::int16_t;
         using ::int32_t;
@@ -195,8 +194,8 @@ namespace tbb {
         using ::uint16_t;
         using ::uint32_t;
         using ::uint64_t;
-    } // namespace internal
 #endif /* Posix */
+    } // namespace internal
 
     using std::size_t;
     using std::ptrdiff_t;
@@ -350,20 +349,18 @@ inline bool is_power_of_two(integer_type arg) {
 //! A function to compute arg modulo divisor where divisor is a power of 2.
 template<typename argument_integer_type, typename divisor_integer_type>
 inline argument_integer_type modulo_power_of_two(argument_integer_type arg, divisor_integer_type divisor) {
-    // Divisor is assumed to be a power of two (which is valid for current uses).
     __TBB_ASSERT( is_power_of_two(divisor), "Divisor should be a power of two" );
     return (arg & (divisor - 1));
 }
 
 
-//! A function to determine if "arg is a multiplication of a number and a power of 2".
-// i.e. for strictly positive i and j, with j a power of 2,
+//! A function to determine if arg is a power of 2 at least as big as another power of 2.
+// i.e. for strictly positive i and j, with j being a power of 2,
 // determines whether i==j<<k for some nonnegative k (so i==j yields true).
-template<typename argument_integer_type, typename divisor_integer_type>
-inline bool is_power_of_two_factor(argument_integer_type arg, divisor_integer_type divisor) {
-    // Divisor is assumed to be a power of two (which is valid for current uses).
-    __TBB_ASSERT( is_power_of_two(divisor), "Divisor should be a power of two" );
-    return 0 == (arg & (arg - divisor));
+template<typename argument_integer_type, typename power2_integer_type>
+inline bool is_power_of_two_at_least(argument_integer_type arg, power2_integer_type power2) {
+    __TBB_ASSERT( is_power_of_two(power2), "Divisor should be a power of two" );
+    return 0 == (arg & (arg - power2));
 }
 
 //! Utility template function to prevent "unused" warnings by various compilers.

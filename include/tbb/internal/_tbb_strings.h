@@ -27,7 +27,7 @@ TBB_STRING_RESOURCE(FLOW_JOIN_NODE_RESERVING, "join_node (reserving)")
 TBB_STRING_RESOURCE(FLOW_JOIN_NODE_TAG_MATCHING, "join_node (tag_matching)")
 TBB_STRING_RESOURCE(FLOW_LIMITER_NODE, "limiter_node")
 TBB_STRING_RESOURCE(FLOW_MULTIFUNCTION_NODE, "multifunction_node")
-TBB_STRING_RESOURCE(FLOW_OR_NODE, "or_node") //no longer in use, kept for backward compatibilty
+TBB_STRING_RESOURCE(FLOW_OR_NODE, "or_node") //no longer in use, kept for backward compatibility
 TBB_STRING_RESOURCE(FLOW_OVERWRITE_NODE, "overwrite_node")
 TBB_STRING_RESOURCE(FLOW_PRIORITY_QUEUE_NODE, "priority_queue_node")
 TBB_STRING_RESOURCE(FLOW_QUEUE_NODE, "queue_node")
@@ -64,3 +64,4 @@ TBB_STRING_RESOURCE(FLOW_OBJECT_NAME, "object_name")
 TBB_STRING_RESOURCE(FLOW_NULL, "null")
 TBB_STRING_RESOURCE(FLOW_INDEXER_NODE, "indexer_node")
 TBB_STRING_RESOURCE(FLOW_COMPOSITE_NODE, "composite_node")
+TBB_STRING_RESOURCE(FLOW_ASYNC_NODE, "async_node")
