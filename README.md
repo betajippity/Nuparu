@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.1.15.39
+v0.1.15.44
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -22,6 +22,7 @@ Nuparu currently consists of:
 * [Zlib](http://www.zlib.net/) 1.2.8 (Win)
 * [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
 * [Embree](https://embree.github.io) 2.7 (OSX/Win)
+* [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (OSX/Linux/Win)
 
 Notes:
 
