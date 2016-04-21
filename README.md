@@ -24,6 +24,7 @@ Nuparu currently consists of:
 * [Embree](https://embree.github.io) 2.7 (OSX/Win)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (OSX/Linux/Win)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.0.1 (OSX/Linux/Win)
+* [NanoGUI](https://github.com/wjakob/nanogui) (OSX)
 
 Notes:
 
