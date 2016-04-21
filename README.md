@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.1.16.16a
+v0.1.16.16c
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -13,7 +13,7 @@ Nuparu currently consists of:
 * [jsoncpp](http://sourceforge.net/projects/jsoncpp/) 0.10.5 (OSX/Win)
 * [stb_image](https://code.google.com/p/stblib/) 1.33 (OSX/Linux/Win)
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (OSX/Linux/Win)
-* [Eigen](eigen.tuxfamily.org/) 3.2.0 (OSX/Linux/Win)
+* [Eigen](eigen.tuxfamily.org/) 3.2.8 (OSX/Linux/Win)
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX/Win)
 * [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (OSX/Win)
 * [RMSD](http://boscoh.com/code/) (OSX/Linux/Win)
