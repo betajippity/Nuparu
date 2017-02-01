@@ -43,9 +43,9 @@ namespace glslUtility {
 		std::ifstream file (fname, ios::in|ios::binary|ios::ate);
 		if (file.is_open())
 		{
-			unsigned int size = (unsigned int)file.tellg();
-			fSize = size;
-			char *memblock = new char [size];
+            int size = (int)file.tellg();
+			fSize = (GLint)size;
+			char *memblock = new char [(size_t)size];
 			file.seekg (0, ios::beg);
 			file.read (memblock, size);
 			file.close();
@@ -70,7 +70,7 @@ namespace glslUtility {
 
 		if (infoLogLen > 1)
 		{
-			infoLog = new GLchar[infoLogLen];
+			infoLog = new GLchar[(size_t)infoLogLen];
 			// error check for fail to allocate memory omitted
 			glGetShaderInfoLog(shader,infoLogLen, &charsWritten, infoLog);
 			//std::cout << "InfoLog:" << std::endl << infoLog << std::endl;
@@ -88,7 +88,7 @@ namespace glslUtility {
 
 		if (infoLogLen > 1)
 		{
-			infoLog = new GLchar[infoLogLen];
+			infoLog = new GLchar[(size_t)infoLogLen];
 			// error check for fail to allocate memory omitted
 			glGetProgramInfoLog(prog,infoLogLen, &charsWritten, infoLog);
 			//std::cout << "InfoLog:" << std::endl << infoLog << std::endl;
@@ -108,8 +108,8 @@ namespace glslUtility {
 		GLint vlen;
 		GLint flen;
 
-		vlen = (unsigned int)std::strlen(passthroughVS.c_str());
-		flen = (unsigned int)std::strlen(passthroughFS.c_str());
+		vlen = (GLint)std::strlen(passthroughVS.c_str());
+		flen = (GLint)std::strlen(passthroughFS.c_str());
 
 		vs = new char[passthroughVS.length()+1];
 		fs = new char[passthroughFS.length()+1];
@@ -131,7 +131,7 @@ namespace glslUtility {
 		{
 			std::cout << "Vertex shader not compiled." << std::endl;
 		} 
-		printShaderInfoLog(v);
+		printShaderInfoLog((GLint)v);
 
 		glCompileShader(f);
 		glGetShaderiv(f, GL_COMPILE_STATUS, &compiled);
@@ -139,7 +139,7 @@ namespace glslUtility {
 		{
 			std::cout << "Fragment shader not compiled." << std::endl;
 		} 
-		printShaderInfoLog(f);
+		printShaderInfoLog((GLint)f);
 
 		shaders_t out; out.vertex = v; out.fragment = f;
 
@@ -178,7 +178,7 @@ namespace glslUtility {
 		{
 			std::cout << "Vertex shader not compiled." << std::endl;
 		} 
-		printShaderInfoLog(v);
+		printShaderInfoLog((GLint)v);
 
 		glCompileShader(f);
 		glGetShaderiv(f, GL_COMPILE_STATUS, &compiled);
@@ -186,7 +186,7 @@ namespace glslUtility {
 		{
 			std::cout << "Fragment shader not compiled." << std::endl;
 		} 
-		printShaderInfoLog(f);
+		printShaderInfoLog((GLint)f);
 
 		shaders_t out; out.vertex = v; out.fragment = f;
 
@@ -207,7 +207,7 @@ namespace glslUtility {
 		{
 			std::cout << "Program did not link." << std::endl;
 		}
-		printLinkInfoLog(program);
+		printLinkInfoLog((GLint)program);
 	}
 
 	GLuint createDefaultProgram(const char *attributeLocations[], GLuint numberOfLocations)
