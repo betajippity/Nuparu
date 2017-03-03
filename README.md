@@ -26,6 +26,7 @@ Nuparu currently consists of:
 * [tinyformat](https://github.com/c42f/tinyformat) 2.0.1 (OSX/Linux/Win)
 * [NanoGUI](https://github.com/wjakob/nanogui) (OSX)
 * [Ptex](http://ptex.us) 2.1.28 (OSX)
+* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.2.0 (OSX)
 
 Notes:
 
