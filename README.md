@@ -25,6 +25,7 @@ Nuparu currently consists of:
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (OSX/Linux/Win)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.0.1 (OSX/Linux/Win)
 * [NanoGUI](https://github.com/wjakob/nanogui) (OSX)
+* [Ptex](http://ptex.us) 2.1.28 (OSX)
 
 Notes:
 
