@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.1.17.09a
+v0.1.17.32a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -21,7 +21,7 @@ Nuparu currently consists of:
 * [TBB](https://www.threadingbuildingblocks.org/) 4.4 (OSX/Win)
 * [Zlib](http://www.zlib.net/) 1.2.8 (Win)
 * [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
-* [Embree](https://embree.github.io) 2.7 (OSX/Win)
+* [Embree](https://embree.github.io) 2.16.4 (OSX)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (OSX/Linux/Win)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.0.1 (OSX/Linux/Win)
 * [NanoGUI](https://github.com/wjakob/nanogui) (OSX)
