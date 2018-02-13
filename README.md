@@ -7,7 +7,6 @@ Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
-* [GLFW](http://www.glfw.org/) 3.1.1 (OSX/Linux/Win)
 * [GLEW](http://glew.sourceforge.net/index.html) 1.10.0 (OSX/Linux/Win)
 * [jsoncpp](http://sourceforge.net/projects/jsoncpp/) 0.10.5 (OSX/Win)
 * [stb_image](https://code.google.com/p/stblib/) 1.33 (OSX/Linux/Win)
@@ -24,12 +23,13 @@ Nuparu currently consists of:
 
 Updated:
 
-* [GLM](http://glm.g-truc.net/0.9.4/index.html) 0.9.8.5 (SRC)
-* [OpenEXR](http://www.openexr.com) 2.2.1 (OSX)
-* [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (8b6ea0d) (OSX)
-* [RMSD](http://boscoh.com/code/) (SRC)
-* [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (SRC)
-* [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (SRC)
+* [GLM](http://glm.g-truc.net) 0.9.8.5 (Src)
+* [GLFW](http://www.glfw.org) 3.2.1 (Mac)
+* [OpenEXR](http://www.openexr.com) 2.2.1 (Mac)
+* [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (8b6ea0d) (Mac)
+* [RMSD](http://boscoh.com/code/) (Src)
+* [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
+* [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 
 Notes:
 
