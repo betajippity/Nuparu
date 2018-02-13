@@ -2,13 +2,14 @@
     nanogui/popup.h -- Simple popup widget which is attached to another given
     window (can be nested)
 
-    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    NanoGUI was developed by Wenzel Jakob <wenzel.jakob@epfl.ch>.
     The widget drawing code is based on the NanoVG demo application
     by Mikko Mononen.
 
     All rights reserved. Use of this source code is governed by a
     BSD-style license that can be found in the LICENSE.txt file.
 */
+/** \file */
 
 #pragma once
 
@@ -17,6 +18,8 @@
 NAMESPACE_BEGIN(nanogui)
 
 /**
+ * \class Popup popup.h nanogui/popup.h
+ *
  * \brief Popup window for combo boxes, popup buttons, nested dialogs etc.
  *
  * Usually the Popup instance is constructed by another widget (e.g. \ref PopupButton)
@@ -24,6 +27,8 @@ NAMESPACE_BEGIN(nanogui)
  */
 class NANOGUI_EXPORT Popup : public Window {
 public:
+    enum Side { Left = 0, Right };
+
     /// Create a new popup parented to a screen (first argument) and a parent window
     Popup(Widget *parent, Window *parentWindow);
 
@@ -36,6 +41,11 @@ public:
     void setAnchorHeight(int anchorHeight) { mAnchorHeight = anchorHeight; }
     /// Return the anchor height; this determines the vertical shift relative to the anchor position
     int anchorHeight() const { return mAnchorHeight; }
+
+    /// Set the side of the parent window at which popup will appear
+    void setSide(Side popupSide) { mSide = popupSide; }
+    /// Return the side of the parent window at which popup will appear
+    Side side() const { return mSide; }
 
     /// Return the parent window of the popup
     Window *parentWindow() { return mParentWindow; }
@@ -58,6 +68,9 @@ protected:
     Window *mParentWindow;
     Vector2i mAnchorPos;
     int mAnchorHeight;
+    Side mSide;
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 NAMESPACE_END(nanogui)

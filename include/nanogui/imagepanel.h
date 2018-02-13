@@ -2,13 +2,14 @@
     nanogui/imagepanel.h -- Image panel widget which shows a number of
     square-shaped icons
 
-    NanoGUI was developed by Wenzel Jakob <wenzel@inf.ethz.ch>.
+    NanoGUI was developed by Wenzel Jakob <wenzel.jakob@epfl.ch>.
     The widget drawing code is based on the NanoVG demo application
     by Mikko Mononen.
 
     All rights reserved. Use of this source code is governed by a
     BSD-style license that can be found in the LICENSE.txt file.
 */
+/** \file */
 
 #pragma once
 
@@ -16,6 +17,11 @@
 
 NAMESPACE_BEGIN(nanogui)
 
+/**
+ * \class ImagePanel imagepanel.h nanogui/imagepanel.h
+ *
+ * \brief Image panel widget which shows a number of square-shaped icons.
+ */
 class NANOGUI_EXPORT ImagePanel : public Widget {
 public:
     typedef std::vector<std::pair<int, std::string>> Images;
@@ -42,6 +48,8 @@ protected:
     int mSpacing;
     int mMargin;
     int mMouseIndex;
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
 
 NAMESPACE_END(nanogui)
