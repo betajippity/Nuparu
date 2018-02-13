@@ -17,7 +17,6 @@ Nuparu currently consists of:
 * [NanoGUI](https://github.com/wjakob/nanogui) (OSX)
 * [Ptex](http://ptex.us) 2.1.28 (OSX)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.2.0 (OSX)
-* [Libdill](http://libdill.org) 1.6 (OSX)
 
 Updated:
 
