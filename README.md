@@ -7,7 +7,6 @@ Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
-* [stb_image](https://code.google.com/p/stblib/) 1.33 (OSX/Linux/Win)
 * [Eigen](eigen.tuxfamily.org/) 3.2.8 (OSX/Linux/Win)
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX/Win)
 * [TBB](https://www.threadingbuildingblocks.org/) 4.4 (OSX/Win)
@@ -25,6 +24,7 @@ Updated:
 * [GLEW](http://github.com/nigels-com/glew) 2.1.0 (Mac)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.8.4 (Mac)
 * [OpenEXR](http://www.openexr.com) 2.2.1 (Mac)
+* [stb_image](https://github.com/nothings/stb) 2.19 (Src)
 * [Partio](http://www.disneyanimation.com/technology/partio.html) 1.1.0 (8b6ea0d) (Mac)
 * [RMSD](http://boscoh.com/code/) (Src)
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
