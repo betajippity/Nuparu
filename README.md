@@ -7,9 +7,7 @@ Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
-* [Eigen](eigen.tuxfamily.org/) 3.2.8 (OSX/Linux/Win)
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX/Win)
-* [TBB](https://www.threadingbuildingblocks.org/) 4.4 (OSX/Win)
 * [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
 * [Ptex](http://ptex.us) 2.1.28 (OSX)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.2.0 (OSX)
@@ -17,6 +15,7 @@ Nuparu currently consists of:
 Updated:
 
 * [GLM](http://glm.g-truc.net) 0.9.8.5 (Src)
+* [Eigen](eigen.tuxfamily.org/) 3.3.4 (Src)
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.0.0 (Win)
 * [GLFW](http://www.glfw.org) 3.2.1 (Mac/Win)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win)
@@ -31,6 +30,7 @@ Updated:
 * [NanoGUI](https://github.com/wjakob/nanogui) (cf576ee) (Mac/Win)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Win)
+* [TBB](https://www.threadingbuildingblocks.org/) 2018 Update 2 (Mac/Win)
 
 Notes:
 
@@ -44,4 +44,4 @@ Notes:
 * All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
 * All binary Windows libraries are built using /MT with Visual Studio 2017.
 * All binary libraries on all platforms are built for x86-64
-* Licenses for each library are included in each library's include/ directory
+* Licenses for each library are included either in each library's include/ directory, or in source files directly
