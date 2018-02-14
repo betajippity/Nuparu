@@ -1,21 +1,21 @@
 /*
-    Copyright 2005-2015 Intel Corporation.  All Rights Reserved.
+    Copyright (c) 2005-2017 Intel Corporation
 
-    This file is part of Threading Building Blocks. Threading Building Blocks is free software;
-    you can redistribute it and/or modify it under the terms of the GNU General Public License
-    version 2  as  published  by  the  Free Software Foundation.  Threading Building Blocks is
-    distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
-    implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-    See  the GNU General Public License for more details.   You should have received a copy of
-    the  GNU General Public License along with Threading Building Blocks; if not, write to the
-    Free Software Foundation, Inc.,  51 Franklin St,  Fifth Floor,  Boston,  MA 02110-1301 USA
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
 
-    As a special exception,  you may use this file  as part of a free software library without
-    restriction.  Specifically,  if other files instantiate templates  or use macros or inline
-    functions from this file, or you compile this file and link it with other files to produce
-    an executable,  this file does not by itself cause the resulting executable to be covered
-    by the GNU General Public License. This exception does not however invalidate any other
-    reasons why the executable file might be covered by the GNU General Public License.
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+
+
+
 */
 
 #ifndef __TBB__flow_graph_types_impl_H
@@ -25,7 +25,7 @@
 #error Do not #include this internal file directly; use public TBB headers instead.
 #endif
 
-// included in namespace tbb::flow::interface8
+// included in namespace tbb::flow::interfaceX
 
 namespace internal {
 
@@ -315,6 +315,66 @@ namespace internal {
     };
 #endif
 
+#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT
+    template< int... S > class sequence {};
+
+    template< int N, int... S >
+    struct make_sequence : make_sequence < N - 1, N - 1, S... > {};
+
+    template< int... S >
+    struct make_sequence < 0, S... > {
+        typedef sequence<S...> type;
+    };
+#endif /* __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT */
+
+#if __TBB_INITIALIZER_LISTS_PRESENT
+    // Until C++14 std::initializer_list does not guarantee life time of contained objects.
+    template <typename T>
+    class initializer_list_wrapper {
+    public:
+        typedef T value_type;
+        typedef const T& reference;
+        typedef const T& const_reference;
+        typedef size_t size_type;
+
+        typedef T* iterator;
+        typedef const T* const_iterator;
+
+        initializer_list_wrapper( std::initializer_list<T> il ) __TBB_NOEXCEPT( true ) : my_begin( static_cast<T*>(malloc( il.size()*sizeof( T ) )) ) {
+            iterator dst = my_begin;
+            for ( typename std::initializer_list<T>::const_iterator src = il.begin(); src != il.end(); ++src )
+                new (dst++) T( *src );
+            my_end = dst;
+        }
+
+        initializer_list_wrapper( const initializer_list_wrapper<T>& ilw ) __TBB_NOEXCEPT( true ) : my_begin( static_cast<T*>(malloc( ilw.size()*sizeof( T ) )) ) {
+            iterator dst = my_begin;
+            for ( typename std::initializer_list<T>::const_iterator src = ilw.begin(); src != ilw.end(); ++src )
+                new (dst++) T( *src );
+            my_end = dst;
+        }
+
+#if __TBB_CPP11_RVALUE_REF_PRESENT
+        initializer_list_wrapper( initializer_list_wrapper<T>&& ilw ) __TBB_NOEXCEPT( true ) : my_begin( ilw.my_begin ), my_end( ilw.my_end ) {
+            ilw.my_begin = ilw.my_end = NULL;
+        }
+#endif /* __TBB_CPP11_RVALUE_REF_PRESENT */
+
+        ~initializer_list_wrapper() {
+            if ( my_begin )
+                free( my_begin );
+        }
+
+        const_iterator begin() const __TBB_NOEXCEPT(true) { return my_begin; }
+        const_iterator end() const __TBB_NOEXCEPT(true) { return my_end; }
+        size_t size() const __TBB_NOEXCEPT(true) { return (size_t)(my_end - my_begin); }
+
+    private:
+        iterator my_begin;
+        iterator my_end;
+    };
+#endif /* __TBB_INITIALIZER_LISTS_PRESENT */
+
 //! type mimicking std::pair but with trailing fill to ensure each element of an array
 //* will have the correct alignment
     template<typename T1, typename T2, size_t REM>
@@ -391,12 +451,12 @@ public:
     explicit Wrapper( const T& other ) : value_space(other) { }
     explicit Wrapper(const Wrapper& other) : value_space(other.value_space) { }
 
-    /*override*/void CopyTo(void* newSpace) const {
+    void CopyTo(void* newSpace) const __TBB_override {
         _unwind_space guard((pointer_type)newSpace);
         (void) new(newSpace) Wrapper(value_space);
         guard.space = NULL;
     }
-    /*override*/~Wrapper() { }
+    ~Wrapper() { }
 };
 
 // specialization for array objects
@@ -459,11 +519,11 @@ public:
         guard.space = NULL;
     }
 
-    /*override*/void CopyTo(void* newSpace) const {
+    void CopyTo(void* newSpace) const __TBB_override {
         (void) new(newSpace) Wrapper(*this);  // exceptions handled in copy constructor
     }
 
-    /*override*/~Wrapper() {
+    ~Wrapper() {
         // have to destroy explicitly in reverse order
         pointer_type vp = reinterpret_cast<pointer_type>(&value_space);
         for(size_t i = N; i > 0 ; --i ) vp[i-1].~value_type();
@@ -645,6 +705,8 @@ const V& cast_to(T const &t) { return t.template cast_to<V>(); }
 
 template<typename V, typename T>
 bool is_a(T const &t) { return t.template is_a<V>(); }
+
+enum op_stat { WAIT = 0, SUCCEEDED, FAILED };
 
 }  // namespace internal
 
