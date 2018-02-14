@@ -268,7 +268,7 @@ inline void formatTruncated(std::ostream& out, const T& value, int ntrunc)
     std::ostringstream tmp;
     tmp << value;
     std::string result = tmp.str();
-    out.write(result.c_str(), std::min(ntrunc, static_cast<int>(result.size())));
+    out.write(result.c_str(), (std::min)(ntrunc, static_cast<int>(result.size())));
 }
 #define TINYFORMAT_DEFINE_FORMAT_TRUNCATED_CSTR(type)       \
 inline void formatTruncated(std::ostream& out, type* value, int ntrunc) \
@@ -318,8 +318,8 @@ inline void formatValue(std::ostream& out, const char* /*fmtBegin*/,
     // void* respectively and format that instead of the value itself.  For the
     // %p conversion it's important to avoid dereferencing the pointer, which
     // could otherwise lead to a crash when printing a dangling (const char*).
-    bool canConvertToChar = detail::is_convertible<T,char>::value;
-    bool canConvertToVoidPtr = detail::is_convertible<T, const void*>::value;
+    const bool canConvertToChar = detail::is_convertible<T,char>::value;
+    const bool canConvertToVoidPtr = detail::is_convertible<T, const void*>::value;
     if(canConvertToChar && *(fmtEnd-1) == 'c')
         detail::formatValueAsType<T, char>::invoke(out, value);
     else if(canConvertToVoidPtr && *(fmtEnd-1) == 'p')
@@ -552,14 +552,16 @@ inline const char* printFormatStringLiteral(std::ostream& out, const char* fmt)
         switch(*c)
         {
             case '\0':
-                out.write(fmt, static_cast<std::streamsize>(c - fmt));
+                out.write(fmt, c - fmt);
                 return c;
             case '%':
-                out.write(fmt, static_cast<std::streamsize>(c - fmt));
+                out.write(fmt, c - fmt);
                 if(*(c+1) != '%')
                     return c;
                 // for "%%", tack trailing % onto next literal section.
                 fmt = ++c;
+                break;
+            default:
                 break;
         }
     }
@@ -630,6 +632,8 @@ inline const char* streamStateFromFormat(std::ostream& out, bool& spacePadPositi
                 spacePadPositive = false;
                 widthExtra = 1;
                 continue;
+            default:
+                break;
         }
         break;
     }
@@ -743,6 +747,8 @@ inline const char* streamStateFromFormat(std::ostream& out, bool& spacePadPositi
             TINYFORMAT_ERROR("tinyformat: Conversion spec incorrectly "
                              "terminated by end of string");
             return c;
+        default:
+            break;
     }
     if(intConversion && precisionSet && !widthSet)
     {

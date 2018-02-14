@@ -12,7 +12,6 @@ Nuparu currently consists of:
 * [TBB](https://www.threadingbuildingblocks.org/) 4.4 (OSX/Win)
 * [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
 * [Embree](https://embree.github.io) 2.17.0 (OSX)
-* [tinyformat](https://github.com/c42f/tinyformat) 2.0.1 (OSX/Linux/Win)
 * [Ptex](http://ptex.us) 2.1.28 (OSX)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.2.0 (OSX)
 
@@ -30,6 +29,7 @@ Updated:
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 * [NanoGUI](https://github.com/wjakob/nanogui) (cf576ee) (Mac/Win)
+* [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Win)
 
 Notes:
