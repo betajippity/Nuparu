@@ -9,7 +9,6 @@ Nuparu currently consists of:
 
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX/Win)
 * [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
-* [Ptex](http://ptex.us) 2.1.28 (OSX)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.2.0 (OSX)
 
 Updated:
@@ -23,6 +22,7 @@ Updated:
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.8.4 (Mac/Win)
 * [OpenEXR](http://www.openexr.com) 2.2.1 (Mac/Win)
 * [stb_image](https://github.com/nothings/stb) 2.19 (Src)
+* [Ptex](http://ptex.us) 2.1.33 (Mac/Win)
 * [Partio](https://www.disneyanimation.com/technology/partio.html) 1.1.0 (8b6ea0d) (Mac/Win)
 * [RMSD](http://boscoh.com/code/) (Src)
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
