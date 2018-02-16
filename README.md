@@ -8,7 +8,6 @@ Third Party dependencies and foundation libraries for Karl's graphics projects
 Nuparu currently consists of:
 
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX/Win)
-* [Boost](http://www.boost.org) 1.55.0 (OSX/Linux/Win)
 
 Updated:
 
@@ -30,6 +29,7 @@ Updated:
 * [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Win)
 * [TBB](https://www.threadingbuildingblocks.org/) 2018 Update 2 (Mac/Win)
+* [Boost](http://www.boost.org) 1.66.0 (Src)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.1 (Mac/Win)
 
 Notes:
@@ -39,6 +39,7 @@ Notes:
 * Since macOS ships with Zlib and GLUT by default, Nuparu does not include Zlib or FreeGLUT for macOS
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included. The components of Boost included are header-only.
 * OpenVDB has a slight modification in Coord.h for Windows support
+* Partio on Windows does not have support for .prt files
 * RMSD has minor modifications for C++ support
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
 * All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
