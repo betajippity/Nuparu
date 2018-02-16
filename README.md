@@ -8,13 +8,12 @@ Third Party dependencies and foundation libraries for Karl's graphics projects
 Nuparu currently consists of:
 
 * [OpenVDB](http://www.openvdb.org/) 2.3.0 (OSX/Win)
-* [Boost](www.boost.org) 1.55.0 (OSX/Linux/Win)
-* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.2.0 (OSX)
+* [Boost](http://www.boost.org) 1.55.0 (OSX/Linux/Win)
 
 Updated:
 
 * [GLM](http://glm.g-truc.net) 0.9.8.5 (Src)
-* [Eigen](eigen.tuxfamily.org/) 3.3.4 (Src)
+* [Eigen](http://eigen.tuxfamily.org/) 3.3.4 (Src)
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.0.0 (Win)
 * [GLFW](http://www.glfw.org) 3.2.1 (Mac/Win)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win)
@@ -31,6 +30,7 @@ Updated:
 * [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Win)
 * [TBB](https://www.threadingbuildingblocks.org/) 2018 Update 2 (Mac/Win)
+* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.1 (Mac/Win)
 
 Notes:
 
