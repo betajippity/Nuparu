@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,15 +34,19 @@
 #ifndef OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 
-#include <sstream>
-#include <boost/type_traits/is_integral.hpp>
 #include "Math.h"
+#include <cmath>
+#include <sstream>
 
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
+
+/// @brief Dummy class for tag dispatch of conversion constructors
+struct Conversion {};
+
 
 /// @class Tuple "Tuple.h"
 /// A base class for homogenous tuple types
@@ -54,31 +58,44 @@ public:
 
     static const int size = SIZE;
 
-    /// Default ctor.  Does nothing.  Required because declaring a copy (or
-    /// other) constructor means the default constructor gets left out.
+    /// @brief Default ctor.  Does nothing.
+    /// @details This is required because declaring a copy (or other) constructor
+    /// prevents the compiler from synthesizing a default constructor.
     Tuple() {}
 
     /// Copy constructor.  Used when the class signature matches exactly.
-    inline Tuple(Tuple const &src) {
+    Tuple(Tuple const& src) {
         for (int i = 0; i < SIZE; ++i) {
             mm[i] = src.mm[i];
         }
     }
 
-    /// Conversion constructor.  Tuples with different value types and
-    /// different sizes can be interconverted using this member.  Converting
-    /// from a larger tuple results in truncation; converting from a smaller
-    /// tuple results in the extra data members being zeroed out.  This
-    /// function assumes that the integer 0 is convertible to the tuple's
-    /// value type.
+    /// @brief Assignment operator
+    /// @details This is required because declaring a copy (or other) constructor
+    /// prevents the compiler from synthesizing a default assignment operator.
+    Tuple& operator=(Tuple const& src) {
+        if (&src != this) {
+            for (int i = 0; i < SIZE; ++i) {
+                mm[i] = src.mm[i];
+            }
+        }
+        return *this;
+    }
+
+    /// @brief Conversion constructor.
+    /// @details Tuples with different value types and different sizes can be
+    /// interconverted using this member.  Converting from a larger tuple
+    /// results in truncation; converting from a smaller tuple results in
+    /// the extra data members being zeroed out.  This function assumes that
+    /// the integer 0 is convertible to the tuple's value type.
     template <int src_size, typename src_valtype>
     explicit Tuple(Tuple<src_size, src_valtype> const &src) {
-        static const int copyEnd = SIZE < src_size ? SIZE : src_size;
+        enum { COPY_END = (SIZE < src_size ? SIZE : src_size) };
 
-        for (int i = 0; i < copyEnd; ++i) {
+        for (int i = 0; i < COPY_END; ++i) {
             mm[i] = src[i];
         }
-        for (int i = copyEnd; i < SIZE; ++i) {
+        for (int i = COPY_END; i < SIZE; ++i) {
             mm[i] = 0;
         }
     }
@@ -120,8 +137,7 @@ public:
     //@}  Compatibility
 
     /// @return string representation of Classname
-    std::string
-    str() const {
+    std::string str() const {
         std::ostringstream buffer;
 
         buffer << "[";
@@ -129,7 +145,7 @@ public:
         // For each column
         for (unsigned j(0); j < SIZE; j++) {
             if (j) buffer << ", ";
-            buffer << mm[j];
+            buffer << PrintCast(mm[j]);
         }
 
         buffer << "]";
@@ -142,6 +158,38 @@ public:
     }
     void read(std::istream& is) {
         is.read(reinterpret_cast<char*>(&mm), sizeof(T)*SIZE);
+    }
+
+    /// True if a Nan is present in this tuple
+    bool isNan() const { 
+        for (int i = 0; i < SIZE; ++i) {
+            if (std::isnan(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if an Inf is present in this tuple
+    bool isInfinite() const {
+        for (int i = 0; i < SIZE; ++i) {
+            if (std::isinf(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if no Nan or Inf values are present
+    bool isFinite() const {
+        for (int i = 0; i < SIZE; ++i) {
+            if (!std::isfinite(mm[i])) return false;
+        }
+        return true;
+    }
+
+    /// True if all elements are exactly zero
+    bool isZero() const {
+        for (int i = 0; i < SIZE; ++i) {
+            if (!isZero(mm[i])) return false;
+        }
+        return true;
     }
 
 protected:
@@ -157,7 +205,7 @@ template<int SIZE, typename T0, typename T1>
 bool
 operator<(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
 {
-    for (size_t i = 0; i < SIZE-1; ++i) {
+    for (int i = 0; i < SIZE-1; ++i) {
         if (!isExactlyEqual(t0[i], t1[i])) return t0[i] < t1[i];
     }
     return t0[SIZE-1] < t1[SIZE-1];
@@ -169,7 +217,7 @@ template<int SIZE, typename T0, typename T1>
 bool
 operator>(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
 {
-    for (size_t i = 0; i < SIZE-1; ++i) {
+    for (int i = 0; i < SIZE-1; ++i) {
         if (!isExactlyEqual(t0[i], t1[i])) return t0[i] > t1[i];
     }
     return t0[SIZE-1] > t1[SIZE-1];
@@ -179,37 +227,31 @@ operator>(const Tuple<SIZE, T0>& t0, const Tuple<SIZE, T1>& t1)
 ////////////////////////////////////////
 
 
-/// Helper class to compute the absolute value of a Tuple
-template<int SIZE, typename T, bool IsInteger>
-struct TupleAbs {
-    static inline Tuple<SIZE, T> absVal(const Tuple<SIZE, T>& t)
-    {
-        Tuple<SIZE, T> result;
-        for (size_t i = 0; i < SIZE; ++i) result[i] = ::fabs(t[i]);
-        return result;
-    }
-};
-
-// Partial specialization for integer types, using abs() instead of fabs()
-template<int SIZE, typename T>
-struct TupleAbs<SIZE, T, /*IsInteger=*/true> {
-    static inline Tuple<SIZE, T> absVal(const Tuple<SIZE, T>& t)
-    {
-        Tuple<SIZE, T> result;
-        for (size_t i = 0; i < SIZE; ++i) result[i] = ::abs(t[i]);
-        return result;
-    }
-};
-
-
 /// @return the absolute value of the given Tuple.
 template<int SIZE, typename T>
 Tuple<SIZE, T>
 Abs(const Tuple<SIZE, T>& t)
 {
-    return TupleAbs<SIZE, T, boost::is_integral<T>::value>::absVal(t);
+    Tuple<SIZE, T> result;
+    for (int i = 0; i < SIZE; ++i) result[i] = math::Abs(t[i]);
+    return result;
 }
 
+/// Return @c true if a Nan is present in the tuple.
+template<int SIZE, typename T>
+inline bool isNan(const Tuple<SIZE, T>& t) { return t.isNan(); }
+
+/// Return @c true if an Inf is present in the tuple.
+template<int SIZE, typename T>
+inline bool isInfinite(const Tuple<SIZE, T>& t) { return t.isInfinite(); }
+
+/// Return @c true if no Nan or Inf values are present.
+template<int SIZE, typename T>
+inline bool isFinite(const Tuple<SIZE, T>& t) { return t.isFinite(); }
+
+/// Return @c true if all elements are exactly equal to zero.
+template<int SIZE, typename T>
+inline bool isZero(const Tuple<SIZE, T>& t) { return t.isZero(); }
 
 ////////////////////////////////////////
 
@@ -228,6 +270,6 @@ std::ostream& operator<<(std::ostream& ostr, const Tuple<SIZE, T>& classname)
 
 #endif // OPENVDB_MATH_TUPLE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

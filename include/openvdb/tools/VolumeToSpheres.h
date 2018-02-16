@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,27 +28,27 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file tools/VolumeToSpheres.h
+///
+/// @brief Fill a closed level set or fog volume with adaptively-sized spheres.
+
 #ifndef OPENVDB_TOOLS_VOLUME_TO_SPHERES_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_SPHERES_HAS_BEEN_INCLUDED
 
-#include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
-#include <openvdb/tools/Morphology.h> // for erodeVoxels()
-
-#include <openvdb/tools/PointScatter.h>
-#include <openvdb/tools/LevelSetUtil.h>
-#include <openvdb/tools/VolumeToMesh.h>
+#include "Morphology.h" // for erodeVoxels()
+#include "PointScatter.h"
+#include "LevelSetUtil.h"
+#include "VolumeToMesh.h"
 
 #include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 
-#include <vector>
 #include <limits> // std::numeric_limits
-
-//////////
+#include <memory>
+#include <vector>
 
 
 namespace openvdb {
@@ -56,37 +56,26 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-
-/// @brief  Threaded method to fill a closed level set or fog volume
-///         with adaptively sized spheres.
+/// @brief Fill a closed level set or fog volume with adaptively-sized spheres.
 ///
-/// @param grid             a scalar gird to fill with spheres.
-///
-/// @param spheres          a @c Vec4 array representing the spheres that returned by this
-///                         method. The first three components specify the sphere center
-///                         and the fourth is the radius. The spheres in this array are
-///                         ordered by radius, biggest to smallest.
-///
-/// @param maxSphereCount   no more than this number of spheres are generated.
-///
+/// @param grid             a scalar grid that defines the surface to be filled with spheres
+/// @param spheres          an output array of 4-tuples representing the fitted spheres<BR>
+///                         The first three components of each tuple specify the sphere center,
+///                         and the fourth specifies the radius.
+///                         The spheres are ordered by radius, from largest to smallest.
+/// @param maxSphereCount   no more than this number of spheres are generated
 /// @param overlapping      toggle to allow spheres to overlap/intersect
-///
-/// @param minRadius        determines the smallest sphere size in voxel units.
-///
-/// @param maxRadius        determines the largest sphere size in voxel units.
-///
-/// @param isovalue         the crossing point of the volume values that is considered
-///                         the surface. The zero default value works for signed distance
-///                         fields while fog volumes require a larger positive value,
-///                         0.5 is a good initial guess.
-///
-/// @param instanceCount    how many interior points to consider for the sphere placement,
-///                         increasing this count increases the chances of finding optimal
+/// @param minRadius        the smallest allowable sphere size, in voxel units
+/// @param maxRadius        the largest allowable sphere size, in voxel units
+/// @param isovalue         the voxel value that determines the surface of the volume<BR>
+///                         The default value of zero works for signed distance fields,
+///                         while fog volumes require a larger positive value
+///                         (0.5 is a good initial guess).
+/// @param instanceCount    the number of interior points to consider for the sphere placement<BR>
+///                         Increasing this count increases the chances of finding optimal
 ///                         sphere sizes.
-///
-/// @param interrupter      a pointer adhering to the util::NullInterrupter interface
-///
-template<typename GridT, typename InterrupterT>
+/// @param interrupter      pointer to an object adhering to the util::NullInterrupter interface
+template<typename GridT, typename InterrupterT = util::NullInterrupter>
 inline void
 fillWithSpheres(
     const GridT& grid,
@@ -97,119 +86,80 @@ fillWithSpheres(
     float maxRadius = std::numeric_limits<float>::max(),
     float isovalue = 0.0,
     int instanceCount = 10000,
-    InterrupterT* interrupter = NULL);
-
-
-/// @brief  @c fillWithSpheres method variant that automatically infers
-///         the util::NullInterrupter.
-template<typename GridT>
-inline void
-fillWithSpheres(
-    const GridT& grid,
-    std::vector<openvdb::Vec4s>& spheres,
-    int maxSphereCount,
-    bool overlapping = false,
-    float minRadius = 1.0,
-    float maxRadius = std::numeric_limits<float>::max(),
-    float isovalue = 0.0,
-    int instanceCount = 10000)
-{
-    fillWithSpheres<GridT, util::NullInterrupter>(grid, spheres,
-        maxSphereCount, overlapping, minRadius, maxRadius, isovalue, instanceCount);
-}
+    InterrupterT* interrupter = nullptr);
 
 
 ////////////////////////////////////////
 
 
-/// @brief  Accelerated closest surface point queries for narrow band level sets.
-///         Supports queries that originate at arbitrary worldspace locations, is
-///         not confined to the narrow band region of the input volume geometry.
+/// @brief  Accelerated closest surface point queries for narrow band level sets
+/// @details Supports queries that originate at arbitrary world-space locations,
+/// is not confined to the narrow band region of the input volume geometry.
 template<typename GridT>
 class ClosestSurfacePoint
 {
 public:
-    typedef typename GridT::TreeType TreeT;
-    typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
-    typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
+    using Ptr = std::unique_ptr<ClosestSurfacePoint>;
+    using TreeT = typename GridT::TreeType;
+    using BoolTreeT = typename TreeT::template ValueConverter<bool>::Type;
+    using Index32TreeT = typename TreeT::template ValueConverter<Index32>::Type;
+    using Int16TreeT = typename TreeT::template ValueConverter<Int16>::Type;
 
-
-    ClosestSurfacePoint();
-
-
-    /// @brief  Extracts the surface points and constructs a spatial acceleration structure.
+    /// @brief Extract surface points and construct a spatial acceleration structure.
     ///
-    /// @param grid             a scalar gird, level set or fog volume.
+    /// @return a null pointer if the initialization fails for any reason,
+    /// otherwise a unique pointer to a newly-allocated ClosestSurfacePoint object.
     ///
-    /// @param isovalue         the crossing point of the volume values that is considered
-    ///                         the surface. The zero default value works for signed distance
-    ///                         fields while fog volumes require a larger positive value,
-    ///                         0.5 is a good initial guess.
-    ///
-    /// @param interrupter      a pointer adhering to the util::NullInterrupter interface.
-    ///
-    template<typename InterrupterT>
-    void initialize(const GridT& grid, float isovalue = 0.0, InterrupterT* interrupter = NULL);
+    /// @param grid         a scalar level set or fog volume
+    /// @param isovalue     the voxel value that determines the surface of the volume
+    ///                     The default value of zero works for signed distance fields,
+    ///                     while fog volumes require a larger positive value
+    ///                     (0.5 is a good initial guess).
+    /// @param interrupter  pointer to an object adhering to the util::NullInterrupter interface.
+    template<typename InterrupterT = util::NullInterrupter>
+    static inline Ptr create(const GridT& grid, float isovalue = 0.0,
+        InterrupterT* interrupter = nullptr);
 
+    /// @brief Compute the distance from each input point to its closest surface point.
+    /// @param points       input list of points in world space
+    /// @param distances    output list of closest surface point distances
+    inline bool search(const std::vector<Vec3R>& points, std::vector<float>& distances);
 
-    /// @brief  @c initialize method variant that automatically infers
-    ///         the util::NullInterrupter.
-    void initialize(const GridT& grid, float isovalue = 0.0);
+    /// @brief Overwrite each input point with its closest surface point.
+    /// @param points       input/output list of points in world space
+    /// @param distances    output list of closest surface point distances
+    inline bool searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances);
 
-
-
-    /// @brief Computes distance to closest surface.
-    ///
-    /// @param points       search locations in world space.
-    ///
-    /// @param distances    list of closest surface point distances, populated by this method.
-    ///
-    bool search(const std::vector<Vec3R>& points, std::vector<float>& distances);
-
-
-    /// @brief Performs closest point searches.
-    ///
-    /// @param points       search locations in world space to be replaced by their closest
-    ///                     surface point.
-    ///
-    /// @param distances    list of closest surface point distances, populated by this method.
-    ///
-    bool searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances);
-
-
-    /// @{
-    /// @brief Tree accessors
-    const IntTreeT& indexTree() const { return *mIdxTreePt; }
+    /// @brief Tree accessor
+    const Index32TreeT& indexTree() const { return *mIdxTreePt; }
+    /// @brief Tree accessor
     const Int16TreeT& signTree() const { return *mSignTreePt; }
-    /// @}
 
 private:
-    typedef typename IntTreeT::LeafNodeType IntLeafT;
-    typedef std::pair<size_t, size_t> IndexRange;
+    using Index32LeafT = typename Index32TreeT::LeafNodeType;
+    using IndexRange = std::pair<size_t, size_t>;
 
-    bool mIsInitialized;
     std::vector<Vec4R> mLeafBoundingSpheres, mNodeBoundingSpheres;
     std::vector<IndexRange> mLeafRanges;
-    std::vector<const IntLeafT*> mLeafNodes;
+    std::vector<const Index32LeafT*> mLeafNodes;
     PointList mSurfacePointList;
-    size_t mPointListSize, mMaxNodeLeafs;
-    float mMaxRadiusSqr;
-    typename IntTreeT::Ptr mIdxTreePt;
+    size_t mPointListSize = 0, mMaxNodeLeafs = 0;
+    typename Index32TreeT::Ptr mIdxTreePt;
     typename Int16TreeT::Ptr mSignTreePt;
 
-    bool search(std::vector<Vec3R>&, std::vector<float>&, bool transformPoints);
+    ClosestSurfacePoint() = default;
+    template<typename InterrupterT = util::NullInterrupter>
+    inline bool initialize(const GridT&, float isovalue, InterrupterT*);
+    inline bool search(std::vector<Vec3R>&, std::vector<float>&, bool transformPoints);
 };
 
 
 ////////////////////////////////////////
 
 
-
-
 // Internal utility methods
 
-
-namespace internal {
+namespace v2s_internal {
 
 struct PointAccessor
 {
@@ -227,13 +177,13 @@ private:
 };
 
 
-template<typename IntLeafT>
-class LeafBS
+template<typename Index32LeafT>
+class LeafOp
 {
 public:
 
-    LeafBS(std::vector<Vec4R>& leafBoundingSpheres,
-        const std::vector<const IntLeafT*>& leafNodes,
+    LeafOp(std::vector<Vec4R>& leafBoundingSpheres,
+        const std::vector<const Index32LeafT*>& leafNodes,
         const math::Transform& transform,
         const PointList& surfacePointList);
 
@@ -244,15 +194,15 @@ public:
 
 private:
     std::vector<Vec4R>& mLeafBoundingSpheres;
-    const std::vector<const IntLeafT*>& mLeafNodes;
+    const std::vector<const Index32LeafT*>& mLeafNodes;
     const math::Transform& mTransform;
     const PointList& mSurfacePointList;
 };
 
-template<typename IntLeafT>
-LeafBS<IntLeafT>::LeafBS(
+template<typename Index32LeafT>
+LeafOp<Index32LeafT>::LeafOp(
     std::vector<Vec4R>& leafBoundingSpheres,
-    const std::vector<const IntLeafT*>& leafNodes,
+    const std::vector<const Index32LeafT*>& leafNodes,
     const math::Transform& transform,
     const PointList& surfacePointList)
     : mLeafBoundingSpheres(leafBoundingSpheres)
@@ -262,9 +212,9 @@ LeafBS<IntLeafT>::LeafBS(
 {
 }
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-LeafBS<IntLeafT>::run(bool threaded)
+LeafOp<Index32LeafT>::run(bool threaded)
 {
     if (threaded) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, mLeafNodes.size()), *this);
@@ -273,15 +223,14 @@ LeafBS<IntLeafT>::run(bool threaded)
     }
 }
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-LeafBS<IntLeafT>::operator()(const tbb::blocked_range<size_t>& range) const
+LeafOp<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
 {
-    typename IntLeafT::ValueOnCIter iter;
+    typename Index32LeafT::ValueOnCIter iter;
     Vec3s avg;
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
-
         avg[0] = 0.0;
         avg[1] = 0.0;
         avg[2] = 0.0;
@@ -291,39 +240,35 @@ LeafBS<IntLeafT>::operator()(const tbb::blocked_range<size_t>& range) const
             avg += mSurfacePointList[iter.getValue()];
             ++count;
         }
-
         if (count > 1) avg *= float(1.0 / double(count));
 
         float maxDist = 0.0;
-
         for (iter = mLeafNodes[n]->cbeginValueOn(); iter; ++iter) {
             float tmpDist = (mSurfacePointList[iter.getValue()] - avg).lengthSqr();
             if (tmpDist > maxDist) maxDist = tmpDist;
         }
 
         Vec4R& sphere = mLeafBoundingSpheres[n];
-
         sphere[0] = avg[0];
         sphere[1] = avg[1];
         sphere[2] = avg[2];
-        sphere[3] = maxDist * 2.0; // padded radius
+        sphere[3] = std::sqrt(maxDist);
     }
 }
 
 
-class NodeBS
+class NodeOp
 {
 public:
-    typedef std::pair<size_t, size_t> IndexRange;
+    using IndexRange = std::pair<size_t, size_t>;
 
-    NodeBS(std::vector<Vec4R>& nodeBoundingSpheres,
+    NodeOp(std::vector<Vec4R>& nodeBoundingSpheres,
         const std::vector<IndexRange>& leafRanges,
         const std::vector<Vec4R>& leafBoundingSpheres);
 
-    void run(bool threaded = true);
+    inline void run(bool threaded = true);
 
-
-    void operator()(const tbb::blocked_range<size_t>&) const;
+    inline void operator()(const tbb::blocked_range<size_t>&) const;
 
 private:
     std::vector<Vec4R>& mNodeBoundingSpheres;
@@ -332,7 +277,7 @@ private:
 };
 
 inline
-NodeBS::NodeBS(std::vector<Vec4R>& nodeBoundingSpheres,
+NodeOp::NodeOp(std::vector<Vec4R>& nodeBoundingSpheres,
     const std::vector<IndexRange>& leafRanges,
     const std::vector<Vec4R>& leafBoundingSpheres)
     : mNodeBoundingSpheres(nodeBoundingSpheres)
@@ -342,7 +287,7 @@ NodeBS::NodeBS(std::vector<Vec4R>& nodeBoundingSpheres,
 }
 
 inline void
-NodeBS::run(bool threaded)
+NodeOp::run(bool threaded)
 {
     if (threaded) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, mLeafRanges.size()), *this);
@@ -352,9 +297,9 @@ NodeBS::run(bool threaded)
 }
 
 inline void
-NodeBS::operator()(const tbb::blocked_range<size_t>& range) const
+NodeOp::operator()(const tbb::blocked_range<size_t>& range) const
 {
-    Vec3s avg, pos;
+    Vec3d avg, pos;
 
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
@@ -362,7 +307,7 @@ NodeBS::operator()(const tbb::blocked_range<size_t>& range) const
         avg[1] = 0.0;
         avg[2] = 0.0;
 
-        int count = mLeafRanges[n].second - mLeafRanges[n].first;
+        int count = int(mLeafRanges[n].second) - int(mLeafRanges[n].first);
 
         for (size_t i = mLeafRanges[n].first; i < mLeafRanges[n].second; ++i) {
             avg[0] += mLeafBoundingSpheres[i][0];
@@ -373,14 +318,14 @@ NodeBS::operator()(const tbb::blocked_range<size_t>& range) const
         if (count > 1) avg *= float(1.0 / double(count));
 
 
-        float maxDist = 0.0;
+        double maxDist = 0.0;
 
         for (size_t i = mLeafRanges[n].first; i < mLeafRanges[n].second; ++i) {
             pos[0] = mLeafBoundingSpheres[i][0];
             pos[1] = mLeafBoundingSpheres[i][1];
             pos[2] = mLeafBoundingSpheres[i][2];
 
-            float tmpDist = (pos - avg).lengthSqr() + mLeafBoundingSpheres[i][3];
+            double tmpDist = (pos - avg).length() + mLeafBoundingSpheres[i][3];
             if (tmpDist > maxDist) maxDist = tmpDist;
         }
 
@@ -389,26 +334,25 @@ NodeBS::operator()(const tbb::blocked_range<size_t>& range) const
         sphere[0] = avg[0];
         sphere[1] = avg[1];
         sphere[2] = avg[2];
-        sphere[3] = maxDist * 2.0; // padded radius
+        sphere[3] = maxDist;
     }
 }
-
 
 
 ////////////////////////////////////////
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 class ClosestPointDist
 {
 public:
-    typedef std::pair<size_t, size_t> IndexRange;
+    using IndexRange = std::pair<size_t, size_t>;
 
     ClosestPointDist(
         std::vector<Vec3R>& instancePoints,
         std::vector<float>& instanceDistances,
         const PointList& surfacePointList,
-        const std::vector<const IntLeafT*>& leafNodes,
+        const std::vector<const Index32LeafT*>& leafNodes,
         const std::vector<IndexRange>& leafRanges,
         const std::vector<Vec4R>& leafBoundingSpheres,
         const std::vector<Vec4R>& nodeBoundingSpheres,
@@ -423,7 +367,7 @@ public:
 
 private:
 
-    void evalLeaf(size_t index, const IntLeafT& leaf) const;
+    void evalLeaf(size_t index, const Index32LeafT& leaf) const;
     void evalNode(size_t pointIndex, size_t nodeIndex) const;
 
 
@@ -432,7 +376,7 @@ private:
 
     const PointList& mSurfacePointList;
 
-    const std::vector<const IntLeafT*>& mLeafNodes;
+    const std::vector<const Index32LeafT*>& mLeafNodes;
     const std::vector<IndexRange>& mLeafRanges;
     const std::vector<Vec4R>& mLeafBoundingSpheres;
     const std::vector<Vec4R>& mNodeBoundingSpheres;
@@ -441,15 +385,15 @@ private:
 
     const bool mTransformPoints;
     size_t mClosestPointIndex;
-};
+};// ClosestPointDist
 
 
-template<typename IntLeafT>
-ClosestPointDist<IntLeafT>::ClosestPointDist(
+template<typename Index32LeafT>
+ClosestPointDist<Index32LeafT>::ClosestPointDist(
     std::vector<Vec3R>& instancePoints,
     std::vector<float>& instanceDistances,
     const PointList& surfacePointList,
-    const std::vector<const IntLeafT*>& leafNodes,
+    const std::vector<const Index32LeafT*>& leafNodes,
     const std::vector<IndexRange>& leafRanges,
     const std::vector<Vec4R>& leafBoundingSpheres,
     const std::vector<Vec4R>& nodeBoundingSpheres,
@@ -470,9 +414,9 @@ ClosestPointDist<IntLeafT>::ClosestPointDist(
 }
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::run(bool threaded)
+ClosestPointDist<Index32LeafT>::run(bool threaded)
 {
     if (threaded) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, mInstancePoints.size()), *this);
@@ -481,11 +425,11 @@ ClosestPointDist<IntLeafT>::run(bool threaded)
     }
 }
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::evalLeaf(size_t index, const IntLeafT& leaf) const
+ClosestPointDist<Index32LeafT>::evalLeaf(size_t index, const Index32LeafT& leaf) const
 {
-    typename IntLeafT::ValueOnCIter iter;
+    typename Index32LeafT::ValueOnCIter iter;
     const Vec3s center = mInstancePoints[index];
     size_t& closestPointIndex = const_cast<size_t&>(mClosestPointIndex);
 
@@ -502,25 +446,29 @@ ClosestPointDist<IntLeafT>::evalLeaf(size_t index, const IntLeafT& leaf) const
 }
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
+ClosestPointDist<Index32LeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
 {
+    if (nodeIndex >= mLeafRanges.size()) return;
+
     const Vec3R& pos = mInstancePoints[pointIndex];
     float minDist = mInstanceDistances[pointIndex];
     size_t minDistIdx = 0;
     Vec3R center;
     bool updatedDist = false;
 
-    for (size_t i = mLeafRanges[nodeIndex].first, n = 0; i < mLeafRanges[nodeIndex].second; ++i, ++n) {
-
+    for (size_t i = mLeafRanges[nodeIndex].first, n = 0;
+        i < mLeafRanges[nodeIndex].second; ++i, ++n)
+    {
         float& distToLeaf = const_cast<float&>(mLeafDistances[n]);
 
         center[0] = mLeafBoundingSpheres[i][0];
         center[1] = mLeafBoundingSpheres[i][1];
         center[2] = mLeafBoundingSpheres[i][2];
+        const auto radius = mLeafBoundingSpheres[i][3];
 
-        distToLeaf = (pos - center).lengthSqr() - mLeafBoundingSpheres[i][3];
+        distToLeaf = float(std::max(0.0, (pos - center).length() - radius));
 
         if (distToLeaf < minDist) {
             minDist = distToLeaf;
@@ -533,7 +481,9 @@ ClosestPointDist<IntLeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
 
     evalLeaf(pointIndex, *mLeafNodes[minDistIdx]);
 
-    for (size_t i = mLeafRanges[nodeIndex].first, n = 0; i < mLeafRanges[nodeIndex].second; ++i, ++n) {
+    for (size_t i = mLeafRanges[nodeIndex].first, n = 0;
+        i < mLeafRanges[nodeIndex].second; ++i, ++n)
+    {
         if (mLeafDistances[n] < mInstanceDistances[pointIndex] && i != minDistIdx) {
             evalLeaf(pointIndex, *mLeafNodes[i]);
         }
@@ -541,9 +491,9 @@ ClosestPointDist<IntLeafT>::evalNode(size_t pointIndex, size_t nodeIndex) const
 }
 
 
-template<typename IntLeafT>
+template<typename Index32LeafT>
 void
-ClosestPointDist<IntLeafT>::operator()(const tbb::blocked_range<size_t>& range) const
+ClosestPointDist<Index32LeafT>::operator()(const tbb::blocked_range<size_t>& range) const
 {
     Vec3R center;
     for (size_t n = range.begin(); n != range.end(); ++n) {
@@ -558,8 +508,9 @@ ClosestPointDist<IntLeafT>::operator()(const tbb::blocked_range<size_t>& range) 
             center[0] = mNodeBoundingSpheres[i][0];
             center[1] = mNodeBoundingSpheres[i][1];
             center[2] = mNodeBoundingSpheres[i][2];
+            const auto radius = mNodeBoundingSpheres[i][3];
 
-            distToNode = (pos - center).lengthSqr() - mNodeBoundingSpheres[i][3];
+            distToNode = float(std::max(0.0, (pos - center).length() - radius));
 
             if (distToNode < minDist) {
                 minDist = distToNode;
@@ -593,13 +544,13 @@ public:
         bool overlapping);
 
     float radius() const { return mRadius; }
-    int index() const { return mIndex; };
+    int index() const { return mIndex; }
 
-    void run(bool threaded = true);
+    inline void run(bool threaded = true);
 
 
     UpdatePoints(UpdatePoints&, tbb::split);
-    void operator()(const tbb::blocked_range<size_t>& range);
+    inline void operator()(const tbb::blocked_range<size_t>& range);
     void join(const UpdatePoints& rhs)
     {
         if (rhs.mRadius > mRadius) {
@@ -609,13 +560,10 @@ public:
     }
 
 private:
-
     const Vec4s& mSphere;
     const std::vector<Vec3R>& mPoints;
-
     std::vector<float>& mDistances;
     std::vector<unsigned char>& mMask;
-
     bool mOverlapping;
     float mRadius;
     int mIndex;
@@ -684,13 +632,13 @@ UpdatePoints::operator()(const tbb::blocked_range<size_t>& range)
 
         if (mDistances[n] > mRadius) {
             mRadius = mDistances[n];
-            mIndex = n;
+            mIndex = int(n);
         }
     }
 }
 
 
-} // namespace internal
+} // namespace v2s_internal
 
 
 ////////////////////////////////////////
@@ -715,32 +663,40 @@ fillWithSpheres(
     const bool addNBPoints = grid.activeVoxelCount() < 10000;
     int instances = std::max(instanceCount, maxSphereCount);
 
-    typedef typename GridT::TreeType TreeT;
-    typedef typename GridT::ValueType ValueT;
+    using TreeT = typename GridT::TreeType;
+    using ValueT = typename GridT::ValueType;
 
-    typedef typename TreeT::template ValueConverter<bool>::Type BoolTreeT;
-    typedef typename TreeT::template ValueConverter<int>::Type IntTreeT;
-    typedef typename TreeT::template ValueConverter<Int16>::Type Int16TreeT;
+    using BoolTreeT = typename TreeT::template ValueConverter<bool>::Type;
+    using Int16TreeT = typename TreeT::template ValueConverter<Int16>::Type;
 
-    typedef tree::LeafManager<const TreeT> LeafManagerT;
-    typedef tree::LeafManager<IntTreeT>    IntLeafManagerT;
-    typedef tree::LeafManager<Int16TreeT>  Int16LeafManagerT;
-
-
-    typedef boost::mt11213b RandGen;
+    using RandGen = std::mersenne_twister_engine<uint32_t, 32, 351, 175, 19,
+        0xccab8ee7, 11, 0xffffffff, 7, 0x31b6ab00, 15, 0xffe50000, 17, 1812433253>; // mt11213b
     RandGen mtRand(/*seed=*/0);
 
     const TreeT& tree = grid.tree();
     const math::Transform& transform = grid.transform();
 
     std::vector<Vec3R> instancePoints;
-
-    { // Scatter candidate sphere centroids (instancePoints)
+    {
+        // Compute a mask of the voxels enclosed by the isosurface.
         typename Grid<BoolTreeT>::Ptr interiorMaskPtr;
-
         if (grid.getGridClass() == GRID_LEVEL_SET) {
+            // Clamp the isovalue to the level set's background value minus epsilon.
+            // (In a valid narrow-band level set, all voxels, including background voxels,
+            // have values less than or equal to the background value, so an isovalue
+            // greater than or equal to the background value would produce a mask with
+            // effectively infinite extent.)
+            isovalue = std::min(isovalue,
+                static_cast<float>(tree.background() - math::Tolerance<ValueT>::value()));
             interiorMaskPtr = sdfInteriorMask(grid, ValueT(isovalue));
         } else {
+            if (grid.getGridClass() == GRID_FOG_VOLUME) {
+                // Clamp the isovalue of a fog volume between epsilon and one,
+                // again to avoid a mask with infinite extent.  (Recall that
+                // fog volume voxel values vary from zero outside to one inside.)
+                isovalue = math::Clamp(isovalue, math::Tolerance<float>::value(), 1.f);
+            }
+            // For non-level-set grids, the interior mask comprises the active voxels.
             interiorMaskPtr = typename Grid<BoolTreeT>::Ptr(Grid<BoolTreeT>::create(false));
             interiorMaskPtr->setTransform(transform.copy());
             interiorMaskPtr->tree().topologyUnion(tree);
@@ -750,45 +706,42 @@ fillWithSpheres(
 
         erodeVoxels(interiorMaskPtr->tree(), 1);
 
+        // Scatter candidate sphere centroids (instancePoints)
         instancePoints.reserve(instances);
-        internal::PointAccessor ptnAcc(instancePoints);
+        v2s_internal::PointAccessor ptnAcc(instancePoints);
 
-        UniformPointScatter<internal::PointAccessor, RandGen, InterrupterT>
-            scatter(ptnAcc, (addNBPoints ? (instances / 2) : instances), mtRand, interrupter);
+        UniformPointScatter<v2s_internal::PointAccessor, RandGen, InterrupterT> scatter(
+            ptnAcc, Index64(addNBPoints ? (instances / 2) : instances), mtRand, 1.0, interrupter);
 
         scatter(*interiorMaskPtr);
     }
 
     if (interrupter && interrupter->wasInterrupted()) return;
 
-    std::vector<float> instanceRadius;
+    auto csp = ClosestSurfacePoint<GridT>::create(grid, isovalue, interrupter);
+    if (!csp) return;
 
-    ClosestSurfacePoint<GridT> csp;
-    csp.initialize(grid, isovalue, interrupter);
-
-    // add extra instance points in the interior narrow band.
-    if (instancePoints.size() < instances) {
-        const Int16TreeT& signTree = csp.signTree();
-        typename Int16TreeT::LeafNodeType::ValueOnCIter it;
-        typename Int16TreeT::LeafCIter leafIt = signTree.cbeginLeaf();
-
-        for (; leafIt; ++leafIt) {
-            for (it = leafIt->cbeginValueOn(); it; ++it) {
-                const int flags = it.getValue();
-                if (!(0xE00 & flags) && (flags & 0x100)) {
+    // Add extra instance points in the interior narrow band.
+    if (instancePoints.size() < size_t(instances)) {
+        const Int16TreeT& signTree = csp->signTree();
+        for (auto leafIt = signTree.cbeginLeaf(); leafIt; ++leafIt) {
+            for (auto it = leafIt->cbeginValueOn(); it; ++it) {
+                const int flags = int(it.getValue());
+                if (!(volume_to_mesh_internal::EDGES & flags)
+                    && (volume_to_mesh_internal::INSIDE & flags))
+                {
                     instancePoints.push_back(transform.indexToWorld(it.getCoord()));
                 }
-
-                if (instancePoints.size() == instances) break;
+                if (instancePoints.size() == size_t(instances)) break;
             }
-            if (instancePoints.size() == instances) break;
+            if (instancePoints.size() == size_t(instances)) break;
         }
     }
 
-
     if (interrupter && interrupter->wasInterrupted()) return;
 
-    if (!csp.search(instancePoints, instanceRadius)) return;
+    std::vector<float> instanceRadius;
+    if (!csp->search(instancePoints, instanceRadius)) return;
 
     std::vector<unsigned char> instanceMask(instancePoints.size(), 0);
     float largestRadius = 0.0;
@@ -797,14 +750,14 @@ fillWithSpheres(
     for (size_t n = 0, N = instancePoints.size(); n < N; ++n) {
         if (instanceRadius[n] > largestRadius) {
             largestRadius = instanceRadius[n];
-            largestRadiusIdx = n;
+            largestRadiusIdx = int(n);
         }
     }
 
     Vec3s pos;
     Vec4s sphere;
-    minRadius *= transform.voxelSize()[0];
-    maxRadius *= transform.voxelSize()[0];
+    minRadius = float(minRadius * transform.voxelSize()[0]);
+    maxRadius = float(maxRadius * transform.voxelSize()[0]);
 
     for (size_t s = 0, S = std::min(size_t(maxSphereCount), instancePoints.size()); s < S; ++s) {
 
@@ -822,127 +775,110 @@ fillWithSpheres(
         spheres.push_back(sphere);
         instanceMask[largestRadiusIdx] = 1;
 
-        internal::UpdatePoints op(sphere, instancePoints, instanceRadius, instanceMask, overlapping);
+        v2s_internal::UpdatePoints op(
+            sphere, instancePoints, instanceRadius, instanceMask, overlapping);
         op.run();
 
         largestRadius = op.radius();
         largestRadiusIdx = op.index();
     }
-}
+} // fillWithSpheres
+
 
 ////////////////////////////////////////
 
 
 template<typename GridT>
-ClosestSurfacePoint<GridT>::ClosestSurfacePoint()
-    : mIsInitialized(false)
-    , mLeafBoundingSpheres(0)
-    , mNodeBoundingSpheres(0)
-    , mLeafRanges(0)
-    , mLeafNodes(0)
-    , mSurfacePointList()
-    , mPointListSize(0)
-    , mMaxNodeLeafs(0)
-    , mMaxRadiusSqr(0.0)
-    , mIdxTreePt()
+template<typename InterrupterT>
+inline typename ClosestSurfacePoint<GridT>::Ptr
+ClosestSurfacePoint<GridT>::create(const GridT& grid, float isovalue, InterrupterT* interrupter)
 {
-}
-
-template<typename GridT>
-void
-ClosestSurfacePoint<GridT>::initialize(const GridT& grid, float isovalue)
-{
-    initialize<GridT, util::NullInterrupter>(grid, isovalue, NULL);
+    auto csp = Ptr{new ClosestSurfacePoint};
+    if (!csp->initialize(grid, isovalue, interrupter)) csp.reset();
+    return csp;
 }
 
 
 template<typename GridT>
 template<typename InterrupterT>
-void
+inline bool
 ClosestSurfacePoint<GridT>::initialize(
     const GridT& grid, float isovalue, InterrupterT* interrupter)
 {
-    mIsInitialized = false;
-    typedef tree::LeafManager<const TreeT> LeafManagerT;
-    typedef tree::LeafManager<IntTreeT>    IntLeafManagerT;
-    typedef tree::LeafManager<Int16TreeT>  Int16LeafManagerT;
-    typedef typename GridT::ValueType ValueT;
+    using Index32LeafManagerT = tree::LeafManager<Index32TreeT>;
+    using ValueT = typename GridT::ValueType;
 
     const TreeT& tree = grid.tree();
     const math::Transform& transform = grid.transform();
 
     { // Extract surface point cloud
 
+        BoolTreeT mask(false);
+        volume_to_mesh_internal::identifySurfaceIntersectingVoxels(mask, tree, ValueT(isovalue));
+
+        mSignTreePt.reset(new Int16TreeT(0));
+        mIdxTreePt.reset(new Index32TreeT(boost::integer_traits<Index32>::const_max));
+
+
+        volume_to_mesh_internal::computeAuxiliaryData(
+            *mSignTreePt, *mIdxTreePt, mask, tree, ValueT(isovalue));
+
+        if (interrupter && interrupter->wasInterrupted()) return false;
+
+        // count unique points
+
+        using Int16LeafNodeType = typename Int16TreeT::LeafNodeType;
+        using Index32LeafNodeType = typename Index32TreeT::LeafNodeType;
+
+        std::vector<Int16LeafNodeType*> signFlagsLeafNodes;
+        mSignTreePt->getNodes(signFlagsLeafNodes);
+
+        const tbb::blocked_range<size_t> auxiliaryLeafNodeRange(0, signFlagsLeafNodes.size());
+
+        boost::scoped_array<Index32> leafNodeOffsets(new Index32[signFlagsLeafNodes.size()]);
+
+        tbb::parallel_for(auxiliaryLeafNodeRange,
+            volume_to_mesh_internal::LeafNodePointCount<Int16LeafNodeType::LOG2DIM>
+                (signFlagsLeafNodes, leafNodeOffsets));
+
         {
-            LeafManagerT leafs(tree);
-            internal::SignData<TreeT, LeafManagerT>
-                signDataOp(tree, leafs, ValueT(isovalue));
+            Index32 pointCount = 0;
+            for (size_t n = 0, N = signFlagsLeafNodes.size(); n < N; ++n) {
+                const Index32 tmp = leafNodeOffsets[n];
+                leafNodeOffsets[n] = pointCount;
+                pointCount += tmp;
+            }
 
-            signDataOp.run();
-
-            mSignTreePt = signDataOp.signTree();
-            mIdxTreePt = signDataOp.idxTree();
+            mPointListSize = size_t(pointCount);
+            mSurfacePointList.reset(new Vec3s[mPointListSize]);
         }
 
-        if (interrupter && interrupter->wasInterrupted()) return;
 
-        Int16LeafManagerT signLeafs(*mSignTreePt);
+        std::vector<Index32LeafNodeType*> pointIndexLeafNodes;
+        mIdxTreePt->getNodes(pointIndexLeafNodes);
 
-        std::vector<size_t> regions(signLeafs.leafCount(), 0);
-        signLeafs.foreach(internal::CountPoints(regions));
-
-        mPointListSize = 0;
-        for (size_t tmp = 0, n = 0, N = regions.size(); n < N; ++n) {
-            tmp = regions[n];
-            regions[n] = mPointListSize;
-            mPointListSize += tmp;
-        }
-
-        if (mPointListSize == 0) return;
-
-        mSurfacePointList.reset(new Vec3s[mPointListSize]);
-
-        internal::GenPoints<TreeT, Int16LeafManagerT>
-            pointOp(signLeafs, tree, *mIdxTreePt, mSurfacePointList, regions, transform, isovalue);
-
-        pointOp.run();
-
-        mIdxTreePt->topologyUnion(*mSignTreePt);
+        tbb::parallel_for(auxiliaryLeafNodeRange, volume_to_mesh_internal::ComputePoints<TreeT>(
+            mSurfacePointList.get(), tree, pointIndexLeafNodes,
+            signFlagsLeafNodes, leafNodeOffsets, transform, ValueT(isovalue)));
     }
 
-    if (interrupter && interrupter->wasInterrupted()) return;
+    if (interrupter && interrupter->wasInterrupted()) return false;
 
-    // estimate max sphere radius (sqr dist)
-    CoordBBox bbox =  grid.evalActiveVoxelBoundingBox();
+    Index32LeafManagerT idxLeafs(*mIdxTreePt);
 
-    Vec3s dim = transform.indexToWorld(bbox.min()) -
-        transform.indexToWorld(bbox.max());
+    using Index32RootNodeT = typename Index32TreeT::RootNodeType;
+    using Index32NodeChainT = typename Index32RootNodeT::NodeChainType;
+    BOOST_STATIC_ASSERT(boost::mpl::size<Index32NodeChainT>::value > 1);
+    using Index32InternalNodeT =
+        typename boost::mpl::at<Index32NodeChainT, boost::mpl::int_<1> >::type;
 
-    dim[0] = std::abs(dim[0]);
-    dim[1] = std::abs(dim[1]);
-    dim[2] = std::abs(dim[2]);
+    typename Index32TreeT::NodeCIter nIt = mIdxTreePt->cbeginNode();
+    nIt.setMinDepth(Index32TreeT::NodeCIter::LEAF_DEPTH - 1);
+    nIt.setMaxDepth(Index32TreeT::NodeCIter::LEAF_DEPTH - 1);
 
-    mMaxRadiusSqr = std::min(std::min(dim[0], dim[1]), dim[2]);
-    mMaxRadiusSqr *= 0.51;
-    mMaxRadiusSqr *= mMaxRadiusSqr;
+    std::vector<const Index32InternalNodeT*> internalNodes;
 
-
-    IntLeafManagerT idxLeafs(*mIdxTreePt);
-
-
-    typedef typename IntTreeT::RootNodeType IntRootNodeT;
-    typedef typename IntRootNodeT::NodeChainType IntNodeChainT;
-    BOOST_STATIC_ASSERT(boost::mpl::size<IntNodeChainT>::value > 1);
-    typedef typename boost::mpl::at<IntNodeChainT, boost::mpl::int_<1> >::type IntInternalNodeT;
-
-
-    typename IntTreeT::NodeCIter nIt = mIdxTreePt->cbeginNode();
-    nIt.setMinDepth(IntTreeT::NodeCIter::LEAF_DEPTH - 1);
-    nIt.setMaxDepth(IntTreeT::NodeCIter::LEAF_DEPTH - 1);
-
-    std::vector<const IntInternalNodeT*> internalNodes;
-
-    const IntInternalNodeT* node = NULL;
+    const Index32InternalNodeT* node = nullptr;
     for (; nIt; ++nIt) {
         nIt.getNode(node);
         if (node) internalNodes.push_back(node);
@@ -951,10 +887,10 @@ ClosestSurfacePoint<GridT>::initialize(
     std::vector<IndexRange>().swap(mLeafRanges);
     mLeafRanges.resize(internalNodes.size());
 
-    std::vector<const IntLeafT*>().swap(mLeafNodes);
+    std::vector<const Index32LeafT*>().swap(mLeafNodes);
     mLeafNodes.reserve(idxLeafs.leafCount());
 
-    typename IntInternalNodeT::ChildOnCIter leafIt;
+    typename Index32InternalNodeT::ChildOnCIter leafIt;
     mMaxNodeLeafs = 0;
     for (size_t n = 0, N = internalNodes.size(); n < N; ++n) {
 
@@ -974,30 +910,29 @@ ClosestSurfacePoint<GridT>::initialize(
     std::vector<Vec4R>().swap(mLeafBoundingSpheres);
     mLeafBoundingSpheres.resize(mLeafNodes.size());
 
-    internal::LeafBS<IntLeafT> leafBS(mLeafBoundingSpheres, mLeafNodes, transform, mSurfacePointList);
+    v2s_internal::LeafOp<Index32LeafT> leafBS(
+        mLeafBoundingSpheres, mLeafNodes, transform, mSurfacePointList);
     leafBS.run();
 
 
     std::vector<Vec4R>().swap(mNodeBoundingSpheres);
     mNodeBoundingSpheres.resize(internalNodes.size());
 
-    internal::NodeBS nodeBS(mNodeBoundingSpheres, mLeafRanges, mLeafBoundingSpheres);
+    v2s_internal::NodeOp nodeBS(mNodeBoundingSpheres, mLeafRanges, mLeafBoundingSpheres);
     nodeBS.run();
-    mIsInitialized = true;
-}
+    return true;
+} // ClosestSurfacePoint::initialize
 
 
 template<typename GridT>
-bool
+inline bool
 ClosestSurfacePoint<GridT>::search(std::vector<Vec3R>& points,
     std::vector<float>& distances, bool transformPoints)
 {
-    if (!mIsInitialized) return false;
-
     distances.clear();
-    distances.resize(points.size(), mMaxRadiusSqr);
+    distances.resize(points.size(), std::numeric_limits<float>::infinity());
 
-    internal::ClosestPointDist<IntLeafT> cpd(points, distances, mSurfacePointList,
+    v2s_internal::ClosestPointDist<Index32LeafT> cpd(points, distances, mSurfacePointList,
         mLeafNodes, mLeafRanges, mLeafBoundingSpheres, mNodeBoundingSpheres,
         mMaxNodeLeafs, transformPoints);
 
@@ -1008,7 +943,7 @@ ClosestSurfacePoint<GridT>::search(std::vector<Vec3R>& points,
 
 
 template<typename GridT>
-bool
+inline bool
 ClosestSurfacePoint<GridT>::search(const std::vector<Vec3R>& points, std::vector<float>& distances)
 {
     return search(const_cast<std::vector<Vec3R>& >(points), distances, false);
@@ -1016,12 +951,12 @@ ClosestSurfacePoint<GridT>::search(const std::vector<Vec3R>& points, std::vector
 
 
 template<typename GridT>
-bool
-ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points, std::vector<float>& distances)
+inline bool
+ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
+    std::vector<float>& distances)
 {
     return search(points, distances, true);
 }
-
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
@@ -1029,6 +964,6 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points, std::ve
 
 #endif // OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

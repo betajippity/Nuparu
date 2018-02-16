@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -646,9 +646,17 @@ public:
     OpAccumulator(const IterT& iter, OpT& op):
         mIsRoot(true),
         mIter(iter),
-        mOp(&op),
-        mOrigOp(new OpT(op))
-    {}
+////
+        //mOp(&op),
+        //mOrigOp(new OpT(op))
+mOp(NULL),
+mOrigOp(NULL)
+{
+    mOp = &op;
+    mOrigOp = new OpT(op);
+}
+    //{}
+////
 
     // When splitting this task, give the subtask a copy of the original functor,
     // not of this task's functor, which might have been modified arbitrarily.
@@ -676,10 +684,13 @@ public:
     void join(OpAccumulator& other) { mOp->join(*other.mOp); }
 
 private:
-    bool mIsRoot;
-    IterT mIter;
+    const bool mIsRoot;
+    const IterT mIter;
     OpT* mOp; // pointer to original functor, which might get modified
-    OpT const * const mOrigOp; // const copy of original functor
+////
+    //OpT const * const mOrigOp; // const copy of original functor
+OpT const * mOrigOp; // const copy of original functor
+////
 }; // class OpAccumulator
 
 } // namespace valxform
@@ -702,6 +713,6 @@ accumulate(const IterT& iter, XformOp& op, bool threaded)
 
 #endif // OPENVDB_TOOLS_VALUETRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

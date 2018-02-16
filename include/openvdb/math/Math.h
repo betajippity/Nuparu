@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,21 +35,16 @@
 #ifndef OPENVDB_MATH_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_HAS_BEEN_INCLUDED
 
-#include <assert.h>
-#include <algorithm> // for std::max()
-#include <cmath>     // for floor(), ceil() and sqrt()
-#include <math.h>    // for pow(), fabs() etc
-#include <cstdlib>   // for srand(), abs(int)
-#include <limits>    // for std::numeric_limits<Type>::max()
-#include <string>
-#include <boost/numeric/conversion/conversion_traits.hpp>
-#include <boost/math/special_functions/cbrt.hpp>
-#include <boost/random/mersenne_twister.hpp> // for boost::random::mt19937
-#include <boost/random/uniform_01.hpp>
-#include <boost/random/uniform_int.hpp>
-#include <boost/version.hpp> // for BOOST_VERSION
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
+#include <boost/numeric/conversion/conversion_traits.hpp>
+#include <algorithm> // for std::max()
+#include <cassert>
+#include <cmath>     // for std::ceil(), std::fabs(), std::pow(), std::sqrt(), etc.
+#include <cstdlib>   // for abs(int)
+#include <random>
+#include <string>
+#include <type_traits> // for std::is_arithmetic
 
 
 // Compile pragmas
@@ -62,6 +57,12 @@
         _Pragma("warning (disable:1572)")
     #define OPENVDB_NO_FP_EQUALITY_WARNING_END \
         _Pragma("warning (pop)")
+#elif defined(__clang__)
+    #define OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN \
+        PRAGMA(clang diagnostic push) \
+        PRAGMA(clang diagnostic ignored "-Wfloat-equal")
+    #define OPENVDB_NO_FP_EQUALITY_WARNING_END \
+        PRAGMA(clang diagnostic pop)
 #else
     // For GCC, #pragma GCC diagnostic ignored "-Wfloat-equal"
     // isn't working until gcc 4.2+,
@@ -81,7 +82,7 @@ namespace OPENVDB_VERSION_NAME {
 /// @brief Return the value of type T that corresponds to zero.
 /// @note A zeroVal<T>() specialization must be defined for each @c ValueType T
 /// that cannot be constructed using the form @c T(0).  For example, @c std::string(0)
-/// treats 0 as @c NULL and throws a @c std::logic_error.
+/// treats 0 as @c nullptr and throws a @c std::logic_error.
 template<typename T> inline T zeroVal() { return T(0); }
 /// Return the @c std::string value that corresponds to zero.
 template<> inline std::string zeroVal<std::string>() { return ""; }
@@ -130,69 +131,95 @@ template<> struct Delta<double>   { static double value() { return 1e-9; } };
 
 /// @brief Simple generator of random numbers over the range [0, 1)
 /// @details Thread-safe as long as each thread has its own Rand01 instance
-template<typename FloatType = double, typename EngineType = boost::mt19937>
+template<typename FloatType = double, typename EngineType = std::mt19937>
 class Rand01
 {
 private:
     EngineType mEngine;
-    boost::uniform_01<FloatType> mRand;
+    std::uniform_real_distribution<FloatType> mRand;
 
 public:
-    typedef FloatType ValueType;
+    using ValueType = FloatType;
+
+    /// @brief Initialize the generator.
+    /// @param engine  random number generator
+    Rand01(const EngineType& engine): mEngine(engine) {}
 
     /// @brief Initialize the generator.
     /// @param seed  seed value for the random number generator
     Rand01(unsigned int seed): mEngine(static_cast<typename EngineType::result_type>(seed)) {}
 
+    /// Set the seed value for the random number generator
+    void setSeed(unsigned int seed)
+    {
+        mEngine.seed(static_cast<typename EngineType::result_type>(seed));
+    }
+
+    /// Return a const reference to the random number generator.
+    const EngineType& engine() const { return mEngine; }
+
     /// Return a uniformly distributed random number in the range [0, 1).
     FloatType operator()() { return mRand(mEngine); }
 };
 
-typedef Rand01<double, boost::mt19937> Random01;
+using Random01 = Rand01<double, std::mt19937>;
 
 
 /// @brief Simple random integer generator
 /// @details Thread-safe as long as each thread has its own RandInt instance
-template<typename EngineType = boost::mt19937>
+template<typename IntType = int, typename EngineType = std::mt19937>
 class RandInt
 {
 private:
-#if BOOST_VERSION >= 104700
-    typedef boost::random::uniform_int_distribution<int> Distr;
-#else
-    typedef boost::uniform_int<int> Distr;
-#endif
+    using Distr = std::uniform_int_distribution<IntType>;
     EngineType mEngine;
     Distr mRand;
 
 public:
     /// @brief Initialize the generator.
+    /// @param engine     random number generator
+    /// @param imin,imax  generate integers that are uniformly distributed over [imin, imax]
+    RandInt(const EngineType& engine, IntType imin, IntType imax):
+        mEngine(engine),
+        mRand(std::min(imin, imax), std::max(imin, imax))
+    {}
+
+    /// @brief Initialize the generator.
     /// @param seed       seed value for the random number generator
     /// @param imin,imax  generate integers that are uniformly distributed over [imin, imax]
-    RandInt(unsigned int seed, int imin, int imax):
+    RandInt(unsigned int seed, IntType imin, IntType imax):
         mEngine(static_cast<typename EngineType::result_type>(seed)),
         mRand(std::min(imin, imax), std::max(imin, imax))
     {}
 
     /// Change the range over which integers are distributed to [imin, imax].
-    void setRange(int imin, int imax) { mRand = Distr(std::min(imin, imax), std::max(imin, imax)); }
+    void setRange(IntType imin, IntType imax)
+    {
+        mRand = Distr(std::min(imin, imax), std::max(imin, imax));
+    }
+
+    /// Set the seed value for the random number generator
+    void setSeed(unsigned int seed)
+    {
+        mEngine.seed(static_cast<typename EngineType::result_type>(seed));
+    }
+
+    /// Return a const reference to the random number generator.
+    const EngineType& engine() const { return mEngine; }
 
     /// Return a randomly-generated integer in the current range.
-    int operator()() { return mRand(mEngine); }
+    IntType operator()() { return mRand(mEngine); }
+
     /// @brief Return a randomly-generated integer in the new range [imin, imax],
     /// without changing the current range.
-    int operator()(int imin, int imax)
+    IntType operator()(IntType imin, IntType imax)
     {
-        const int lo = std::min(imin, imax), hi = std::max(imin, imax);
-#if BOOST_VERSION >= 104700
-        return mRand(mEngine, Distr::param_type(lo, hi));
-#else
-        return Distr(lo, hi)(mEngine);
-#endif
+        const IntType lo = std::min(imin, imax), hi = std::max(imin, imax);
+        return mRand(mEngine, typename Distr::param_type(lo, hi));
     }
 };
 
-typedef RandInt<boost::mt19937> RandomInt;
+using RandomInt = RandInt<int, std::mt19937>;
 
 
 // ==========> Clamp <==================
@@ -202,7 +229,7 @@ template<typename Type>
 inline Type
 Clamp(Type x, Type min, Type max)
 {
-    assert(min<max);
+    assert( !(min>max) );
     return x > min ? x < max ? x : max : min;
 }
 
@@ -223,16 +250,22 @@ ClampTest01(Type &x)
     return true;
 }
 
+/// @brief Return 0 if @a x < @a 0, 1 if @a x > 1 or else (3 &minus; 2 @a x) @a x&sup2;.
+template<typename Type>
+inline Type
+SmoothUnitStep(Type x)
+{
+    return x > 0 ? x < 1 ? (3-2*x)*x*x : Type(1) : Type(0);
+}
 
-/// @brief Return 0 if @a x < @a min, 1 if @a x > @a max or else @f$(3-2t)t^2@f$,
-/// where @f$t = (x-min)/(max-min)@f$.
+/// @brief Return 0 if @a x < @a min, 1 if @a x > @a max or else (3 &minus; 2 @a t) @a t&sup2;,
+/// where @a t = (@a x &minus; @a min)/(@a max &minus; @a min).
 template<typename Type>
 inline Type
 SmoothUnitStep(Type x, Type min, Type max)
 {
     assert(min < max);
-    const Type t = (x-min)/(max-min);
-    return t > 0 ? t < 1 ? (3-2*t)*t*t : Type(1) : Type(0);
+    return SmoothUnitStep((x-min)/(max-min));
 }
 
 
@@ -250,11 +283,12 @@ inline int64_t Abs(int64_t i)
     return labs(i);
 #endif
 }
-inline float Abs(float x) { return fabs(x); }
-inline double Abs(double x) { return fabs(x); }
-inline long double Abs(long double x) { return fabsl(x); }
+inline float Abs(float x) { return std::fabs(x); }
+inline double Abs(double x) { return std::fabs(x); }
+inline long double Abs(long double x) { return std::fabs(x); }
 inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
+inline bool Abs(bool b) { return b; }
 // On OSX size_t and uint64_t are different types
 #if defined(__APPLE__) || defined(MACOSX)
 inline size_t Abs(size_t i) { return i; }
@@ -286,7 +320,7 @@ inline bool
 isApproxZero(const Type& x)
 {
     const Type tolerance = Type(zeroVal<Type>() + Tolerance<Type>::value());
-    return x < tolerance && x > -tolerance;
+    return !(x > tolerance) && !(x < -tolerance);
 }
 
 /// Return @c true if @a x is equal to zero to within the given tolerance.
@@ -294,7 +328,7 @@ template<typename Type>
 inline bool
 isApproxZero(const Type& x, const Type& tolerance)
 {
-    return x < tolerance && x > -tolerance;
+    return !(x > tolerance) && !(x < -tolerance);
 }
 
 
@@ -305,6 +339,12 @@ isNegative(const Type& x) { return x < zeroVal<Type>(); }
 
 /// Return @c false, since @c bool values are never less than zero.
 template<> inline bool isNegative<bool>(const bool&) { return false; }
+
+
+/// Return @c true if @a x is finite.
+template<typename Type, typename std::enable_if<std::is_arithmetic<Type>::value, int>::type = 0>
+inline bool
+isFinite(const Type& x) { return std::isfinite(x); }
 
 
 /// @brief Return @c true if @a a is equal to @a b to within
@@ -407,8 +447,8 @@ doubleToInt64(const double aDoubleValue)
 
 // aUnitsInLastPlace is the allowed difference between the least significant digits
 // of the numbers' floating point representation
-// Please read refernce paper before trying to use isUlpsEqual
-// http://www.cygnus-software.com/papers/comparingFloats/comparingFloats.htm
+// Please read the reference paper before trying to use isUlpsEqual
+// http://www.cygnus-software.com/papers/comparingfloats/comparingfloats.htm
 inline bool
 isUlpsEqual(const double aLeft, const double aRight, const int64_t aUnitsInLastPlace)
 {
@@ -453,19 +493,19 @@ isUlpsEqual(const float aLeft, const float aRight, const int32_t aUnitsInLastPla
 
 // ==========> Pow <==================
 
-/// Return @f$ x^2 @f$.
+/// Return @a x<sup>2</sup>.
 template<typename Type>
 inline Type Pow2(Type x) { return x*x; }
 
-/// Return @f$ x^3 @f$.
+/// Return @a x<sup>3</sup>.
 template<typename Type>
 inline Type Pow3(Type x) { return x*x*x; }
 
-/// Return @f$ x^4 @f$.
+/// Return @a x<sup>4</sup>.
 template<typename Type>
 inline Type Pow4(Type x) { return Pow2(Pow2(x)); }
 
-/// Return @f$ x^n @f$.
+/// Return @a x<sup>@a n</sup>.
 template<typename Type>
 Type
 Pow(Type x, int n)
@@ -480,7 +520,7 @@ Pow(Type x, int n)
 }
 
 //@{
-/// Return @f$ b^e @f$.
+/// Return @a b<sup>@a e</sup>.
 inline float
 Pow(float b, float e)
 {
@@ -492,7 +532,7 @@ inline double
 Pow(double b, double e)
 {
     assert( b >= 0.0 && "Pow(double,double): base is negative" );
-    return pow(b,e);
+    return std::pow(b,e);
 }
 //@}
 
@@ -504,7 +544,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b)
 {
-    return std::max(a,b) ;
+    return std::max(a,b);
 }
 
 /// Return the maximum of three values
@@ -512,7 +552,7 @@ template<typename Type>
 inline const Type&
 Max(const Type& a, const Type& b, const Type& c)
 {
-    return std::max( std::max(a,b), c ) ;
+    return std::max(std::max(a,b), c);
 }
 
 /// Return the maximum of four values
@@ -615,9 +655,27 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 
 // ============> Exp <==================
 
-/// Return @f$ e^x @f$.
+/// Return @a e<sup>@a x</sup>.
 template<typename Type>
 inline Type Exp(const Type& x) { return std::exp(x); }
+
+// ============> Sin <==================
+
+//@{
+/// Return sin @a x.
+inline float Sin(const float& x) { return std::sin(x); }
+
+inline double Sin(const double& x) { return std::sin(x); }
+//@}
+
+// ============> Cos <==================
+
+//@{
+/// Return cos @a x.
+inline float Cos(const float& x) { return std::cos(x); }
+
+inline double Cos(const double& x) { return std::cos(x); }
+//@}
 
 
 ////////////////////////////////////////
@@ -650,35 +708,35 @@ ZeroCrossing(const Type& a, const Type& b)
 
 //@{
 /// Return the square root of a floating-point value.
-inline float Sqrt(float x) { return sqrtf(x); }
-inline double Sqrt(double x) { return sqrt(x); }
-inline long double Sqrt(long double x) { return sqrtl(x); }
+inline float Sqrt(float x) { return std::sqrt(x); }
+inline double Sqrt(double x) { return std::sqrt(x); }
+inline long double Sqrt(long double x) { return std::sqrt(x); }
 //@}
 
 
 //@{
 /// Return the cube root of a floating-point value.
-inline float Cbrt(float x) { return boost::math::cbrt(x); }
-inline double Cbrt(double x) { return boost::math::cbrt(x); }
-inline long double Cbrt(long double x) { return boost::math::cbrt(x); }
+inline float Cbrt(float x) { return std::cbrt(x); }
+inline double Cbrt(double x) { return std::cbrt(x); }
+inline long double Cbrt(long double x) { return std::cbrt(x); }
 //@}
 
 
 //@{
 /// Return the remainder of @a x / @a y.
 inline int Mod(int x, int y) { return (x % y); }
-inline float Mod(float x, float y) { return fmodf(x,y); }
-inline double Mod(double x, double y) { return fmod(x,y); }
-inline long double Mod(long double x, long double y) { return fmodl(x,y); }
-template<typename Type> inline Type Remainder(Type x, Type y) { return Mod(x,y); }
+inline float Mod(float x, float y) { return std::fmod(x, y); }
+inline double Mod(double x, double y) { return std::fmod(x, y); }
+inline long double Mod(long double x, long double y) { return std::fmod(x, y); }
+template<typename Type> inline Type Remainder(Type x, Type y) { return Mod(x, y); }
 //@}
 
 
 //@{
 /// Return @a x rounded up to the nearest integer.
-inline float RoundUp(float x) { return ceilf(x); }
-inline double RoundUp(double x) { return ceil(x); }
-inline long double RoundUp(long double x) { return ceill(x); }
+inline float RoundUp(float x) { return std::ceil(x); }
+inline double RoundUp(double x) { return std::ceil(x); }
+inline long double RoundUp(long double x) { return std::ceil(x); }
 //@}
 /// Return @a x rounded up to the nearest multiple of @a base.
 template<typename Type>
@@ -692,10 +750,9 @@ RoundUp(Type x, Type base)
 
 //@{
 /// Return @a x rounded down to the nearest integer.
-inline float RoundDown(float x) { return floorf(x); }
-inline double RoundDown(double x) { return floor(x); }
-inline long double RoundDown(long double x) { return floorl(x); }
-template <typename Type> inline Type Round(Type x) { return RoundDown(x+0.5); }
+inline float RoundDown(float x) { return std::floor(x); }
+inline double RoundDown(double x) { return std::floor(x); }
+inline long double RoundDown(long double x) { return std::floor(x); }
 //@}
 /// Return @a x rounded down to the nearest multiple of @a base.
 template<typename Type>
@@ -705,6 +762,21 @@ RoundDown(Type x, Type base)
     Type remainder = Remainder(x, base);
     return remainder ? x-remainder : x;
 }
+
+
+//@{
+/// Return @a x rounded to the nearest integer.
+inline float Round(float x) { return RoundDown(x + 0.5f); }
+inline double Round(double x) { return RoundDown(x + 0.5); }
+inline long double Round(long double x) { return RoundDown(x + 0.5l); }
+//@}
+
+
+/// Return the euclidean remainder of @a x.
+/// Note unlike % operator this will always return a positive result
+template<typename Type>
+inline Type
+EuclideanRemainder(Type x) { return x - RoundDown(x); }
 
 
 /// Return the integer part of @a x.
@@ -717,26 +789,27 @@ IntegerPart(Type x)
 
 /// Return the fractional part of @a x.
 template<typename Type>
-inline Type FractionalPart(Type x) { return Mod(x,Type(1)); }
+inline Type
+FractionalPart(Type x) { return Mod(x,Type(1)); }
 
 
 //@{
 /// Return the floor of @a x.
-inline int Floor(float x) { return (int)RoundDown(x); }
-inline int Floor(double x) { return (int)RoundDown(x); }
-inline int Floor(long double x) { return (int)RoundDown(x); }
+inline int Floor(float x) { return int(RoundDown(x)); }
+inline int Floor(double x) { return int(RoundDown(x)); }
+inline int Floor(long double x) { return int(RoundDown(x)); }
 //@}
 
 
 //@{
 /// Return the ceiling of @a x.
-inline int Ceil(float x) { return (int)RoundUp(x); }
-inline int Ceil(double x) { return (int)RoundUp(x); }
-inline int Ceil(long double x) { return (int)RoundUp(x); }
+inline int Ceil(float x) { return int(RoundUp(x)); }
+inline int Ceil(double x) { return int(RoundUp(x)); }
+inline int Ceil(long double x) { return int(RoundUp(x)); }
 //@}
 
 
-/// Return @a x if it is greater in magnitude than @a delta.  Otherwise, return zero.
+/// Return @a x if it is greater or equal in magnitude than @a delta.  Otherwise, return zero.
 template<typename Type>
 inline Type Chop(Type x, Type delta) { return (Abs(x) < delta ? zeroVal<Type>() : x); }
 
@@ -749,6 +822,18 @@ Truncate(Type x, unsigned int digits)
     Type tenth = Pow(10,digits);
     return RoundDown(x*tenth+0.5)/tenth;
 }
+
+
+////////////////////////////////////////
+
+
+/// @brief 8-bit integer values print to std::ostreams as characters.
+/// Cast them so that they print as integers instead.
+template<typename T>
+inline auto PrintCast(const T& val) -> typename std::enable_if<!std::is_same<T, int8_t>::value
+    && !std::is_same<T, uint8_t>::value, const T&>::type { return val; }
+inline int32_t PrintCast(int8_t val) { return int32_t(val); }
+inline uint32_t PrintCast(uint8_t val) { return uint32_t(val); }
 
 
 ////////////////////////////////////////
@@ -785,13 +870,13 @@ enum RotationOrder {
 
 template <typename S, typename T>
 struct promote {
-    typedef typename boost::numeric::conversion_traits<S, T>::supertype type;
+    using type = typename boost::numeric::conversion_traits<S, T>::supertype;
 };
 
 
 /// @brief Return the index [0,1,2] of the smallest value in a 3D vector.
 /// @note This methods assumes operator[] exists and avoids branching.
-/// @details If two components of the input vector are equal and smaller then the
+/// @details If two components of the input vector are equal and smaller than the
 /// third component, the largest index of the two is always returned.
 /// If all three vector components are equal the largest index, i.e. 2, is
 /// returned. In other words the return value corresponds to the largest index
@@ -800,7 +885,10 @@ template<typename Vec3T>
 size_t
 MinIndex(const Vec3T& v)
 {
-    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
+    static
+#endif
+    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] < v[1]) << 2) + ((v[0] < v[2]) << 1) + (v[1] < v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -809,16 +897,19 @@ MinIndex(const Vec3T& v)
 
 /// @brief Return the index [0,1,2] of the largest value in a 3D vector.
 /// @note This methods assumes operator[] exists and avoids branching.
-/// @details If two components of the input vector are equal and larger then the
+/// @details If two components of the input vector are equal and larger than the
 /// third component, the largest index of the two is always returned.
 /// If all three vector components are equal the largest index, i.e. 2, is
 /// returned. In other words the return value corresponds to the largest index
-/// of the of the largest vector components.
+/// of the largest vector components.
 template<typename Vec3T>
 size_t
 MaxIndex(const Vec3T& v)
 {
-    static const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
+#ifndef _MSC_VER // Visual C++ doesn't guarantee thread-safe initialization of local statics
+    static
+#endif
+    const size_t hashTable[8] = { 2, 1, 9, 1, 2, 9, 0, 0 };//9 is a dummy value
     const size_t hashKey =
         ((v[0] > v[1]) << 2) + ((v[0] > v[2]) << 1) + (v[1] > v[2]);// ?*4+?*2+?*1
     return hashTable[hashKey];
@@ -830,6 +921,6 @@ MaxIndex(const Vec3T& v)
 
 #endif // OPENVDB_MATH_MATH_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

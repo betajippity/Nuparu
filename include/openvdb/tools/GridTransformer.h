@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,25 +27,26 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file GridTransformer.h
 /// @author Peter Cucka
 
 #ifndef OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-#include <cmath>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
-#include <tbb/blocked_range.h>
-#include <tbb/parallel_reduce.h>
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
 #include <openvdb/util/NullInterrupter.h>
+#include "ChangeBackground.h"
 #include "Interpolation.h"
 #include "LevelSetRebuild.h" // for doLevelSetRebuild()
+#include "SignedFloodFill.h" // for signedFloodFill
+#include "Prune.h" // for pruneLevelSet
+#include <tbb/blocked_range.h>
+#include <tbb/parallel_reduce.h>
+#include <cmath>
+#include <functional>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -117,7 +118,7 @@ template<typename Sampler, typename TreeT>
 class TileSampler: public Sampler
 {
 public:
-    typedef typename TreeT::ValueType ValueT;
+    using ValueT = typename TreeT::ValueType;
 
     /// @param b        the index-space bounding box of a particular grid tile
     /// @param tileVal  the tile's value
@@ -145,14 +146,16 @@ protected:
 /// @brief For point sampling, tree traversal is less expensive than testing
 /// bounding box membership.
 template<typename TreeT>
-struct TileSampler<PointSampler, TreeT>: public PointSampler {
+class TileSampler<PointSampler, TreeT>: public PointSampler {
+public:
     TileSampler(const CoordBBox&, const typename TreeT::ValueType&, bool) {}
 };
 
 /// @brief For point sampling, tree traversal is less expensive than testing
 /// bounding box membership.
 template<typename TreeT>
-struct TileSampler<StaggeredPointSampler, TreeT>: public StaggeredPointSampler {
+class TileSampler<StaggeredPointSampler, TreeT>: public StaggeredPointSampler {
+public:
     TileSampler(const CoordBBox&, const typename TreeT::ValueType&, bool) {}
 };
 
@@ -182,11 +185,14 @@ struct TileSampler<StaggeredPointSampler, TreeT>: public StaggeredPointSampler {
 class GridResampler
 {
 public:
-    typedef boost::shared_ptr<GridResampler> Ptr;
-    typedef boost::function<bool (void)> InterruptFunc;
+    using Ptr = SharedPtr<GridResampler>;
+    using InterruptFunc = std::function<bool (void)>;
 
     GridResampler(): mThreaded(true), mTransformTiles(true) {}
     virtual ~GridResampler() {}
+
+    GridResampler(const GridResampler&) = default;
+    GridResampler& operator=(const GridResampler&) = default;
 
     /// Enable or disable threading.  (Threading is enabled by default.)
     void setThreaded(bool b) { mThreaded = b; }
@@ -250,7 +256,7 @@ private:
 class GridTransformer: public GridResampler
 {
 public:
-    typedef boost::shared_ptr<GridTransformer> Ptr;
+    using Ptr = SharedPtr<GridTransformer>;
 
     GridTransformer(const Mat4R& xform);
     GridTransformer(
@@ -260,7 +266,10 @@ public:
         const Vec3R& translate,
         const std::string& xformOrder = "tsr",
         const std::string& rotationOrder = "zyx");
-    virtual ~GridTransformer() {}
+    ~GridTransformer() override = default;
+
+    GridTransformer(const GridTransformer&) = default;
+    GridTransformer& operator=(const GridTransformer&) = default;
 
     const Mat4R& getTransform() const { return mTransform; }
 
@@ -287,7 +296,6 @@ namespace local_util {
 
 /// @brief Decompose an affine transform into scale, rotation and translation components.
 /// @return @c false if the given matrix is not affine or cannot otherwise be decomposed.
-/// @todo This is not safe for matrices with shear.
 template<typename T>
 inline bool
 decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
@@ -295,24 +303,73 @@ decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
 {
     if (!math::isAffine(m)) return false;
 
-    // this is the translation in world space
+    // This is the translation in world space
     translate = m.getTranslation();
     // Extract translation.
-    math::Mat3<T> temp = m.getMat3();
+    const math::Mat3<T> xform = m.getMat3();
 
-    scale.init(
-        (math::Vec3<T>(1, 0, 0) * temp).length(),
-        (math::Vec3<T>(0, 1, 0) * temp).length(),
-        (math::Vec3<T>(0, 0, 1) * temp).length());
-    // Extract scale.
-    temp *= math::scale<math::Mat3<T> >(scale).inverse();
+    const math::Vec3<T> unsignedScale(
+        (math::Vec3<T>(1, 0, 0) * xform).length(),
+        (math::Vec3<T>(0, 1, 0) * xform).length(),
+        (math::Vec3<T>(0, 0, 1) * xform).length());
 
-    rotate = math::eulerAngles(temp, math::XYZ_ROTATION);
+    const bool hasUniformScale = unsignedScale.eq(math::Vec3<T>(unsignedScale[0]));
 
-    if (!rotate.eq(math::Vec3<T>::zero()) && !scale.eq(math::Vec3<T>(scale[0]))) {
+    bool hasRotation = false;
+    bool validDecomposition = false;
+
+    T minAngle = std::numeric_limits<T>::max();
+
+    // If the transformation matrix contains a reflection,
+    // test different negative scales to find a decomposition
+    // that favors the optimal resampling algorithm.
+    for (size_t n = 0; n < 8; ++n) {
+
+        const math::Vec3<T> signedScale(
+            n & 0x1 ? -unsignedScale.x() : unsignedScale.x(),
+            n & 0x2 ? -unsignedScale.y() : unsignedScale.y(),
+            n & 0x4 ? -unsignedScale.z() : unsignedScale.z());
+
+        // Extract scale and potentially reflection.
+        const math::Mat3<T> mat = xform * math::scale<math::Mat3<T> >(signedScale).inverse();
+        if (mat.det() < T(0.0)) continue; // Skip if mat contains a reflection.
+
+        const math::Vec3<T> tmpAngle = math::eulerAngles(mat, math::XYZ_ROTATION);
+
+        const math::Mat3<T> rebuild =
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(1, 0, 0), tmpAngle.x()) *
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(0, 1, 0), tmpAngle.y()) *
+            math::rotation<math::Mat3<T> >(math::Vec3<T>(0, 0, 1), tmpAngle.z()) *
+            math::scale<math::Mat3<T> >(signedScale);
+
+        if (xform.eq(rebuild)) {
+
+            const T maxAngle = std::max(std::abs(tmpAngle[0]),
+                std::max(std::abs(tmpAngle[1]), std::abs(tmpAngle[2])));
+
+            if (!(minAngle < maxAngle)) { // Update if less or equal.
+
+                minAngle = maxAngle;
+                rotate = tmpAngle;
+                scale = signedScale;
+
+                hasRotation = !rotate.eq(math::Vec3<T>::zero());
+                validDecomposition = true;
+
+                if (hasUniformScale || !hasRotation) {
+                    // Current decomposition is optimal.
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!validDecomposition || (hasRotation && !hasUniformScale)) {
+        // The decomposition is invalid if the transformation matrix contains shear.
         // No unique decomposition if scale is nonuniform and rotation is nonzero.
         return false;
     }
+
     return true;
 }
 
@@ -438,7 +495,7 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
 
         // If the output grid is a level set, resample the input grid to have the output grid's
         // background value.  Otherwise, preserve the input grid's background value.
-        typedef typename GridType::ValueType ValueT;
+        using ValueT = typename GridType::ValueType;
         const ValueT halfWidth = ((outGrid.getGridClass() == openvdb::GRID_LEVEL_SET)
             ? ValueT(outGrid.background() * (1.0 / outGrid.voxelSize()[0]))
             : ValueT(inGrid.background() * (1.0 / inGrid.voxelSize()[0])));
@@ -620,7 +677,7 @@ template<typename InterrupterType>
 void
 GridResampler::setInterrupter(InterrupterType& interrupter)
 {
-    mInterrupt = boost::bind(&InterrupterType::wasInterrupted,
+    mInterrupt = std::bind(&InterrupterType::wasInterrupted,
         /*this=*/&interrupter, /*percent=*/-1);
 }
 
@@ -630,7 +687,7 @@ void
 GridResampler::transformGrid(const Transformer& xform,
     const GridT& inGrid, GridT& outGrid) const
 {
-    outGrid.setBackground(inGrid.background());
+    tools::changeBackground(outGrid.tree(), inGrid.background());
     applyTransform<Sampler>(xform, inGrid, outGrid);
 }
 
@@ -639,7 +696,7 @@ template<class Sampler, class GridT>
 void
 GridTransformer::transformGrid(const GridT& inGrid, GridT& outGrid) const
 {
-    outGrid.setBackground(inGrid.background());
+    tools::changeBackground(outGrid.tree(), inGrid.background());
 
     if (!Sampler::mipmap() || mMipLevels == Vec3i::zero()) {
         // Skip the mipmapping step.
@@ -703,12 +760,12 @@ template<class Sampler, class TreeT, typename Transformer>
 class GridResampler::RangeProcessor
 {
 public:
-    typedef typename TreeT::LeafCIter LeafIterT;
-    typedef typename TreeT::ValueAllCIter TileIterT;
-    typedef typename tree::IteratorRange<LeafIterT> LeafRange;
-    typedef typename tree::IteratorRange<TileIterT> TileRange;
-    typedef typename tree::ValueAccessor<const TreeT> InTreeAccessor;
-    typedef typename tree::ValueAccessor<TreeT> OutTreeAccessor;
+    using LeafIterT = typename TreeT::LeafCIter;
+    using TileIterT = typename TreeT::ValueAllCIter;
+    using LeafRange = typename tree::IteratorRange<LeafIterT>;
+    using TileRange = typename tree::IteratorRange<TileIterT>;
+    using InTreeAccessor = typename tree::ValueAccessor<const TreeT>;
+    using OutTreeAccessor = typename tree::ValueAccessor<TreeT>;
 
     RangeProcessor(const Transformer& xform, const CoordBBox& b, const TreeT& inT, TreeT& outT):
         mIsRoot(true), mXform(xform), mBBox(b),
@@ -815,11 +872,11 @@ void
 GridResampler::applyTransform(const Transformer& xform,
     const GridT& inGrid, GridT& outGrid) const
 {
-    typedef typename GridT::TreeType TreeT;
+    using TreeT = typename GridT::TreeType;
     const TreeT& inTree = inGrid.tree();
     TreeT& outTree = outGrid.tree();
 
-    typedef RangeProcessor<Sampler, TreeT, Transformer> RangeProc;
+    using RangeProc = RangeProcessor<Sampler, TreeT, Transformer>;
 
     const GridClass gridClass = inGrid.getGridClass();
 
@@ -864,8 +921,8 @@ GridResampler::applyTransform(const Transformer& xform,
 
     // If the grid is a level set, mark inactive voxels as inside or outside.
     if (gridClass == GRID_LEVEL_SET) {
-        outTree.pruneInactive();
-        outTree.signedFloodFill();
+        tools::pruneLevelSet(outTree);
+        tools::signedFloodFill(outTree);
     }
 }
 
@@ -884,13 +941,13 @@ GridResampler::transformBBox(
     const InterruptFunc& interrupt,
     const Sampler& sampler)
 {
-    typedef typename OutTreeT::ValueType ValueT;
+    using ValueT = typename OutTreeT::ValueType;
 
     // Transform the corners of the input tree's bounding box
     // and compute the enclosing bounding box in the output tree.
     Vec3R
         inRMin(bbox.min().x(), bbox.min().y(), bbox.min().z()),
-        inRMax(bbox.max().x(), bbox.max().y(), bbox.max().z()),
+        inRMax(bbox.max().x()+1, bbox.max().y()+1, bbox.max().z()+1),
         outRMin = math::minComponent(xform.transform(inRMin), xform.transform(inRMax)),
         outRMax = math::maxComponent(xform.transform(inRMin), xform.transform(inRMax));
     for (int i = 0; i < 8; ++i) {
@@ -981,6 +1038,6 @@ GridResampler::transformBBox(
 
 #endif // OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

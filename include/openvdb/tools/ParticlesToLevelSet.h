@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,21 +27,21 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Ken Museth
 ///
-/// @file ParticlesToLevelSet.h
+/// @file tools/ParticlesToLevelSet.h
 ///
-/// @brief This tool converts particles (with position, radius and
-/// velocity) into a singed distance field encoded as a narrow band
-/// level set. Optionally arbitrary attributes on the particles can
-/// be transferred resulting in an additional attribute grid with the
-/// same topology as the level set grid.
+/// @brief This tool converts particles (with position, radius and velocity)
+/// into a signed distance field encoded as a narrow band level set.
+/// Optionally, arbitrary attributes on the particles can be transferred
+/// resulting in an additional attribute grid with the same topology
+/// as the level set grid.
 ///
 /// @note This fast particle to level set converter is always intended
 /// to be combined with some kind of surface post processing,
 /// i.e. tools::Filter. Without such post processing the generated
-/// surface is typically too noisy and blooby. However it serves as a
+/// surface is typically too noisy and blobby. However it serves as a
 /// great and fast starting point for subsequent level set surface
 /// processing and convolution.
 ///
@@ -53,26 +53,27 @@
 /// class ParticleList {
 ///   ...
 /// public:
+///   using PosType = openvdb::Vec3R;
 ///
 ///   // Return the total number of particles in list.
 ///   // Always required!
-///   size_t         size()          const;
+///   size_t size() const;
 ///
-///   // Get the world space position of n'th particle.
+///   // Get the world space position of the nth particle.
 ///   // Required by ParticledToLevelSet::rasterizeSphere(*this,radius).
 ///   void getPos(size_t n, Vec3R& xyz) const;
 ///
-///   // Get the world space position and radius of n'th particle.
+///   // Get the world space position and radius of the nth particle.
 ///   // Required by ParticledToLevelSet::rasterizeSphere(*this).
 ///   void getPosRad(size_t n, Vec3R& xyz, Real& rad) const;
 ///
-///   // Get the world space position, radius and velocity of n'th particle.
+///   // Get the world space position, radius and velocity of the nth particle.
 ///   // Required by ParticledToLevelSet::rasterizeSphere(*this,radius).
 ///   void getPosRadVel(size_t n, Vec3R& xyz, Real& rad, Vec3R& vel) const;
 ///
-///   // Get the attribute of the n'th particle. AttributeType is user-defined!
-///   // Only required if attribute transfer is enabled in ParticledToLevelSet.
-///   void getAtt(AttributeType& att) const;
+///   // Get the attribute of the nth particle. AttributeType is user-defined!
+///   // Only required if attribute transfer is enabled in ParticlesToLevelSet.
+///   void getAtt(size_t n, AttributeType& att) const;
 /// };
 /// @endcode
 ///
@@ -84,9 +85,9 @@
 /// class Interrupter {
 ///   ...
 /// public:
-///   void start(const char* name = NULL)// called when computations begin
-///   void end()                         // called when computations end
-///   bool wasInterrupted(int percent=-1)// return true to break computation
+///   void start(const char* name = nullptr) // called when computations begin
+///   void end()                             // called when computations end
+///   bool wasInterrupted(int percent=-1)    // return true to break computation
 /// };
 /// @endcode
 ///
@@ -99,29 +100,31 @@
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
-#include <boost/utility/enable_if.hpp>
-#include <boost/mpl/if.hpp>
-#include <openvdb/util/Util.h>
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Composite.h" // for csgUnion()
+#include "PointPartitioner.h"
+#include "Prune.h"
+#include "SignedFloodFill.h"
+#include <iostream>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
-
+namespace p2ls_internal {
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is performed
-// in the ParticlesToLevelSet::Raster memberclass defined below.
-namespace local {template <typename VisibleT, typename BlindT> class BlindData;}
+// in the ParticlesToLevelSet::Raster member class defined below.
+template<typename VisibleT, typename BlindT> class BlindData;
+}// namespace p2ls_internal
+
 
 template<typename SdfGridT,
          typename AttributeT = void,
@@ -129,17 +132,17 @@ template<typename SdfGridT,
 class ParticlesToLevelSet
 {
 public:
+    using DisableT = typename std::is_void<AttributeT>::type;
+    using InterrupterType = InterrupterT;
 
-    typedef typename boost::is_void<AttributeT>::type DisableT;
-    typedef InterrupterT                          InterrupterType;
+    using SdfGridType = SdfGridT;
+    using SdfType = typename SdfGridT::ValueType;
 
-    typedef SdfGridT                              SdfGridType;
-    typedef typename SdfGridT::ValueType          SdfType;
+    using AttType = typename std::conditional<DisableT::value, size_t, AttributeT>::type;
+    using AttGridType = typename SdfGridT::template ValueConverter<AttType>::Type;
 
-    typedef typename boost::mpl::if_<DisableT, size_t, AttributeT>::type  AttType;
-    typedef typename SdfGridT::template ValueConverter<AttType>::Type AttGridType;
-
-    BOOST_STATIC_ASSERT(boost::is_floating_point<SdfType>::value);
+    static_assert(std::is_floating_point<SdfType>::value,
+        "ParticlesToLevelSet requires an SDF grid with floating-point values");
 
     /// @brief Constructor using an exiting signed distance,
     /// i.e. narrow band level set, grid.
@@ -148,8 +151,8 @@ public:
     /// @param interrupt Callback to interrupt a long-running process
     ///
     /// @note The input grid is assumed to be a valid level set and if
-    /// it already contains voxels (with SDF values) partices are unioned
-    /// onto the exisinting level set surface. However, if attribute tranfer
+    /// it already contains voxels (with SDF values) particles are unioned
+    /// onto the existing level set surface. However, if attribute transfer
     /// is enabled, i.e. AttributeT != void, attributes are only
     /// generated for voxels that overlap with particles, not the existing
     /// voxels in the input grid (for which no attributes exist!).
@@ -162,7 +165,7 @@ public:
     /// band level sets. Finally the default NullInterrupter should
     /// compile out interruption checks during optimization, thus
     /// incurring no run-time overhead.
-    explicit ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupt = NULL);
+    explicit ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupt = nullptr);
 
     /// Destructor
     ~ParticlesToLevelSet() { delete mBlindGrid; }
@@ -171,16 +174,17 @@ public:
     /// and therefore needs to be called before any of these grids are
     /// used and after the last call to any of the rasterizer methods.
     ///
-    /// @note Avoid calling this method more then once and only after
-    /// all the particles have been rasterized. It has no effect if
-    /// attribute transfer is disabled, i.e. AttributeT = void.
-    void finalize();
+    /// @note Avoid calling this method more than once and only after
+    /// all the particles have been rasterized. It has no effect or
+    /// overhead if attribute transfer is disabled, i.e. AttributeT =
+    /// void and prune is false.
+    void finalize(bool prune = false);
 
     /// @brief Return a shared pointer to the grid containing the
     /// (optional) attribute.
     ///
     /// @warning If attribute transfer was disabled, i.e. AttributeT =
-    /// void, or finalize() was not called the pointer is NULL!
+    /// void, or finalize() was not called the pointer is nullptr!
     typename AttGridType::Ptr attributeGrid() { return mAttGrid; }
 
     /// @brief Return the size of a voxel in world units
@@ -206,7 +210,7 @@ public:
     /// @brief set the largest radius allowed in voxel units
     void setRmax(Real Rmax) { mRmax = math::Max(mRmin,Rmax); }
 
-    /// @brief Rreturn the grain-size used for multi-threading
+    /// @brief Returns the grain-size used for multi-threading
     int  getGrainSize() const { return mGrainSize; }
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
@@ -247,9 +251,8 @@ public:
     void rasterizeTrails(const ParticleListT& pa, Real delta=1.0);
 
 private:
-
-    typedef local::BlindData<SdfType, AttType>    BlindType;
-    typedef typename SdfGridT::template ValueConverter<BlindType>::Type BlindGridType;
+    using BlindType = p2ls_internal::BlindData<SdfType, AttType>;
+    using BlindGridType = typename SdfGridT::template ValueConverter<BlindType>::Type;
 
     /// Class with multi-threaded implementation of particle rasterization
     template<typename ParticleListT, typename GridT> struct Raster;
@@ -269,7 +272,7 @@ template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 inline ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::
 ParticlesToLevelSet(SdfGridT& grid, InterrupterT* interrupter) :
     mSdfGrid(&grid),
-    mBlindGrid(NULL),
+    mBlindGrid(nullptr),
     mInterrupter(interrupter),
     mDx(grid.voxelSize()[0]),
     mHalfWidth(grid.background()/mDx),
@@ -339,13 +342,18 @@ rasterizeTrails(const ParticleListT& pa, Real delta)
 
 template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 inline void
-ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize()
+ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize(bool prune)
 {
-    if (mBlindGrid==NULL) return;
+    if (mBlindGrid == nullptr) {
+        if (prune) tools::pruneLevelSet(mSdfGrid->tree());
+        return;
+    } else {
+        if (prune) tools::prune(mBlindGrid->tree());
+    }
 
-    typedef typename SdfGridType::TreeType   SdfTreeT;
-    typedef typename AttGridType::TreeType   AttTreeT;
-    typedef typename BlindGridType::TreeType BlindTreeT;
+    using SdfTreeT = typename SdfGridType::TreeType;
+    using AttTreeT = typename AttGridType::TreeType;
+    using BlindTreeT = typename BlindGridType::TreeType;
     // Use topology copy constructors since output grids have the same topology as mBlindDataGrid
     const BlindTreeT& tree = mBlindGrid->tree();
 
@@ -361,26 +369,36 @@ ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::finalize()
 
     // Extract the level set and IDs from mBlindDataGrid. We will
     // explore the fact that by design active values always live
-    // at the leaf node level, i.e. no active tiles exist in level sets
-    typedef typename BlindTreeT::LeafCIter    LeafIterT;
-    typedef typename BlindTreeT::LeafNodeType LeafT;
-    typedef typename SdfTreeT::LeafNodeType   SdfLeafT;
-    typedef typename AttTreeT::LeafNodeType   AttLeafT;
+    // at the leaf node level, i.e. level sets have no active tiles!
+    using LeafIterT = typename BlindTreeT::LeafCIter;
+    using LeafT = typename BlindTreeT::LeafNodeType;
+    using SdfLeafT = typename SdfTreeT::LeafNodeType;
+    using AttLeafT = typename AttTreeT::LeafNodeType;
     for (LeafIterT n = tree.cbeginLeaf(); n; ++n) {
         const LeafT& leaf = *n;
         const openvdb::Coord xyz = leaf.origin();
-        // Get leafnodes that were allocated during topology contruction!
+        // Get leafnodes that were allocated during topology construction!
         SdfLeafT* sdfLeaf = sdfTree->probeLeaf(xyz);
         AttLeafT* attLeaf = attTree->probeLeaf(xyz);
-        for (typename LeafT::ValueOnCIter m=leaf.cbeginValueOn(); m; ++m) {
-            // Use linear offset (vs coordinate) access for better performance!
-            const openvdb::Index k = m.pos();
-            const BlindType& v = *m;
-            sdfLeaf->setValueOnly(k, v.visible());
-            attLeaf->setValueOnly(k, v.blind());
+        // Use linear offset (vs coordinate) access for better performance!
+        typename LeafT::ValueOnCIter m=leaf.cbeginValueOn();
+        if (!m) {//no active values in leaf node so copy everything
+            for (openvdb::Index k = 0; k!=LeafT::SIZE; ++k) {
+                const BlindType& v = leaf.getValue(k);
+                sdfLeaf->setValueOnly(k, v.visible());
+                attLeaf->setValueOnly(k, v.blind());
+            }
+        } else {//only copy active values (using flood fill for the inactive values)
+            for(; m; ++m) {
+                const openvdb::Index k = m.pos();
+                const BlindType& v = *m;
+                sdfLeaf->setValueOnly(k, v.visible());
+                attLeaf->setValueOnly(k, v.blind());
+            }
         }
     }
-    sdfTree->signedFloodFill();//required since we only transferred active voxels!
+
+    tools::signedFloodFill(*sdfTree);//required since we only transferred active voxels!
 
     if (mSdfGrid->empty()) {
         mSdfGrid->setTree(sdfTree);
@@ -395,40 +413,56 @@ template<typename SdfGridT, typename AttributeT, typename InterrupterT>
 template<typename ParticleListT, typename GridT>
 struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
 {
-    typedef typename boost::is_void<AttributeT>::type DisableT;
-    typedef ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT> ParticlesToLevelSetT;
-    typedef typename ParticlesToLevelSetT::SdfType   SdfT;//type of signed distance values
-    typedef typename ParticlesToLevelSetT::AttType   AttT;//type of particle attribute
-    typedef typename GridT::ValueType                ValueT;
-    typedef typename GridT::Accessor                 AccessorT;
+    using DisableT = typename std::is_void<AttributeT>::type;
+    using ParticlesToLevelSetT = ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>;
+    using SdfT = typename ParticlesToLevelSetT::SdfType; // type of signed distance values
+    using AttT = typename ParticlesToLevelSetT::AttType; // type of particle attribute
+    using ValueT = typename GridT::ValueType;
+    using AccessorT = typename GridT::Accessor;
+    using TreeT = typename GridT::TreeType;
+    using LeafNodeT = typename TreeT::LeafNodeType;
+    using PointPartitionerT = PointPartitioner<Index32, LeafNodeT::LOG2DIM>;
+
 
     /// @brief Main constructor
     Raster(ParticlesToLevelSetT& parent, GridT* grid, const ParticleListT& particles)
-        : mParent(parent),
-          mParticles(particles),
-          mGrid(grid),
-          mMap(*(mGrid->transform().baseMap())),
-          mMinCount(0),
-          mMaxCount(0),
-          mOwnsGrid(false)
+        : mParent(parent)
+        , mParticles(particles)
+        , mGrid(grid)
+        , mMap(*(mGrid->transform().baseMap()))
+        , mMinCount(0)
+        , mMaxCount(0)
+        , mIsCopy(false)
     {
+        mPointPartitioner = new PointPartitionerT();
+        mPointPartitioner->construct(particles, mGrid->transform());
     }
 
     /// @brief Copy constructor called by tbb threads
     Raster(Raster& other, tbb::split)
-        : mParent(other.mParent),
-          mParticles(other.mParticles),
-          mGrid(new GridT(*other.mGrid, openvdb::ShallowCopy())),
-          mMap(other.mMap),
-          mMinCount(0),
-          mMaxCount(0),
-          mTask(other.mTask),
-          mOwnsGrid(true)
+        : mParent(other.mParent)
+        , mParticles(other.mParticles)
+        , mGrid(new GridT(*other.mGrid, openvdb::ShallowCopy()))
+        , mMap(other.mMap)
+        , mMinCount(0)
+        , mMaxCount(0)
+        , mTask(other.mTask)
+        , mIsCopy(true)
+        , mPointPartitioner(other.mPointPartitioner)
     {
         mGrid->newTree();
     }
 
-    virtual ~Raster() { if (mOwnsGrid) delete mGrid; }
+    virtual ~Raster() {
+
+        // Copies construct temporary grids that have to be deleted
+        // but the original has ownership of the bucket array
+        if (mIsCopy) {
+            delete mGrid;
+        } else {
+            delete mPointPartitioner;
+        }
+    }
 
     /// @brief Rasterize a sphere per particle derived from their
     /// position and radius. All spheres are CSG unioned.
@@ -438,7 +472,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using spheres");
         }
-        mTask = boost::bind(&Raster::rasterSpheres, _1, _2);
+        mTask = std::bind(&Raster::rasterSpheres, std::placeholders::_1, std::placeholders::_2);
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }
@@ -457,7 +491,8 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
                 mParent.mInterrupter->start(
                     "Rasterizing particles to level set using const spheres");
             }
-            mTask = boost::bind(&Raster::rasterFixedSpheres, _1, _2, SdfT(radius));
+            mTask = std::bind(&Raster::rasterFixedSpheres,
+                std::placeholders::_1, std::placeholders::_2, SdfT(radius));
             this->cook();
             if (mParent.mInterrupter) mParent.mInterrupter->end();
         }
@@ -482,7 +517,8 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
         if (mParent.mInterrupter) {
             mParent.mInterrupter->start("Rasterizing particles to level set using trails");
         }
-        mTask = boost::bind(&Raster::rasterTrails, _1, _2, SdfT(delta));
+        mTask = std::bind(&Raster::rasterTrails,
+            std::placeholders::_1, std::placeholders::_2, SdfT(delta));
         this->cook();
         if (mParent.mInterrupter) mParent.mInterrupter->end();
     }
@@ -505,7 +541,7 @@ struct ParticlesToLevelSet<SdfGridT, AttributeT, InterrupterT>::Raster
     }
 private:
     /// Disallow assignment since some of the members are references
-    Raster& operator=(const Raster& other) { return *this; }
+    Raster& operator=(const Raster&) { return *this; }
 
     /// @return true if the particle is too small or too large
     bool ignoreParticle(SdfT R)
@@ -528,26 +564,36 @@ private:
     {
         AccessorT acc = mGrid->getAccessor(); // local accessor
         bool run = true;
-        const SdfT invDx = 1/mParent.mDx;
+        const SdfT invDx = SdfT(1/mParent.mDx);
         AttT att;
         Vec3R pos;
         Real rad;
-        for (Index32 id = r.begin(), e=r.end(); run && id != e; ++id) {
-            mParticles.getPosRad(id, pos, rad);
-            const SdfT R = invDx * rad;// in voxel units
-            if (this->ignoreParticle(R)) continue;
-            const Vec3R P = mMap.applyInverseMap(pos);
-            this->getAtt<DisableT>(id, att);
-            run = this->makeSphere(P, R, att, acc);
-        }//end loop over particles
+
+        // Loop over buckets
+        for (size_t n = r.begin(), N = r.end(); n < N; ++n) {
+            // Loop over particles in bucket n.
+            typename PointPartitionerT::IndexIterator iter = mPointPartitioner->indices(n);
+            for ( ; run && iter; ++iter) {
+                const Index32& id = *iter;
+                mParticles.getPosRad(id, pos, rad);
+                const SdfT R = SdfT(invDx * rad);// in voxel units
+                if (this->ignoreParticle(R)) continue;
+                const Vec3R P = mMap.applyInverseMap(pos);
+                this->getAtt<DisableT>(id, att);
+                run = this->makeSphere(P, R, att, acc);
+            }//end loop over particles
+        }//end loop over buckets
     }
+
     /// @brief Reguired by tbb::parallel_reduce to multithreaded
     /// rasterization of particles as spheres with a fixed radius
     ///
     /// @param r tbb's default range referring to the list of particles
     void rasterFixedSpheres(const tbb::blocked_range<size_t>& r, SdfT R)
     {
-        const SdfT dx = mParent.mDx, w = mParent.mHalfWidth;// in voxel units
+        const SdfT
+            dx = static_cast<SdfT>(mParent.mDx),
+            w = static_cast<SdfT>(mParent.mHalfWidth); // in voxel units
         AccessorT acc = mGrid->getAccessor(); // local accessor
         const ValueT inside = -mGrid->background();
         const SdfT max = R + w;// maximum distance in voxel units
@@ -557,37 +603,46 @@ private:
         size_t count = 0;
         AttT att;
         Vec3R pos;
-        for (size_t id = r.begin(), e=r.end(); id != e; ++id) {
-            this->getAtt<DisableT>(id, att);
-            mParticles.getPos(id, pos);
-            const Vec3R P = mMap.applyInverseMap(pos);
-            const Coord a(math::Floor(P[0]-max),math::Floor(P[1]-max),math::Floor(P[2]-max));
-            const Coord b(math::Ceil( P[0]+max),math::Ceil( P[1]+max),math::Ceil( P[2]+max));
-            for ( Coord c = a; c.x() <= b.x(); ++c.x() ) {
-                //only check interrupter every 32'th scan in x
-                if (!(count++ & (1<<5)-1) && util::wasInterrupted(mParent.mInterrupter)) {
-                    tbb::task::self().cancel_group_execution();
-                    return;
-                }
-                SdfT x2 = math::Pow2( c.x() - P[0] );
-                for ( c.y() = a.y(); c.y() <= b.y(); ++c.y() ) {
-                    SdfT x2y2 = x2 + math::Pow2( c.y() - P[1] );
-                    for ( c.z() = a.z(); c.z() <= b.z(); ++c.z() ) {
-                        SdfT x2y2z2 = x2y2 + math::Pow2(c.z()- P[2]);//square distance from c to P
-                        if ( x2y2z2 >= max2 || (!acc.probeValue(c,v) && v<ValueT(0)) )
-                            continue;//outside narrow band of particle or inside existing level set
-                        if ( x2y2z2 <= min2 ) {//inside narrow band of the particle.
-                            acc.setValueOff(c, inside);
-                            continue;
-                        }
-                        // convert signed distance from voxel units to world units
-                        const ValueT d=Merge(dx*(math::Sqrt(x2y2z2) - R), att);
-                        if (d < v) acc.setValue(c, d);//CSG union
-                    }//end loop over z
-                }//end loop over y
-            }//end loop over x
-        }//end loop over particles
+
+        // Loop over buckets
+        for (size_t n = r.begin(), N = r.end(); n < N; ++n) {
+            // Loop over particles in bucket n.
+            typename PointPartitionerT::IndexIterator iter = mPointPartitioner->indices(n);
+            for ( ; iter; ++iter) {
+                const Index32& id = *iter;
+                this->getAtt<DisableT>(id, att);
+                mParticles.getPos(id, pos);
+                const Vec3R P = mMap.applyInverseMap(pos);
+                const Coord a(math::Floor(P[0]-max),math::Floor(P[1]-max),math::Floor(P[2]-max));
+                const Coord b(math::Ceil( P[0]+max),math::Ceil( P[1]+max),math::Ceil( P[2]+max));
+                for (Coord c = a; c.x() <= b.x(); ++c.x()) {
+                    //only check interrupter every 32'th scan in x
+                    if (!(count++ & ((1<<5)-1)) && util::wasInterrupted(mParent.mInterrupter)) {
+                        tbb::task::self().cancel_group_execution();
+                        return;
+                    }
+                    SdfT x2 = static_cast<SdfT>(math::Pow2(c.x() - P[0]));
+                    for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
+                        SdfT x2y2 = static_cast<SdfT>(x2 + math::Pow2(c.y() - P[1]));
+                        for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
+                            SdfT x2y2z2 = static_cast<SdfT>(
+                                x2y2 + math::Pow2(c.z()- P[2])); // square distance from c to P
+                            if (x2y2z2 >= max2 || (!acc.probeValue(c,v) && v<ValueT(0)))
+                                continue;//outside narrow band of particle or inside existing level set
+                            if (x2y2z2 <= min2) {//inside narrow band of the particle.
+                                acc.setValueOff(c, inside);
+                                continue;
+                            }
+                            // convert signed distance from voxel units to world units
+                            const ValueT d=Merge(dx*(math::Sqrt(x2y2z2) - R), att);
+                            if (d < v) acc.setValue(c, d);//CSG union
+                        }//end loop over z
+                    }//end loop over y
+                }//end loop over x
+            }//end loop over particles
+        }// end loop over buckts
     }
+
     /// @brief Reguired by tbb::parallel_reduce to multithreaded
     /// rasterization of particles as spheres with velocity blurring
     ///
@@ -600,34 +655,44 @@ private:
         Vec3R pos, vel;
         Real rad;
         const Vec3R origin = mMap.applyInverseMap(Vec3R(0,0,0));
-        const SdfT Rmin = mParent.mRmin, invDx = 1/mParent.mDx;
-        for (size_t id = r.begin(), e=r.end(); run && id != e; ++id) {
-            mParticles.getPosRadVel(id, pos, rad, vel);
-            const SdfT R0 = invDx*rad;
-            if (this->ignoreParticle(R0)) continue;
-            this->getAtt<DisableT>(id, att);
-            const Vec3R P0 = mMap.applyInverseMap(pos);
-            const Vec3R V  = mMap.applyInverseMap(vel) - origin;//exclude translation
-            const SdfT speed = V.length(), inv_speed=1.0/speed;
-            const Vec3R N = -V*inv_speed;// inverse normalized direction
-            Vec3R P = P0;// local position of instance
-            SdfT R = R0, d=0;// local radius and length of trail
-            for (size_t m=0; run && d <= speed ; ++m) {
-                run = this->makeSphere(P, R, att, acc);
-                P += 0.5*delta*R*N;// adaptive offset along inverse velocity direction
-                d  = (P-P0).length();// current length of trail
-                R  = R0-(R0-Rmin)*d*inv_speed;// R = R0 -> mRmin(e.g. 1.5)
-            }//end loop over sphere instances
-        }//end loop over particles
+        const SdfT Rmin = SdfT(mParent.mRmin), invDx = SdfT(1/mParent.mDx);
+
+        // Loop over buckets
+        for (size_t n = r.begin(), N = r.end(); n < N; ++n) {
+            // Loop over particles in bucket n.
+            typename PointPartitionerT::IndexIterator iter = mPointPartitioner->indices(n);
+            for ( ; run && iter; ++iter) {
+                const Index32& id = *iter;
+                mParticles.getPosRadVel(id, pos, rad, vel);
+                const SdfT R0 = SdfT(invDx*rad);
+                if (this->ignoreParticle(R0)) continue;
+                this->getAtt<DisableT>(id, att);
+                const Vec3R P0 = mMap.applyInverseMap(pos);
+                const Vec3R V  = mMap.applyInverseMap(vel) - origin;//exclude translation
+                const SdfT speed = SdfT(V.length()), inv_speed = SdfT(1.0/speed);
+                const Vec3R Nrml = -V*inv_speed;// inverse normalized direction
+                Vec3R P = P0;// local position of instance
+                SdfT R = R0, d=0;// local radius and length of trail
+                for (size_t m=0; run && d <= speed ; ++m) {
+                    run = this->makeSphere(P, R, att, acc);
+                    P += 0.5*delta*R*Nrml;// adaptive offset along inverse velocity direction
+                    d  = SdfT((P-P0).length());// current length of trail
+                    R  = R0-(R0-Rmin)*d*inv_speed;// R = R0 -> mRmin(e.g. 1.5)
+                }//end loop over sphere instances
+            }//end loop over particles
+        }//end loop over buckets
     }
 
     void cook()
     {
+        // parallelize over the point buckets
+        const Index32 bucketCount = Index32(mPointPartitioner->size());
+
         if (mParent.mGrainSize>0) {
             tbb::parallel_reduce(
-                tbb::blocked_range<size_t>(0,mParticles.size(),mParent.mGrainSize), *this);
+              tbb::blocked_range<size_t>(0, bucketCount, mParent.mGrainSize), *this);
         } else {
-            (*this)(tbb::blocked_range<size_t>(0, mParticles.size()));
+            (*this)(tbb::blocked_range<size_t>(0, bucketCount));
         }
     }
 
@@ -643,13 +708,13 @@ private:
     /// @note For best performance all computations are performed in
     /// voxel-space with the important exception of the final level set
     /// value that is converted to world units (e.g. the grid stores
-    /// the closest Euclidian signed distances measured in world
+    /// the closest Euclidean signed distances measured in world
     /// units). Also note we use the convention of positive distances
-    /// outside the surface an negative distances inside the surface.
+    /// outside the surface and negative distances inside the surface.
     bool makeSphere(const Vec3R &P, SdfT R, const AttT& att, AccessorT& acc)
     {
         const ValueT inside = -mGrid->background();
-        const SdfT dx = mParent.mDx, w = mParent.mHalfWidth;
+        const SdfT dx = SdfT(mParent.mDx), w = SdfT(mParent.mHalfWidth);
         const SdfT max = R + w;// maximum distance in voxel units
         const Coord a(math::Floor(P[0]-max),math::Floor(P[1]-max),math::Floor(P[2]-max));
         const Coord b(math::Ceil( P[0]+max),math::Ceil( P[1]+max),math::Ceil( P[2]+max));
@@ -659,18 +724,18 @@ private:
         size_t count = 0;
         for ( Coord c = a; c.x() <= b.x(); ++c.x() ) {
             //only check interrupter every 32'th scan in x
-            if (!(count++ & (1<<5)-1) && util::wasInterrupted(mParent.mInterrupter)) {
+            if (!(count++ & ((1<<5)-1)) && util::wasInterrupted(mParent.mInterrupter)) {
                 tbb::task::self().cancel_group_execution();
                 return false;
             }
-            SdfT x2 = math::Pow2( c.x() - P[0] );
-            for ( c.y() = a.y(); c.y() <= b.y(); ++c.y() ) {
-                SdfT x2y2 = x2 + math::Pow2( c.y() - P[1] );
-                for ( c.z() = a.z(); c.z() <= b.z(); ++c.z() ) {
-                    SdfT x2y2z2 = x2y2 + math::Pow2( c.z() - P[2] );//square distance from c to P
-                    if ( x2y2z2 >= max2 || (!acc.probeValue(c,v) && v<ValueT(0)) )
+            SdfT x2 = SdfT(math::Pow2(c.x() - P[0]));
+            for (c.y() = a.y(); c.y() <= b.y(); ++c.y()) {
+                SdfT x2y2 = SdfT(x2 + math::Pow2(c.y() - P[1]));
+                for (c.z() = a.z(); c.z() <= b.z(); ++c.z()) {
+                    SdfT x2y2z2 = SdfT(x2y2 + math::Pow2(c.z()-P[2]));//square distance from c to P
+                    if (x2y2z2 >= max2 || (!acc.probeValue(c,v) && v<ValueT(0)))
                         continue;//outside narrow band of the particle or inside existing level set
-                    if ( x2y2z2 <= min2 ) {//inside narrow band of the particle.
+                    if (x2y2z2 <= min2) {//inside narrow band of the particle.
                         acc.setValueOff(c, inside);
                         continue;
                     }
@@ -683,22 +748,22 @@ private:
         }//end loop over x
         return true;
     }
-    typedef typename boost::function<void (Raster*, const tbb::blocked_range<size_t>&)> FuncType;
+    using FuncType = typename std::function<void (Raster*, const tbb::blocked_range<size_t>&)>;
 
-    template <typename DisableType>
-    typename boost::enable_if<DisableType>::type
-    getAtt(size_t, AttT&) const {;}
+    template<typename DisableType>
+    typename std::enable_if<DisableType::value>::type
+    getAtt(size_t, AttT&) const {}
 
-    template <typename DisableType>
-    typename boost::disable_if<DisableType>::type
-    getAtt(size_t n, AttT& a) const {mParticles.getAtt(n, a);}
+    template<typename DisableType>
+    typename std::enable_if<!DisableType::value>::type
+    getAtt(size_t n, AttT& a) const { mParticles.getAtt(n, a); }
 
-    template <typename T>
-    typename boost::enable_if<boost::is_same<T,ValueT>, ValueT>::type
+    template<typename T>
+    typename std::enable_if<std::is_same<T, ValueT>::value, ValueT>::type
     Merge(T s, const AttT&) const { return s; }
 
-    template <typename T>
-    typename boost::disable_if<boost::is_same<T,ValueT>, ValueT>::type
+    template<typename T>
+    typename std::enable_if<!std::is_same<T, ValueT>::value, ValueT>::type
     Merge(T s, const AttT& a) const { return ValueT(s,a); }
 
     ParticlesToLevelSetT& mParent;
@@ -707,59 +772,64 @@ private:
     const math::MapBase&  mMap;
     size_t                mMinCount, mMaxCount;//counters for ignored particles!
     FuncType              mTask;
-    const bool            mOwnsGrid;
+    const bool            mIsCopy;
+    PointPartitionerT*    mPointPartitioner;
 };//end of Raster struct
 
 
 ///////////////////// YOU CAN SAFELY IGNORE THIS SECTION /////////////////////
 
-namespace local {
+namespace p2ls_internal {
+
 // This is a simple type that combines a distance value and a particle
 // attribute. It's required for attribute transfer which is defined in the
 // Raster class above.
-template <typename VisibleT, typename BlindT>
+template<typename VisibleT, typename BlindT>
 class BlindData
 {
-  public:
-    typedef VisibleT type;
-    typedef VisibleT VisibleType;
-    typedef BlindT   BlindType;
-    explicit BlindData() {}
-    explicit BlindData(VisibleT v) : mVisible(v) {}
+public:
+    using type = VisibleT;
+    using VisibleType = VisibleT;
+    using BlindType = BlindT;
+
+    BlindData() {}
+    explicit BlindData(VisibleT v) : mVisible(v), mBlind(zeroVal<BlindType>()) {}
     BlindData(VisibleT v, BlindT b) : mVisible(v), mBlind(b) {}
-    BlindData& operator=(const BlindData& rhs)
-    {
-        mVisible = rhs.mVisible;
-        mBlind = rhs.mBlind;
-        return *this;
-    }
+    BlindData(const BlindData&) = default;
+    BlindData& operator=(const BlindData&) = default;
     const VisibleT& visible() const { return mVisible; }
     const BlindT&   blind()   const { return mBlind; }
+    OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
     bool operator==(const BlindData& rhs)     const { return mVisible == rhs.mVisible; }
-    bool operator< (const BlindData& rhs)     const { return mVisible <  rhs.mVisible; };
-    bool operator> (const BlindData& rhs)     const { return mVisible >  rhs.mVisible; };
-    BlindData operator+(const BlindData& rhs) const { return BlindData(mVisible + rhs.mVisible); };
-    BlindData operator+(const VisibleT&  rhs) const { return BlindData(mVisible + rhs); };
-    BlindData operator-(const BlindData& rhs) const { return BlindData(mVisible - rhs.mVisible); };
+    OPENVDB_NO_FP_EQUALITY_WARNING_END
+    bool operator< (const BlindData& rhs)     const { return mVisible <  rhs.mVisible; }
+    bool operator> (const BlindData& rhs)     const { return mVisible >  rhs.mVisible; }
+    BlindData operator+(const BlindData& rhs) const { return BlindData(mVisible + rhs.mVisible); }
+    BlindData operator+(const VisibleT&  rhs) const { return BlindData(mVisible + rhs); }
+    BlindData operator-(const BlindData& rhs) const { return BlindData(mVisible - rhs.mVisible); }
     BlindData operator-() const { return BlindData(-mVisible, mBlind); }
+
 protected:
     VisibleT mVisible;
     BlindT   mBlind;
 };
+
 // Required by several of the tree nodes
-template <typename VisibleT, typename BlindT>
+template<typename VisibleT, typename BlindT>
 inline std::ostream& operator<<(std::ostream& ostr, const BlindData<VisibleT, BlindT>& rhs)
 {
     ostr << rhs.visible();
     return ostr;
 }
+
 // Required by math::Abs
-template <typename VisibleT, typename BlindT>
+template<typename VisibleT, typename BlindT>
 inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 {
     return BlindData<VisibleT, BlindT>(math::Abs(x.visible()), x.blind());
 }
-}// local namespace
+
+} // namespace p2ls_internal
 
 //////////////////////////////////////////////////////////////////////////////
 
@@ -769,6 +839,6 @@ inline BlindData<VisibleT, BlindT> Abs(const BlindData<VisibleT, BlindT>& x)
 
 #endif // OPENVDB_TOOLS_PARTICLES_TO_LEVELSET_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

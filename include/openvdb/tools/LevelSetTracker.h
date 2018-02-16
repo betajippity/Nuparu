@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,10 +27,10 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @author Ken Museth
 ///
-/// @file LevelSetTracker.h
+/// @file tools/LevelSetTracker.h
 ///
 /// @brief Performs multi-threaded interface tracking of narrow band
 /// level sets. This is the building-block for most level set
@@ -39,11 +39,7 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_reduce.h>
 #include <tbb/parallel_for.h>
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/type_traits/is_floating_point.hpp>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/FiniteDifference.h>
@@ -54,7 +50,12 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/tree/LeafManager.h>
-#include "Morphology.h"//for tools::dilateVoxels
+#include "ChangeBackground.h"// for changeLevelSetBackground
+#include "Morphology.h"//for dilateActiveValues
+#include "Prune.h"// for pruneLevelSet
+#include <functional>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -66,139 +67,198 @@ template<typename GridT, typename InterruptT = util::NullInterrupter>
 class LevelSetTracker
 {
 public:
-    typedef GridT                                GridType;
-    typedef typename GridT::TreeType             TreeType;
-    typedef typename TreeType::LeafNodeType      LeafType;
-    typedef typename TreeType::ValueType         ValueType;
-    typedef typename tree::LeafManager<TreeType> LeafManagerType; // leafs + buffers
-    typedef typename LeafManagerType::RangeType  RangeType;
-    typedef typename LeafManagerType::LeafRange  LeafRange;
-    typedef typename LeafManagerType::BufferType BufferType;
-    BOOST_STATIC_ASSERT(boost::is_floating_point<ValueType>::value);
+    using GridType = GridT;
+    using TreeType = typename GridT::TreeType;
+    using LeafType = typename TreeType::LeafNodeType;
+    using ValueType = typename TreeType::ValueType;
+    using LeafManagerType = typename tree::LeafManager<TreeType>; // leafs + buffers
+    using LeafRange = typename LeafManagerType::LeafRange;
+    using BufferType = typename LeafManagerType::BufferType;
+    using MaskTreeType = typename TreeType::template ValueConverter<ValueMask>::Type;
+    static_assert(std::is_floating_point<ValueType>::value,
+        "LevelSetTracker requires a level set grid with floating-point values");
 
-    /// Main constructor
+    /// Lightweight struct that stores the state of the LevelSetTracker
+    struct State {
+        State(math::BiasedGradientScheme s = math::HJWENO5_BIAS,
+              math::TemporalIntegrationScheme t = math::TVD_RK1,
+              int n = static_cast<int>(LEVEL_SET_HALF_WIDTH), int g = 1)
+            : spatialScheme(s), temporalScheme(t), normCount(n), grainSize(g) {}
+        math::BiasedGradientScheme      spatialScheme;
+        math::TemporalIntegrationScheme temporalScheme;
+        int                             normCount;// Number of iterations of normalization
+        int                             grainSize;
+    };
+
+    /// @brief Main constructor
     /// @throw RuntimeError if the grid is not a level set
-    LevelSetTracker(GridT& grid, InterruptT* interrupt = NULL);
+    LevelSetTracker(GridT& grid, InterruptT* interrupt = nullptr);
 
-    /// Shallow copy constructor called by tbb::parallel_for() threads during filtering
-    LevelSetTracker(const LevelSetTracker& other);
+    virtual ~LevelSetTracker() { delete mLeafs; }
 
-    virtual ~LevelSetTracker() { if (mIsMaster) delete mLeafs; }
+    /// @brief Iterative normalization, i.e. solving the Eikonal equation
+    /// @note The mask it optional and by default it is ignored.
+    template <typename MaskType>
+    void normalize(const MaskType* mask);
 
-    /// Iterative normalization, i.e. solving the Eikonal equation
-    void normalize();
+    /// @brief Iterative normalization, i.e. solving the Eikonal equation
+    void normalize() { this->normalize<MaskTreeType>(nullptr); }
 
-    /// Track the level set interface, i.e. rebuild and normalize the
+    /// @brief Track the level set interface, i.e. rebuild and normalize the
     /// narrow band of the level set.
     void track();
 
-    /// Remove voxels that are outside the narrow band. (substep of track)
+    /// @brief Remove voxels that are outside the narrow band. (substep of track)
     void prune();
 
+    /// @brief Fast but approximate dilation of the narrow band - one
+    /// layer at a time. Normally we recommend using the resize method below
+    /// which internally calls dilate (or erode) with the correct
+    /// number of @a iterations to achieve the desired half voxel width
+    /// of the narrow band (3 is recomended for most level set applications).
+    ///
+    /// @note Since many level set applications perform
+    /// interface-tracking, which in turn rebuilds the narrow-band
+    /// accurately, this dilate method can often be used with a
+    /// single iterations of low-order re-normalization. This
+    /// effectively allows very narrow bands to be created from points
+    /// or polygons (e.g. with a half voxel width of 1), followed by a
+    /// fast but approximate dilation (typically with a half voxel
+    /// width of 3). This can be significantly faster than generating
+    /// the final width of the narrow band from points or polygons.
+    void dilate(int iterations = 1);
+
+    /// @brief Erodes the width of the narrow-band and update the background values
+    /// @throw ValueError if @a iterations is larger than the current half-width.
+    void erode(int iterations = 1);
+
+    /// @brief Resize the width of the narrow band, i.e. perform
+    /// dilation and renormalization or erosion as required.
+    bool resize(Index halfWidth = static_cast<Index>(LEVEL_SET_HALF_WIDTH));
+
+    /// @brief Return the half width of the narrow band in floating-point voxel units.
+    ValueType getHalfWidth() const { return mGrid->background()/mDx; }
+
+    /// @brief Return the state of the tracker (see struct defined above)
+    State getState() const { return mState; }
+
+    /// @brief Set the state of the tracker (see struct defined above)
+    void setState(const State& s) { mState =s; }
+
     /// @return the spatial finite difference scheme
-    math::BiasedGradientScheme getSpatialScheme() const { return mSpatialScheme; }
+    math::BiasedGradientScheme getSpatialScheme() const { return mState.spatialScheme; }
+
     /// @brief Set the spatial finite difference scheme
-    void setSpatialScheme(math::BiasedGradientScheme scheme) { mSpatialScheme = scheme; }
+    void setSpatialScheme(math::BiasedGradientScheme scheme) { mState.spatialScheme = scheme; }
 
     /// @return the temporal integration scheme
-    math::TemporalIntegrationScheme getTemporalScheme() const { return mTemporalScheme; }
+    math::TemporalIntegrationScheme getTemporalScheme() const { return mState.temporalScheme; }
+
     /// @brief Set the spatial finite difference scheme
-    void setTemporalScheme(math::TemporalIntegrationScheme scheme) { mTemporalScheme = scheme; }
+    void setTemporalScheme(math::TemporalIntegrationScheme scheme) { mState.temporalScheme = scheme;}
 
     /// @return The number of normalizations performed per track or
     /// normalize call.
-    int  getNormCount() const { return mNormCount; }
+    int  getNormCount() const { return mState.normCount; }
+
     /// @brief Set the number of normalizations performed per track or
     /// normalize call.
-    void setNormCount(int n) { mNormCount = n; }
+    void setNormCount(int n) { mState.normCount = n; }
 
     /// @return the grain-size used for multi-threading
-    int  getGrainSize() const { return mGrainSize; }
+    int  getGrainSize() const { return mState.grainSize; }
+
     /// @brief Set the grain-size used for multi-threading.
     /// @note A grainsize of 0 or less disables multi-threading!
-    void setGrainSize(int grainsize) { mGrainSize = grainsize; }
+    void setGrainSize(int grainsize) { mState.grainSize = grainsize; }
 
     ValueType voxelSize() const { return mDx; }
 
     void startInterrupter(const char* msg);
+
     void endInterrupter();
+
     /// @return false if the process was interrupted
     bool checkInterrupter();
 
     const GridType& grid() const { return *mGrid; }
 
     LeafManagerType& leafs() { return *mLeafs; }
+
     const LeafManagerType& leafs() const { return *mLeafs; }
 
-    /// @brief Public functor called by tbb::parallel_for()
-    /// @note Never call this method directly
-    void operator()(const RangeType& r) const
-    {
-        if (mTask) mTask(const_cast<LevelSetTracker*>(this), r);
-        else OPENVDB_THROW(ValueError, "task is undefined - call track(), etc");
-    }
-    
 private:
 
+    // disallow copy construction and copy by assignment!
+    LevelSetTracker(const LevelSetTracker&);// not implemented
+    LevelSetTracker& operator=(const LevelSetTracker&);// not implemented
+
+    // Private class to perform multi-threaded trimming of
+    // voxels that are too far away from the zero-crossing.
+    struct Trim
+    {
+        Trim(LevelSetTracker& tracker) : mTracker(tracker) {}
+        void trim();
+        void operator()(const LeafRange& r) const;
+        LevelSetTracker& mTracker;
+    };// Trim
+
+    // Private struct to perform multi-threaded normalization
     template<math::BiasedGradientScheme      SpatialScheme,
-             math::TemporalIntegrationScheme TemporalScheme>
+             math::TemporalIntegrationScheme TemporalScheme,
+             typename MaskT>
     struct Normalizer
     {
-        Normalizer(LevelSetTracker& tracker): mTracker(tracker), mTask(0) {}
+        using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
+        using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+        using MaskLeafT = typename MaskT::LeafNodeType;
+        using MaskIterT = typename MaskLeafT::ValueOnCIter;
+        using VoxelIterT = typename LeafType::ValueOnCIter;
+
+        Normalizer(LevelSetTracker& tracker, const MaskT* mask);
         void normalize();
-        void operator()(const RangeType& r) const {mTask(const_cast<Normalizer*>(this), r);}
-        typedef typename boost::function<void (Normalizer*, const RangeType&)> FuncType;
+        void operator()(const LeafRange& r) const {mTask(const_cast<Normalizer*>(this), r);}
+        void cook(const char* msg, int swapBuffer=0);
+        template <int Nominator, int Denominator>
+        void euler(const LeafRange& range, Index phiBuffer, Index resultBuffer);
+        inline void euler01(const LeafRange& r) {this->euler<0,1>(r, 0, 1);}
+        inline void euler12(const LeafRange& r) {this->euler<1,2>(r, 1, 1);}
+        inline void euler34(const LeafRange& r) {this->euler<3,4>(r, 1, 2);}
+        inline void euler13(const LeafRange& r) {this->euler<1,3>(r, 1, 2);}
+        template <int Nominator, int Denominator>
+        void eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const;
         LevelSetTracker& mTracker;
-        FuncType         mTask;
-        void cook(int swapBuffer=0);
-        void euler1(const RangeType& range, ValueType dt, Index resultBuffer);
-        void euler2(const RangeType& range, ValueType dt, ValueType alpha,
-                    Index phiBuffer, Index resultBuffer);
-    }; // end of protected Normalizer class
-    
-    typedef typename boost::function<void (LevelSetTracker*, const RangeType&)> FuncType;
+        const MaskT*     mMask;
+        const ValueType  mDt, mInvDx;
+        typename std::function<void (Normalizer*, const LeafRange&)> mTask;
+    }; // Normalizer struct
 
-    void trim(const RangeType& r);
-
-    template<math::BiasedGradientScheme SpatialScheme>
-    void normalize1();
+    template<math::BiasedGradientScheme SpatialScheme, typename MaskT>
+    void normalize1(const MaskT* mask);
 
     template<math::BiasedGradientScheme SpatialScheme,
-             math::TemporalIntegrationScheme TemporalScheme>
-    void normalize2();
-     
+             math::TemporalIntegrationScheme TemporalScheme, typename MaskT>
+    void normalize2(const MaskT* mask);
+
     // Throughout the methods below mLeafs is always assumed to contain
     // a list of the current LeafNodes! The auxiliary buffers on the
     // other hand always have to be allocated locally, since some
     // methods need them and others don't!
-    GridType*                       mGrid;
-    LeafManagerType*                mLeafs;
-    InterruptT*                     mInterrupter;
-    const ValueType                 mDx;
-    math::BiasedGradientScheme      mSpatialScheme;
-    math::TemporalIntegrationScheme mTemporalScheme;
-    int                             mNormCount;// Number of iteratations of normalization
-    int                             mGrainSize;
-    FuncType                        mTask;
-    const bool                      mIsMaster;
-
-    // disallow copy by assignment
-    void operator=(const LevelSetTracker& other) {}
-
+    GridType*        mGrid;
+    LeafManagerType* mLeafs;
+    InterruptT*      mInterrupter;
+    const ValueType  mDx;
+    State            mState;
 }; // end of LevelSetTracker class
 
 template<typename GridT, typename InterruptT>
-LevelSetTracker<GridT, InterruptT>::LevelSetTracker(GridT& grid, InterruptT* interrupt):
+LevelSetTracker<GridT, InterruptT>::
+LevelSetTracker(GridT& grid, InterruptT* interrupt):
     mGrid(&grid),
     mLeafs(new LeafManagerType(grid.tree())),
     mInterrupter(interrupt),
-    mDx(grid.voxelSize()[0]),
-    mSpatialScheme(math::HJWENO5_BIAS),
-    mTemporalScheme(math::TVD_RK1),
-    mNormCount(static_cast<int>(LEVEL_SET_HALF_WIDTH)),
-    mGrainSize(1),
-    mTask(0),
-    mIsMaster(true)// N.B.
+    mDx(static_cast<ValueType>(grid.voxelSize()[0])),
+    mState()
 {
     if ( !grid.hasUniformVoxels() ) {
          OPENVDB_THROW(RuntimeError,
@@ -206,42 +266,25 @@ LevelSetTracker<GridT, InterruptT>::LevelSetTracker(GridT& grid, InterruptT* int
     }
     if ( grid.getGridClass() != GRID_LEVEL_SET) {
         OPENVDB_THROW(RuntimeError,
-                      "LevelSetTracker only supports level sets!\n"
-                      "However, only level sets are guaranteed to work!\n"
-                      "Hint: Grid::setGridClass(openvdb::GRID_LEVEL_SET)");
+            "LevelSetTracker expected a level set, got a grid of class \""
+            + grid.gridClassToString(grid.getGridClass())
+            + "\" [hint: Grid::setGridClass(openvdb::GRID_LEVEL_SET)]");
     }
-}
-
-template<typename GridT, typename InterruptT>
-LevelSetTracker<GridT, InterruptT>::LevelSetTracker(const LevelSetTracker& other):
-    mGrid(other.mGrid),
-    mLeafs(other.mLeafs),
-    mInterrupter(other.mInterrupter),
-    mDx(other.mDx),
-    mSpatialScheme(other.mSpatialScheme),
-    mTemporalScheme(other.mTemporalScheme),
-    mNormCount(other.mNormCount),
-    mGrainSize(other.mGrainSize),
-    mTask(other.mTask),
-    mIsMaster(false)// N.B.
-{
 }
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetTracker<GridT, InterruptT>::prune()
+LevelSetTracker<GridT, InterruptT>::
+prune()
 {
     this->startInterrupter("Pruning Level Set");
+
     // Prune voxels that are too far away from the zero-crossing
-    mTask = boost::bind(&LevelSetTracker::trim, _1, _2);
-    if (mGrainSize>0) {
-        tbb::parallel_for(mLeafs->getRange(mGrainSize), *this);
-    } else {
-        (*this)(mLeafs->getRange());
-    }
+    Trim t(*this);
+    t.trim();
 
     // Remove inactive nodes from tree
-    mGrid->tree().pruneLevelSet();
+    tools::pruneLevelSet(mGrid->tree());
 
     // The tree topology has changes so rebuild the list of leafs
     mLeafs->rebuildLeafArray();
@@ -250,10 +293,11 @@ LevelSetTracker<GridT, InterruptT>::prune()
 
 template<typename GridT, typename InterruptT>
 inline void
-LevelSetTracker<GridT, InterruptT>::track()
+LevelSetTracker<GridT, InterruptT>::
+track()
 {
     // Dilate narrow-band (this also rebuilds the leaf array!)
-    tools::dilateVoxels(*mLeafs);
+    tools::dilateActiveValues( *mLeafs, 1, tools::NN_FACE, tools::IGNORE_TILES);
 
     // Compute signed distances in dilated narrow-band
     this->normalize();
@@ -262,23 +306,74 @@ LevelSetTracker<GridT, InterruptT>::track()
     this->prune();
 }
 
+template<typename GridT, typename InterruptT>
+inline void
+LevelSetTracker<GridT, InterruptT>::
+dilate(int iterations)
+{
+    if (this->getNormCount() == 0) {
+        for (int i=0; i < iterations; ++i) {
+            tools::dilateActiveValues( *mLeafs, 1, tools::NN_FACE, tools::IGNORE_TILES);
+            tools::changeLevelSetBackground(this->leafs(), mDx + mGrid->background());
+        }
+    } else {
+        for (int i=0; i < iterations; ++i) {
+            MaskTreeType mask0(mGrid->tree(), false, TopologyCopy());
+            tools::dilateActiveValues( *mLeafs, 1, tools::NN_FACE, tools::IGNORE_TILES);
+            tools::changeLevelSetBackground(this->leafs(), mDx + mGrid->background());
+            MaskTreeType mask(mGrid->tree(), false, TopologyCopy());
+            mask.topologyDifference(mask0);
+            this->normalize(&mask);
+        }
+    }
+}
+
+template<typename GridT, typename InterruptT>
+inline void
+LevelSetTracker<GridT, InterruptT>::
+erode(int iterations)
+{
+    tools::erodeVoxels(*mLeafs, iterations);
+    mLeafs->rebuildLeafArray();
+    const ValueType background = mGrid->background() - iterations*mDx;
+    tools::changeLevelSetBackground(this->leafs(), background);
+}
+
+template<typename GridT, typename InterruptT>
+inline bool
+LevelSetTracker<GridT, InterruptT>::
+resize(Index halfWidth)
+{
+    const int wOld = static_cast<int>(math::RoundDown(this->getHalfWidth()));
+    const int wNew = static_cast<int>(halfWidth);
+    if (wOld < wNew) {
+        this->dilate(wNew - wOld);
+    } else if (wOld > wNew) {
+        this->erode(wOld - wNew);
+    }
+    return wOld != wNew;
+}
+
 template<typename GridT,  typename InterruptT>
 inline void
-LevelSetTracker<GridT, InterruptT>::startInterrupter(const char* msg)
+LevelSetTracker<GridT, InterruptT>::
+startInterrupter(const char* msg)
 {
     if (mInterrupter) mInterrupter->start(msg);
 }
 
 template<typename GridT,  typename InterruptT>
 inline void
-LevelSetTracker<GridT, InterruptT>::endInterrupter()
+LevelSetTracker<GridT, InterruptT>::
+endInterrupter()
 {
     if (mInterrupter) mInterrupter->end();
 }
 
 template<typename GridT,  typename InterruptT>
 inline bool
-LevelSetTracker<GridT, InterruptT>::checkInterrupter()
+LevelSetTracker<GridT, InterruptT>::
+checkInterrupter()
 {
     if (util::wasInterrupted(mInterrupter)) {
         tbb::task::self().cancel_group_execution();
@@ -287,58 +382,43 @@ LevelSetTracker<GridT, InterruptT>::checkInterrupter()
     return true;
 }
 
-/// Prunes away voxels that have moved outside the narrow band
 template<typename GridT, typename InterruptT>
+template<typename MaskT>
 inline void
-LevelSetTracker<GridT, InterruptT>::trim(const RangeType& range)
+LevelSetTracker<GridT, InterruptT>::
+normalize(const MaskT* mask)
 {
-    typedef typename LeafType::ValueOnIter VoxelIterT;
-    const_cast<LevelSetTracker*>(this)->checkInterrupter();
-    const ValueType gamma = mGrid->background();
-    for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        LeafType &leaf = mLeafs->leaf(n);
-        for (VoxelIterT iter = leaf.beginValueOn(); iter; ++iter) {
-            const ValueType val = *iter;
-            if (val < -gamma)
-                leaf.setValueOff(iter.pos(), -gamma);
-            else if (val > gamma)
-                leaf.setValueOff(iter.pos(),  gamma);
-        }
-    }
-}
-
-template<typename GridT, typename InterruptT>
-inline void
-LevelSetTracker<GridT, InterruptT>::normalize()
-{
-    switch (mSpatialScheme) {
+    switch (this->getSpatialScheme()) {
     case math::FIRST_BIAS:
-        this->normalize1<math::FIRST_BIAS  >(); break;
+        this->normalize1<math::FIRST_BIAS ,  MaskT>(mask); break;
     case math::SECOND_BIAS:
-        this->normalize1<math::SECOND_BIAS >(); break;
+        this->normalize1<math::SECOND_BIAS,  MaskT>(mask); break;
     case math::THIRD_BIAS:
-        this->normalize1<math::THIRD_BIAS  >(); break;
+        this->normalize1<math::THIRD_BIAS,   MaskT>(mask); break;
     case math::WENO5_BIAS:
-        this->normalize1<math::WENO5_BIAS  >(); break;
+        this->normalize1<math::WENO5_BIAS,   MaskT>(mask); break;
     case math::HJWENO5_BIAS:
-        this->normalize1<math::HJWENO5_BIAS>(); break;
+        this->normalize1<math::HJWENO5_BIAS, MaskT>(mask); break;
+    case math::UNKNOWN_BIAS:
     default:
         OPENVDB_THROW(ValueError, "Spatial difference scheme not supported!");
     }
 }
 
 template<typename GridT, typename InterruptT>
-template<math::BiasedGradientScheme SpatialScheme>
+template<math::BiasedGradientScheme SpatialScheme, typename MaskT>
 inline void
-LevelSetTracker<GridT, InterruptT>::normalize1()
+LevelSetTracker<GridT, InterruptT>::
+normalize1(const MaskT* mask)
 {
-    switch (mTemporalScheme) {
+    switch (this->getTemporalScheme()) {
     case math::TVD_RK1:
-        this->normalize2<SpatialScheme, math::TVD_RK1>(); break;
+        this->normalize2<SpatialScheme, math::TVD_RK1, MaskT>(mask); break;
     case math::TVD_RK2:
-        this->normalize2<SpatialScheme, math::TVD_RK2>(); break;
+        this->normalize2<SpatialScheme, math::TVD_RK2, MaskT>(mask); break;
     case math::TVD_RK3:
-        this->normalize2<SpatialScheme, math::TVD_RK3>(); break;
+        this->normalize2<SpatialScheme, math::TVD_RK3, MaskT>(mask); break;
+    case math::UNKNOWN_TIS:
     default:
         OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
     }
@@ -346,77 +426,138 @@ LevelSetTracker<GridT, InterruptT>::normalize1()
 
 template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme>
+         math::TemporalIntegrationScheme TemporalScheme,
+         typename MaskT>
 inline void
-LevelSetTracker<GridT, InterruptT>::normalize2()
+LevelSetTracker<GridT, InterruptT>::
+normalize2(const MaskT* mask)
 {
-    Normalizer<SpatialScheme, TemporalScheme> tmp(*this);
+    Normalizer<SpatialScheme, TemporalScheme, MaskT> tmp(*this, mask);
     tmp.normalize();
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+template<typename GridT, typename InterruptT>
+inline void
+LevelSetTracker<GridT, InterruptT>::
+Trim::trim()
+{
+    const int grainSize = mTracker.getGrainSize();
+    const LeafRange range = mTracker.leafs().leafRange(grainSize);
+
+    if (grainSize>0) {
+        tbb::parallel_for(range, *this);
+    } else {
+        (*this)(range);
+    }
+}
+
+/// Prunes away voxels that have moved outside the narrow band
+template<typename GridT, typename InterruptT>
+inline void
+LevelSetTracker<GridT, InterruptT>::
+Trim::operator()(const LeafRange& range) const
+{
+    using VoxelIterT = typename LeafType::ValueOnIter;
+    mTracker.checkInterrupter();
+    const ValueType gamma = mTracker.mGrid->background();
+
+    for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+        LeafType &leaf = *leafIter;
+        for (VoxelIterT iter = leaf.beginValueOn(); iter; ++iter) {
+            const ValueType val = *iter;
+            if (val <= -gamma)
+                leaf.setValueOff(iter.pos(), -gamma);
+            else if (val >= gamma)
+                leaf.setValueOff(iter.pos(),  gamma);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////
+
+template<typename GridT, typename InterruptT>
+template<math::BiasedGradientScheme SpatialScheme,
+         math::TemporalIntegrationScheme TemporalScheme,
+         typename MaskT>
+inline
+LevelSetTracker<GridT, InterruptT>::
+Normalizer<SpatialScheme, TemporalScheme, MaskT>::
+Normalizer(LevelSetTracker& tracker, const MaskT* mask)
+    : mTracker(tracker)
+    , mMask(mask)
+    , mDt(tracker.voxelSize()*(TemporalScheme == math::TVD_RK1 ? 0.3f :
+                               TemporalScheme == math::TVD_RK2 ? 0.9f : 1.0f))
+    , mInvDx(1.0f/tracker.voxelSize())
+    , mTask(0)
+{
 }
 
 template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme>
+         math::TemporalIntegrationScheme TemporalScheme,
+         typename MaskT>
 inline void
-LevelSetTracker<GridT,InterruptT>::Normalizer<SpatialScheme, TemporalScheme>::
+LevelSetTracker<GridT, InterruptT>::
+Normalizer<SpatialScheme, TemporalScheme, MaskT>::
 normalize()
 {
+    namespace ph = std::placeholders;
+
     /// Make sure we have enough temporal auxiliary buffers
     mTracker.mLeafs->rebuildAuxBuffers(TemporalScheme == math::TVD_RK3 ? 2 : 1);
-
-    const ValueType dt = (TemporalScheme == math::TVD_RK1 ? ValueType(0.3) :
-        TemporalScheme == math::TVD_RK2 ? ValueType(0.9) : ValueType(1.0))
-        * ValueType(mTracker.voxelSize());
 
     for (int n=0, e=mTracker.getNormCount(); n < e; ++n) {
 
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         switch(TemporalScheme) {//switch is resolved at compile-time
         case math::TVD_RK1:
-            //std::cerr << "1";
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(0) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler1, _1, _2, dt, /*result=*/1);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
+
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
-            this->cook(1);
+            this->cook("Normalizing level set using TVD_RK1", 1);
             break;
         case math::TVD_RK2:
-            //std::cerr << "2";
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler1, _1, _2, dt, /*result=*/1);
-            // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
-            this->cook(1);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
 
-            // Convex combine explict Euler step: t2 = t0 + dt
+            // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
+            this->cook("Normalizing level set using TVD_RK1 (step 1 of 2)", 1);
+
+            // Convex combine explicit Euler step: t2 = t0 + dt
             // Phi_t2(1) = 1/2 * Phi_t0(1) + 1/2 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Normalizer::euler2,
-                _1, _2, dt, ValueType(0.5), /*phi=*/1, /*result=*/1);
+            mTask = std::bind(&Normalizer::euler12, ph::_1, ph::_2);
+
             // Cook and swap buffer 0 and 1 such that Phi_t2(0) and Phi_t1(1)
-            this->cook(1);
+            this->cook("Normalizing level set using TVD_RK1 (step 2 of 2)", 1);
             break;
         case math::TVD_RK3:
-            //std::cerr << "3";
             // Perform one explicit Euler step: t1 = t0 + dt
             // Phi_t1(1) = Phi_t0(0) - dt * VdotG_t0(1)
-            mTask = boost::bind(&Normalizer::euler1, _1, _2, dt, /*result=*/1);
+            mTask = std::bind(&Normalizer::euler01, ph::_1, ph::_2);
+
             // Cook and swap buffer 0 and 1 such that Phi_t1(0) and Phi_t0(1)
-            this->cook(1);
+            this->cook("Normalizing level set using TVD_RK3 (step 1 of 3)", 1);
 
-            // Convex combine explict Euler step: t2 = t0 + dt/2
+            // Convex combine explicit Euler step: t2 = t0 + dt/2
             // Phi_t2(2) = 3/4 * Phi_t0(1) + 1/4 * (Phi_t1(0) - dt * V.Grad_t1(0))
-            mTask = boost::bind(&Normalizer::euler2,
-                _1, _2, dt, ValueType(0.75), /*phi=*/1, /*result=*/2);
-            // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
-            this->cook(2);
+            mTask = std::bind(&Normalizer::euler34, ph::_1, ph::_2);
 
-            // Convex combine explict Euler step: t3 = t0 + dt
+            // Cook and swap buffer 0 and 2 such that Phi_t2(0) and Phi_t1(2)
+            this->cook("Normalizing level set using TVD_RK3 (step 2 of 3)", 2);
+
+            // Convex combine explicit Euler step: t3 = t0 + dt
             // Phi_t3(2) = 1/3 * Phi_t0(1) + 2/3 * (Phi_t2(0) - dt * V.Grad_t2(0)
-            mTask = boost::bind(&Normalizer::euler2,
-                _1, _2, dt, ValueType(1.0/3.0), /*phi=*/1, /*result=*/2);
+            mTask = std::bind(&Normalizer::euler13, ph::_1, ph::_2);
+
             // Cook and swap buffer 0 and 2 such that Phi_t3(0) and Phi_t2(2)
-            this->cook(2);
+            this->cook("Normalizing level set using TVD_RK3 (step 3 of 3)", 2);
             break;
+        case math::UNKNOWN_TIS:
         default:
             OPENVDB_THROW(ValueError, "Temporal integration scheme not supported!");
         }
@@ -429,83 +570,80 @@ normalize()
 /// subsequently swap the leaf buffers.
 template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme      SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme>
+         math::TemporalIntegrationScheme TemporalScheme,
+         typename MaskT>
 inline void
-LevelSetTracker<GridT,InterruptT>::Normalizer<SpatialScheme, TemporalScheme>::
-cook(int swapBuffer)
+LevelSetTracker<GridT, InterruptT>::
+Normalizer<SpatialScheme, TemporalScheme, MaskT>::
+cook(const char* msg, int swapBuffer)
 {
-    mTracker.startInterrupter("Normalizing Level Set");
+    mTracker.startInterrupter( msg );
 
-    if (mTracker.getGrainSize()>0) {
-        tbb::parallel_for(mTracker.mLeafs->getRange(mTracker.getGrainSize()), *this);
-    } else {
-        (*this)(mTracker.mLeafs->getRange());
-    }
+    const int grainSize   = mTracker.getGrainSize();
+    const LeafRange range = mTracker.leafs().leafRange(grainSize);
 
-    mTracker.mLeafs->swapLeafBuffer(swapBuffer, mTracker.getGrainSize()==0);
+    grainSize>0 ? tbb::parallel_for(range, *this) : (*this)(range);
+
+    mTracker.leafs().swapLeafBuffer(swapBuffer, grainSize==0);
 
     mTracker.endInterrupter();
 }
 
-
-/// Perform normalization using one of the upwinding schemes
-/// This currently supports only forward Euler time integration
-/// and is not expected to work well with the higher-order spactial schemes
 template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme      SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme>
+         math::TemporalIntegrationScheme TemporalScheme,
+         typename MaskT>
+template <int Nominator, int Denominator>
 inline void
-LevelSetTracker<GridT,InterruptT>::Normalizer<SpatialScheme, TemporalScheme>::
-euler1(const RangeType &range, ValueType dt, Index resultBuffer)
+LevelSetTracker<GridT, InterruptT>::
+Normalizer<SpatialScheme, TemporalScheme, MaskT>::
+eval(StencilT& stencil, const ValueType* phi, ValueType* result, Index n) const
 {
-    typedef math::BIAS_SCHEME<SpatialScheme>                             Scheme;
-    typedef typename Scheme::template ISStencil<GridType>::StencilType   Stencil;
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
-    mTracker.checkInterrupter();
-    const ValueType one(1.0), invDx = one/mTracker.voxelSize();
-    Stencil stencil(mTracker.grid());
-    for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        BufferType& result = mTracker.mLeafs->getBuffer(n, resultBuffer);
-        const LeafType& leaf = mTracker.mLeafs->leaf(n);
-        for (VoxelIterT iter = leaf.cbeginValueOn(); iter; ++iter) {
-            stencil.moveTo(iter);
-            const ValueType normSqGradPhi =
-                math::ISGradientNormSqrd<SpatialScheme>::result(stencil);
-            const ValueType phi0 = stencil.getValue();
-            const ValueType diff = math::Sqrt(normSqGradPhi)*invDx - one;
-            const ValueType S = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
-            result.setValue(iter.pos(), phi0 - dt * S * diff);
-        }
-    }
+    using GradientT = typename math::ISGradientNormSqrd<SpatialScheme>;
+    static const ValueType alpha = ValueType(Nominator)/ValueType(Denominator);
+    static const ValueType beta  = ValueType(1) - alpha;
+
+    const ValueType normSqGradPhi = GradientT::result(stencil);
+    const ValueType phi0 = stencil.getValue();
+    ValueType v = phi0 / ( math::Sqrt(math::Pow2(phi0) + normSqGradPhi) +
+                           math::Tolerance<ValueType>::value() );
+    v = phi0 - mDt * v * (math::Sqrt(normSqGradPhi) * mInvDx - 1.0f);
+    result[n] = Nominator ? alpha * phi[n] + beta * v : v;
 }
 
 template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme      SpatialScheme,
-         math::TemporalIntegrationScheme TemporalScheme>
+         math::TemporalIntegrationScheme TemporalScheme,
+         typename MaskT>
+template <int Nominator, int Denominator>
 inline void
-LevelSetTracker<GridT,InterruptT>::Normalizer<SpatialScheme, TemporalScheme>::
-euler2(const RangeType& range, ValueType dt, ValueType alpha, Index phiBuffer, Index resultBuffer)
+LevelSetTracker<GridT,InterruptT>::
+Normalizer<SpatialScheme, TemporalScheme, MaskT>::
+euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
 {
-    typedef math::BIAS_SCHEME<SpatialScheme>                             Scheme;
-    typedef typename Scheme::template ISStencil<GridType>::StencilType   Stencil;
-    typedef typename LeafType::ValueOnCIter VoxelIterT;
+    using VoxelIterT = typename LeafType::ValueOnCIter;
+
     mTracker.checkInterrupter();
-    const ValueType one(1.0), beta = one - alpha, invDx = one/mTracker.voxelSize();
-    Stencil stencil(mTracker.grid());
-    for (size_t n=range.begin(), e=range.end(); n != e; ++n) {
-        const BufferType& phi = mTracker.mLeafs->getBuffer(n, phiBuffer);
-        BufferType& result    = mTracker.mLeafs->getBuffer(n, resultBuffer);
-        const LeafType& leaf  = mTracker.mLeafs->leaf(n);
-        for (VoxelIterT iter  = leaf.cbeginValueOn(); iter; ++iter) {
-            stencil.moveTo(iter);
-            const ValueType normSqGradPhi =
-                math::ISGradientNormSqrd<SpatialScheme>::result(stencil);
-            const ValueType phi0 = stencil.getValue();
-            const ValueType diff = math::Sqrt(normSqGradPhi)*invDx - one;
-            const ValueType S = phi0 / (math::Sqrt(math::Pow2(phi0) + normSqGradPhi));
-            result.setValue(iter.pos(), alpha*phi[iter.pos()] + beta*(phi0 - dt * S * diff));
+
+    StencilT stencil(mTracker.grid());
+
+    for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+        const ValueType* phi = leafIter.buffer(phiBuffer).data();
+        ValueType* result = leafIter.buffer(resultBuffer).data();
+        if (mMask == nullptr) {
+            for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                stencil.moveTo(iter);
+                this->eval<Nominator, Denominator>(stencil, phi, result, iter.pos());
+            }//loop over active voxels in the leaf of the level set
+        } else if (const MaskLeafT* mask = mMask->probeLeaf(leafIter->origin())) {
+            const ValueType* phi0 = leafIter->buffer().data();
+            for (MaskIterT iter  = mask->cbeginValueOn(); iter; ++iter) {
+                const Index i = iter.pos();
+                stencil.moveTo(iter.getCoord(), phi0[i]);
+                this->eval<Nominator, Denominator>(stencil, phi, result, i);
+            }//loop over active voxels in the leaf of the mask
         }
-    }
+    }//loop over leafs of the level set
 }
 
 } // namespace tools
@@ -514,6 +652,6 @@ euler2(const RangeType& range, ValueType dt, ValueType alpha, Index phiBuffer, I
 
 #endif // OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

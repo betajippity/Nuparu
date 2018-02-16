@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -35,17 +35,17 @@
 #ifndef OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-#include <boost/shared_array.hpp>
-#include <boost/static_assert.hpp>
 #include <openvdb/Platform.h>
 #include <openvdb/util/NodeMasks.h>
-#include <openvdb/io/Compression.h> // for io::readData(), etc.
-#include <openvdb/math/Math.h> // for Abs(), isExactlyEqual()
+#include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc.
+#include <openvdb/math/Math.h> // for math::isExactlyEqual(), etc.
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
 #include "Iterator.h"
 #include "NodeUnion.h"
-#include "Util.h"
+#include <tbb/parallel_for.h>
+#include <memory>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -60,27 +60,28 @@ template<typename _ChildNodeType, Index Log2Dim>
 class InternalNode
 {
 public:
-    typedef _ChildNodeType                        ChildNodeType;
-    typedef typename ChildNodeType::LeafNodeType  LeafNodeType;
-    typedef typename ChildNodeType::ValueType     ValueType;
-    typedef NodeUnion<ValueType, ChildNodeType>   UnionType;
-    typedef util::NodeMask<Log2Dim>               NodeMaskType;
+    using ChildNodeType = _ChildNodeType;
+    using LeafNodeType = typename ChildNodeType::LeafNodeType;
+    using ValueType = typename ChildNodeType::ValueType;
+    using BuildType = typename ChildNodeType::BuildType;
+    using UnionType = NodeUnion<ValueType, ChildNodeType>;
+    using NodeMaskType = util::NodeMask<Log2Dim>;
 
     static const Index
-        LOG2DIM      = Log2Dim,
-        TOTAL        = Log2Dim + ChildNodeType::TOTAL,
-        DIM          = 1 << TOTAL,
-        NUM_VALUES   = 1 << (3 * Log2Dim),
-        LEVEL        = 1 + ChildNodeType::LEVEL; // level 0 = leaf
+        LOG2DIM      = Log2Dim,                        // log2 of tile count in one dimension
+        TOTAL        = Log2Dim + ChildNodeType::TOTAL, // log2 of voxel count in one dimension
+        DIM          = 1 << TOTAL,                     // total voxel count in one dimension
+        NUM_VALUES   = 1 << (3 * Log2Dim),             // total voxel count represented by this node
+        LEVEL        = 1 + ChildNodeType::LEVEL;       // level 0 = leaf
     static const Index64
-        NUM_VOXELS   = uint64_t(1) << (3 * TOTAL); // total # of voxels represented by this node
+        NUM_VOXELS   = uint64_t(1) << (3 * TOTAL);     // total voxel count represented by this node
 
     /// @brief ValueConverter<T>::Type is the type of an InternalNode having the same
     /// child hierarchy and dimensions as this node but a different value type, T.
     template<typename OtherValueType>
     struct ValueConverter {
-        typedef InternalNode<typename ChildNodeType::template ValueConverter<
-            OtherValueType>::Type, Log2Dim> Type;
+        using Type = InternalNode<typename ChildNodeType::template ValueConverter<
+            OtherValueType>::Type, Log2Dim>;
     };
 
     /// @brief SameConfiguration<OtherNodeType>::value is @c true if and only if OtherNodeType
@@ -93,35 +94,59 @@ public:
     };
 
 
+    /// @brief Default constructor
+    /// @warning The resulting InternalNode is uninitialized
     InternalNode() {}
 
+    /// @brief Constructor of an InternalNode with dense inactive tiles of the specified value.
+    /// @param offValue Background value used for inactive values
     explicit InternalNode(const ValueType& offValue);
 
-    InternalNode(const Coord&, const ValueType& value, bool active = false);
+    /// @brief Constructs an InternalNode with dense tiles
+    /// @param origin    The location in index space of the fist tile value
+    /// @param fillValue Value assigned to all the tiles
+    /// @param active    State assigned to all the tiles
+    InternalNode(const Coord& origin, const ValueType& fillValue, bool active = false);
 
-    /// Deep copy constructor
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
+    InternalNode(PartialCreate, const Coord&, const ValueType& fillValue, bool active = false);
+#endif
+
+    /// @brief Deep copy constructor
+    ///
+    /// @note This method is multi-threaded!
     InternalNode(const InternalNode&);
 
-    /// Value conversion copy constructor
+    /// @brief Value conversion copy constructor
+    ///
+    /// @note This method is multi-threaded!
     template<typename OtherChildNodeType>
     explicit InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other);
 
-    /// Topology copy constructor
+    /// @brief Topology copy constructor
+    ///
+    /// @note This method is multi-threaded!
     template<typename OtherChildNodeType>
     InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
                  const ValueType& background, TopologyCopy);
 
-    /// Topology copy constructor
+    /// @brief Topology copy constructor
+    ///
+    /// @note This method is multi-threaded!
     template<typename OtherChildNodeType>
     InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
                  const ValueType& offValue, const ValueType& onValue, TopologyCopy);
 
+#if OPENVDB_ABI_VERSION_NUMBER < 5
     virtual ~InternalNode();
+#else
+    ~InternalNode();
+#endif
 
 protected:
-    typedef typename NodeMaskType::OnIterator    MaskOnIterator;
-    typedef typename NodeMaskType::OffIterator   MaskOffIterator;
-    typedef typename NodeMaskType::DenseIterator MaskDenseIterator;
+    using MaskOnIterator = typename NodeMaskType::OnIterator;
+    using MaskOffIterator = typename NodeMaskType::OffIterator;
+    using MaskDenseIterator = typename NodeMaskType::DenseIterator;
 
     // Type tags to disambiguate template instantiations
     struct ValueOn {}; struct ValueOff {}; struct ValueAll {};
@@ -130,6 +155,7 @@ protected:
     // The following class templates implement the iterator interfaces specified in Iterator.h
     // by providing getItem(), setItem() and/or modifyItem() methods.
 
+    // Sparse iterator that visits child nodes of an InternalNode
     template<typename NodeT, typename ChildT, typename MaskIterT, typename TagT>
     struct ChildIter: public SparseIteratorBase<
         MaskIterT, ChildIter<NodeT, ChildT, MaskIterT, TagT>, NodeT, ChildT>
@@ -150,6 +176,7 @@ protected:
         // Note: modifyItem() isn't implemented, since it's not useful for child node pointers.
     };// ChildIter
 
+    // Sparse iterator that visits tile values of an InternalNode
     template<typename NodeT, typename ValueT, typename MaskIterT, typename TagT>
     struct ValueIter: public SparseIteratorBase<
         MaskIterT, ValueIter<NodeT, ValueT, MaskIterT, TagT>, NodeT, ValueT>
@@ -171,12 +198,13 @@ protected:
         }
     };// ValueIter
 
+    // Dense iterator that visits both tiles and child nodes of an InternalNode
     template<typename NodeT, typename ChildT, typename ValueT, typename TagT>
     struct DenseIter: public DenseIteratorBase<
         MaskDenseIterator, DenseIter<NodeT, ChildT, ValueT, TagT>, NodeT, ChildT, ValueT>
     {
-        typedef DenseIteratorBase<MaskDenseIterator, DenseIter, NodeT, ChildT, ValueT> BaseT;
-        typedef typename BaseT::NonConstValueType NonConstValueT;
+        using BaseT = DenseIteratorBase<MaskDenseIterator, DenseIter, NodeT, ChildT, ValueT>;
+        using NonConstValueT = typename BaseT::NonConstValueType;
 
         DenseIter() {}
         DenseIter(const MaskDenseIterator& iter, NodeT* parent):
@@ -188,7 +216,7 @@ protected:
                 child = this->parent().getChildNode(pos);
                 return true;
             }
-            child = NULL;
+            child = nullptr;
             value = this->parent().mNodes[pos].getValue();
             return false;
         }
@@ -208,19 +236,19 @@ protected:
 
 public:
     // Iterators (see Iterator.h for usage)
-    typedef ChildIter<InternalNode, ChildNodeType, MaskOnIterator, ChildOn>          ChildOnIter;
-    typedef ChildIter<const InternalNode,const ChildNodeType,MaskOnIterator,ChildOn> ChildOnCIter;
-    typedef ValueIter<InternalNode, const ValueType, MaskOffIterator, ChildOff>      ChildOffIter;
-    typedef ValueIter<const InternalNode,const ValueType,MaskOffIterator,ChildOff>   ChildOffCIter;
-    typedef DenseIter<InternalNode, ChildNodeType, ValueType, ChildAll>              ChildAllIter;
-    typedef DenseIter<const InternalNode,const ChildNodeType, ValueType, ChildAll>   ChildAllCIter;
+    using ChildOnIter = ChildIter<InternalNode, ChildNodeType, MaskOnIterator, ChildOn>;
+    using ChildOnCIter = ChildIter<const InternalNode,const ChildNodeType,MaskOnIterator,ChildOn>;
+    using ChildOffIter = ValueIter<InternalNode, const ValueType, MaskOffIterator, ChildOff>;
+    using ChildOffCIter = ValueIter<const InternalNode,const ValueType,MaskOffIterator,ChildOff>;
+    using ChildAllIter = DenseIter<InternalNode, ChildNodeType, ValueType, ChildAll>;
+    using ChildAllCIter = DenseIter<const InternalNode,const ChildNodeType, ValueType, ChildAll>;
 
-    typedef ValueIter<InternalNode, const ValueType, MaskOnIterator, ValueOn>        ValueOnIter;
-    typedef ValueIter<const InternalNode,const ValueType,MaskOnIterator,ValueOn>     ValueOnCIter;
-    typedef ValueIter<InternalNode, const ValueType, MaskOffIterator, ValueOff>      ValueOffIter;
-    typedef ValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueOff>   ValueOffCIter;
-    typedef ValueIter<InternalNode, const ValueType, MaskOffIterator, ValueAll>      ValueAllIter;
-    typedef ValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueAll>   ValueAllCIter;
+    using ValueOnIter = ValueIter<InternalNode, const ValueType, MaskOnIterator, ValueOn>;
+    using ValueOnCIter = ValueIter<const InternalNode, const ValueType, MaskOnIterator, ValueOn>;
+    using ValueOffIter = ValueIter<InternalNode, const ValueType, MaskOffIterator, ValueOff>;
+    using ValueOffCIter = ValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueOff>;
+    using ValueAllIter = ValueIter<InternalNode, const ValueType, MaskOffIterator, ValueAll>;
+    using ValueAllCIter = ValueIter<const InternalNode,const ValueType,MaskOffIterator,ValueAll>;
 
     ChildOnCIter  cbeginChildOn()  const { return ChildOnCIter(mChildMask.beginOn(), this); }
     ChildOffCIter cbeginChildOff() const { return ChildOffCIter(mChildMask.beginOff(), this); }
@@ -233,19 +261,31 @@ public:
     ChildAllIter   beginChildAll() { return ChildAllIter(mChildMask.beginDense(), this); }
 
     ValueOnCIter  cbeginValueOn()  const { return ValueOnCIter(mValueMask.beginOn(), this); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them!
     ValueOffCIter cbeginValueOff() const { return ValueOffCIter(mValueMask.beginOff(), this); }
     ValueAllCIter cbeginValueAll() const { return ValueAllCIter(mChildMask.beginOff(), this); }
     ValueOnCIter   beginValueOn()  const { return cbeginValueOn(); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them!
     ValueOffCIter  beginValueOff() const { return cbeginValueOff(); }
     ValueAllCIter  beginValueAll() const { return cbeginValueAll(); }
     ValueOnIter    beginValueOn()  { return ValueOnIter(mValueMask.beginOn(), this); }
+    /// @warning This iterator will also visit child nodes so use isChildMaskOn to skip them!
     ValueOffIter   beginValueOff() { return ValueOffIter(mValueMask.beginOff(), this); }
     ValueAllIter   beginValueAll() { return ValueAllIter(mChildMask.beginOff(), this); }
 
 
+    /// @return The dimension of this InternalNode
+    /// @details The number of voxels in one coordinate direction covered by this node
     static Index dim() { return DIM; }
+    /// @return The level of this node
+    /// @details Level 0 is by definition the level of the leaf nodes
     static Index getLevel() { return LEVEL; }
+    /// @brief Populated an stil::vector with the dimension of all the
+    /// nodes in the branch starting with this node.
     static void getNodeLog2Dims(std::vector<Index>& dims);
+    /// @return The dimension of the child nodes of this node.
+    /// @details The number of voxels in one coordinate direction
+    /// covered by a child node of this node.
     static Index getChildDim() { return ChildNodeType::DIM; }
 
     /// Return the linear table offset of the given global or local coordinates.
@@ -282,13 +322,34 @@ public:
     /// spanned by the node regardless of its content.
     CoordBBox getNodeBoundingBox() const { return CoordBBox::createCube(mOrigin, DIM); }
 
+    /// @return True if this node contains no child nodes.
     bool isEmpty() const { return mChildMask.isOff(); }
 
     /// Return @c true if all of this node's table entries have the same active state
     /// and the same constant value to within the given tolerance,
-    /// and return that value in @a constValue and the active state in @a state.
-    bool isConstant(ValueType& constValue, bool& state,
-        const ValueType& tolerance = zeroVal<ValueType>()) const;
+    /// and return that value in @a firstValue and the active state in @a state.
+    ///
+    /// @note This method also returns @c false if this node contains any child nodes.
+    bool isConstant(ValueType& firstValue, bool& state,
+                    const ValueType& tolerance = zeroVal<ValueType>()) const;
+
+    /// Return @c true if all of this node's tables entries have
+    /// the same active @a state and the range of its values satisfy
+    /// (@a maxValue - @a minValue) <= @a tolerance.
+    ///
+    /// @param minValue  Is updated with the minimum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param maxValue  Is updated with the maximum of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param state     Is updated with the state of all values IF method
+    ///                  returns @c true. Else the value is undefined!
+    /// @param tolerance The tolerance used to determine if values are
+    ///                  approximatly constant.
+    ///
+    /// @note This method also returns @c false if this node contains any child nodes.
+    bool isConstant(ValueType& minValue, ValueType& maxValue,
+                    bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
+
     /// Return @c true if this node has no children and only contains inactive values.
     bool isInactive() const { return this->isChildMaskOff() && this->isValueMaskOff(); }
 
@@ -412,7 +473,6 @@ public:
     /// Mark all values (both tiles and voxels) as active.
     void setValuesOn();
 
-
     //
     // I/O
     //
@@ -420,35 +480,39 @@ public:
     void readTopology(std::istream&, bool fromHalf = false);
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
+    void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
 
 
     //
     // Aux methods
     //
-    /// @brief Set all voxels within an axis-aligned box to a constant value.
-    /// (The min and max coordinates are inclusive.)
-    void fill(const CoordBBox& bbox, const ValueType&, bool active = true);
 
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// a new value whose magnitude is equal to the specified background value and whose
-    /// sign is consistent with that of the lexicographically closest active value.
-    /// @details This is primarily useful for propagating the sign from the (active) voxels
-    /// in a narrow-band level set to the inactive voxels outside the narrow band.
-    void signedFloodFill(const ValueType& background);
-
-    /// @brief Overwrite each inactive value in this node and in any child nodes with
-    /// either @a outside or @a inside, depending on the sign of the lexicographically
-    /// closest active value.
-    /// @details Specifically, an inactive value is set to @a outside if the closest active
-    /// value in the lexicographic direction is positive, otherwise it is set to @a inside.
-    void signedFloodFill(const ValueType& outside, const ValueType& inside);
-
-    /// Change the sign of all the values represented in this node and
-    /// its child nodes.
+    /// Change the sign of all the values represented in this node and its child nodes.
     void negate();
 
-    /// Densify active tiles, i.e., replace them with leaf-level active voxels.
-    void voxelizeActiveTiles();
+    /// @brief Set all voxels within a given axis-aligned box to a constant value.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box
+    /// @param value   the value to which to set voxels within the box
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive
+    /// @note This operation generates a sparse, but not always optimally sparse,
+    /// representation of the filled box. Follow fill operations with a prune()
+    /// operation for optimal sparseness.
+    void fill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+
+    /// @brief Set all voxels within a given axis-aligned box to a constant value
+    /// and ensure that those voxels are all represented at the leaf level.
+    /// @param bbox    inclusive coordinates of opposite corners of an axis-aligned box.
+    /// @param value   the value to which to set voxels within the box.
+    /// @param active  if true, mark voxels within the box as active,
+    ///                otherwise mark them as inactive.
+    /// @sa voxelizeActiveTiles()
+    void denseFill(const CoordBBox& bbox, const ValueType& value, bool active = true);
+
+    /// @brief Densify active tiles, i.e., replace them with leaf-level active voxels.
+    /// @param threaded if true, this operation is multi-threaded (over the internal nodes).
+    /// @sa denseFill()
+    void voxelizeActiveTiles(bool threaded = true);
 
     /// @brief Copy into a dense grid the values of the voxels that lie within
     /// a given bounding box.
@@ -547,26 +611,13 @@ public:
     template<typename IterT, typename VisitorOp>
     void visit2(IterT& otherIter, VisitorOp&, bool otherIsLHS = false) const;
 
-    /// @brief Call the @c PruneOp functor for each child node and, if the functor
-    /// returns @c true, prune the node and replace it with a tile.
-    ///
-    /// This method is used to implement all of the various pruning algorithms
-    /// (prune(), pruneInactive(), etc.).  It should rarely be called directly.
-    /// @see openvdb/tree/Util.h for the definition of the @c PruneOp functor
-    template<typename PruneOp> void pruneOp(PruneOp&);
+    /// Set all voxels that lie outside the given axis-aligned box to the background.
+    void clip(const CoordBBox&, const ValueType& background);
 
     /// @brief Reduce the memory footprint of this tree by replacing with tiles
     /// any nodes whose values are all the same (optionally to within a tolerance)
     /// and have the same active state.
     void prune(const ValueType& tolerance = zeroVal<ValueType>());
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// tiles of the given value any nodes whose values are all inactive.
-    void pruneInactive(const ValueType&);
-
-    /// @brief Reduce the memory footprint of this tree by replacing with
-    /// background tiles any nodes whose values are all inactive.
-    void pruneInactive();
 
     /// @brief Add the specified leaf to this node, possibly creating a child branch
     /// in the process.  If the leaf node already exists, replace it.
@@ -579,7 +630,7 @@ public:
 
     /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z)
     /// and replace it with a tile of the specified value and state.
-    /// If no such node exists, leave the tree unchanged and return @c NULL.
+    /// If no such node exists, leave the tree unchanged and return @c nullptr.
     ///
     /// @note The caller takes ownership of the node and is responsible for deleting it.
     ///
@@ -602,7 +653,7 @@ public:
 
     //@{
     /// @brief Return a pointer to the node that contains voxel (x, y, z).
-    /// If no such node exists, return NULL.
+    /// If no such node exists, return nullptr.
     template<typename NodeType> NodeType* probeNode(const Coord& xyz);
     template<typename NodeType> const NodeType* probeConstNode(const Coord& xyz) const;
     //@}
@@ -618,7 +669,7 @@ public:
 
     //@{
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z).
-    /// If no such node exists, return NULL.
+    /// If no such node exists, return @c nullptr.
     LeafNodeType* probeLeaf(const Coord& xyz);
     const LeafNodeType* probeConstLeaf(const Coord& xyz) const;
     const LeafNodeType* probeLeaf(const Coord& xyz) const;
@@ -647,6 +698,61 @@ public:
     /// to the nodes along the path from the root node to the node containing the coordinate.
     template<typename AccessorT>
     LeafNodeType* touchLeafAndCache(const Coord& xyz, AccessorT&);
+
+    //@{
+    /// @brief Adds all nodes of a certain type to a container with the following API:
+    /// @code
+    /// struct ArrayT {
+    ///    using value_type = ...;// defines the type of nodes to be added to the array
+    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    /// };
+    /// @endcode
+    /// @details An example of a wrapper around a c-style array is:
+    /// @code
+    /// struct MyArray {
+    ///    using value_type = LeafType*;
+    ///    value_type* ptr;
+    ///    MyArray(value_type* array) : ptr(array) {}
+    ///    void push_back(value_type leaf) { *ptr++ = leaf; }
+    ///};
+    /// @endcode
+    /// @details An example that constructs a list of pointer to all leaf nodes is:
+    /// @code
+    /// std::vector<const LeafNodeType*> array;//most std contains have the required API
+    /// array.reserve(tree.leafCount());//this is a fast preallocation.
+    /// tree.getNodes(array);
+    /// @endcode
+    template<typename ArrayT>
+    void getNodes(ArrayT& array);
+    template<typename ArrayT>
+    void getNodes(ArrayT& array) const;
+    //@}
+
+    /// @brief Steals all nodes of a certain type from the tree and
+    /// adds them to a container with the following API:
+    /// @code
+    /// struct ArrayT {
+    ///    using value_type = ...;// defines the type of nodes to be added to the array
+    ///    void push_back(value_type nodePtr);// method that add nodes to the array
+    /// };
+    /// @endcode
+    /// @details An example of a wrapper around a c-style array is:
+    /// @code
+    /// struct MyArray {
+    ///    using value_type = LeafType*;
+    ///    value_type* ptr;
+    ///    MyArray(value_type* array) : ptr(array) {}
+    ///    void push_back(value_type leaf) { *ptr++ = leaf; }
+    ///};
+    /// @endcode
+    /// @details An example that constructs a list of pointer to all leaf nodes is:
+    /// @code
+    /// std::vector<const LeafNodeType*> array;//most std contains have the required API
+    /// array.reserve(tree.leafCount());//this is a fast preallocation.
+    /// tree.stealNodes(array);
+    /// @endcode
+    template<typename ArrayT>
+    void stealNodes(ArrayT& array, const ValueType& value, bool state);
 
     /// @brief Change inactive tiles or voxels with value oldBackground to newBackground
     /// or -oldBackground to -newBackground. Active values are unchanged.
@@ -679,6 +785,16 @@ public:
     bool isChildMaskOn(Index n) const { return mChildMask.isOn(n); }
     bool isChildMaskOff(Index n) const { return mChildMask.isOff(n); }
     bool isChildMaskOff() const { return mChildMask.isOff(); }
+    const NodeMaskType& getValueMask() const { return mValueMask; }
+    const NodeMaskType& getChildMask() const { return mChildMask; }
+    NodeMaskType getValueOffMask() const
+    {
+        NodeMaskType mask = mValueMask;
+        mask |= mChildMask;
+        mask.toggle();
+        return mask;
+    }
+    const UnionType* getTable() const { return mNodes; }
 protected:
     //@{
     /// Use a mask accessor to ensure consistency between the child and value masks;
@@ -703,13 +819,23 @@ protected:
     static inline void doVisit2(NodeT&, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
 
     ///@{
-    /// @brief Returns a pointer to the child node at the linear offset n. 
+    /// @brief Returns a pointer to the child node at the linear offset n.
     /// @warning This protected method assumes that a child node exists at
     /// the specified linear offset!
     ChildNodeType* getChildNode(Index n);
     const ChildNodeType* getChildNode(Index n) const;
     ///@}
 
+    ///@{
+    /// @brief Protected member classes for recursive multi-threading
+    struct VoxelizeActiveTiles;
+    template<typename OtherInternalNode> struct DeepCopy;
+    template<typename OtherInternalNode> struct TopologyCopy1;
+    template<typename OtherInternalNode> struct TopologyCopy2;
+    template<typename OtherInternalNode> struct TopologyUnion;
+    template<typename OtherInternalNode> struct TopologyDifference;
+    template<typename OtherInternalNode> struct TopologyIntersection;
+    ///@}
 
     UnionType mNodes[NUM_VALUES];
     NodeMaskType mChildMask, mValueMask;
@@ -759,6 +885,41 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const Coord& origin, const ValueType
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
+// For InternalNodes, the PartialCreate constructor is identical to its
+// non-PartialCreate counterpart.
+template<typename ChildT, Index Log2Dim>
+inline
+InternalNode<ChildT, Log2Dim>::InternalNode(PartialCreate,
+    const Coord& origin, const ValueType& val, bool active)
+    : mOrigin(origin[0] & ~(DIM-1), origin[1] & ~(DIM-1), origin[2] & ~(DIM-1))
+{
+    if (active) mValueMask.setOn();
+    for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(val);
+}
+#endif
+
+template<typename ChildT, Index Log2Dim>
+template<typename OtherInternalNode>
+struct InternalNode<ChildT, Log2Dim>::DeepCopy
+{
+    DeepCopy(const OtherInternalNode* source, InternalNode* target) : s(source), t(target) {
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
+        //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//serial
+    }
+    void operator()(const tbb::blocked_range<Index> &r) const {
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (s->mChildMask.isOff(i)) {
+                t->mNodes[i].setValue(ValueType(s->mNodes[i].getValue()));
+            } else {
+                t->mNodes[i].setChild(new ChildNodeType(*(s->mNodes[i].getChild())));
+            }
+        }
+    }
+    const OtherInternalNode* s;
+    InternalNode* t;
+};// DeepCopy
+
 template<typename ChildT, Index Log2Dim>
 inline
 InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode& other):
@@ -766,13 +927,7 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode& other):
     mValueMask(other.mValueMask),
     mOrigin(other.mOrigin)
 {
-    for (Index i = 0; i < NUM_VALUES; ++i) {
-        if (isChildMaskOn(i)) {
-            mNodes[i].setChild(new ChildNodeType(*(other.mNodes[i].getChild())));
-        } else {
-            mNodes[i].setValue(other.mNodes[i].getValue());
-        }
-    }
+    DeepCopy<InternalNode<ChildT, Log2Dim> > tmp(&other, this);
 }
 
 
@@ -785,40 +940,32 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeTyp
     , mValueMask(other.mValueMask)
     , mOrigin(other.mOrigin)
 {
-    struct Local {
-        /// @todo Consider using a value conversion functor passed as an argument instead.
-        static inline ValueType
-        convertValue(const typename OtherChildNodeType::ValueType& val) { return ValueType(val); }
-    };
-
-    for (Index i = 0; i < NUM_VALUES; ++i) {
-        if (other.mChildMask.isOff(i)) {
-            mNodes[i].setValue(Local::convertValue(other.mNodes[i].getValue()));
-        } else {
-            mNodes[i].setChild(new ChildNodeType(*(other.mNodes[i].getChild())));
-        }
-    }
+    DeepCopy<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this);
 }
-
 
 template<typename ChildT, Index Log2Dim>
-template<typename OtherChildNodeType>
-inline
-InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
-    const ValueType& offValue, const ValueType& onValue, TopologyCopy):
-    mChildMask(other.mChildMask),
-    mValueMask(other.mValueMask),
-    mOrigin(other.mOrigin)
+template<typename OtherInternalNode>
+struct InternalNode<ChildT, Log2Dim>::TopologyCopy1
 {
-    for (Index i = 0; i < NUM_VALUES; ++i) {
-        if (isChildMaskOn(i)) {
-            mNodes[i].setChild(new ChildNodeType(*(other.mNodes[i].getChild()),
-                                                 offValue, onValue, TopologyCopy()));
-        } else {
-            mNodes[i].setValue(isValueMaskOn(i) ? onValue : offValue);
+    TopologyCopy1(const OtherInternalNode* source, InternalNode* target,
+                  const ValueType& background) : s(source), t(target), b(background) {
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
+        //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//serial
+    }
+    void operator()(const tbb::blocked_range<Index> &r) const {
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (s->isChildMaskOn(i)) {
+                t->mNodes[i].setChild(new ChildNodeType(*(s->mNodes[i].getChild()),
+                                                        b, TopologyCopy()));
+            } else {
+                t->mNodes[i].setValue(b);
+            }
         }
     }
-}
+    const OtherInternalNode* s;
+    InternalNode* t;
+    const ValueType &b;
+};// TopologyCopy1
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildNodeType>
@@ -829,11 +976,44 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeTyp
     mValueMask(other.mValueMask),
     mOrigin(other.mOrigin)
 {
-    for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(background);
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        mNodes[iter.pos()].setChild(new ChildNodeType(*(other.mNodes[iter.pos()].getChild()),
-                                                      background, TopologyCopy()));
+    TopologyCopy1<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this, background);
+}
+
+template<typename ChildT, Index Log2Dim>
+template<typename OtherInternalNode>
+struct InternalNode<ChildT, Log2Dim>::TopologyCopy2
+{
+    TopologyCopy2(const OtherInternalNode* source, InternalNode* target,
+                  const ValueType& offValue, const ValueType& onValue)
+        : s(source), t(target), offV(offValue), onV(onValue) {
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
     }
+    void operator()(const tbb::blocked_range<Index> &r) const {
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (s->isChildMaskOn(i)) {
+                t->mNodes[i].setChild(new ChildNodeType(*(s->mNodes[i].getChild()),
+                                                        offV, onV, TopologyCopy()));
+            } else {
+                t->mNodes[i].setValue(s->isValueMaskOn(i) ? onV : offV);
+            }
+        }
+    }
+    const OtherInternalNode* s;
+    InternalNode* t;
+    const ValueType &offV, &onV;
+ };// TopologyCopy2
+
+template<typename ChildT, Index Log2Dim>
+template<typename OtherChildNodeType>
+inline
+InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
+                                            const ValueType& offValue,
+                                            const ValueType& onValue, TopologyCopy):
+    mChildMask(other.mChildMask),
+    mValueMask(other.mValueMask),
+    mOrigin(other.mOrigin)
+{
+    TopologyCopy2<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this, offValue, onValue);
 }
 
 
@@ -966,46 +1146,22 @@ InternalNode<ChildT, Log2Dim>::evalActiveBoundingBox(CoordBBox& bbox, bool visit
 
 
 template<typename ChildT, Index Log2Dim>
-template<typename PruneOp>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneOp(PruneOp& op)
-{
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        ChildT* child = mNodes[i].getChild();
-        if (!op(*child)) continue;
-        delete child;
-        mChildMask.setOff(i);
-        mValueMask.set(i, op.state);
-        mNodes[i].setValue(op.value);
-    }
-
-}
-
-
-template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::prune(const ValueType& tolerance)
 {
-    TolerancePrune<ValueType> op(tolerance);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneInactive(const ValueType& bg)
-{
-    InactivePrune<ValueType> op(bg);
-    this->pruneOp(op);
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::pruneInactive()
-{
-    this->pruneInactive(this->getBackground());
+    bool state = false;
+    ValueType value = zeroVal<ValueType>();
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        const Index i = iter.pos();
+        ChildT* child = mNodes[i].getChild();
+        child->prune(tolerance);
+        if (child->isConstant(value, state, tolerance)) {
+            delete child;
+            mChildMask.setOff(i);
+            mValueMask.set(i, state);
+            mNodes[i].setValue(value);
+        }
+     }
 }
 
 
@@ -1017,18 +1173,18 @@ template<typename NodeT>
 inline NodeT*
 InternalNode<ChildT, Log2Dim>::stealNode(const Coord& xyz, const ValueType& value, bool state)
 {
-    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
-         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(std::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return nullptr;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     const Index n = this->coordToOffset(xyz);
-    if (mChildMask.isOff(n)) return NULL;
+    if (mChildMask.isOff(n)) return nullptr;
     ChildT* child = mNodes[n].getChild();
-    if (boost::is_same<NodeT, ChildT>::value) {
+    if (std::is_same<NodeT, ChildT>::value) {
         mChildMask.setOff(n);
         mValueMask.set(n, state);
         mNodes[n].setValue(value);
     }
-    return (boost::is_same<NodeT, ChildT>::value)
+    return (std::is_same<NodeT, ChildT>::value)
         ? reinterpret_cast<NodeT*>(child)
         : child->template stealNode<NodeT>(xyz, value, state);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
@@ -1043,13 +1199,13 @@ template<typename NodeT>
 inline NodeT*
 InternalNode<ChildT, Log2Dim>::probeNode(const Coord& xyz)
 {
-    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
-         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(std::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return nullptr;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     const Index n = this->coordToOffset(xyz);
-    if (mChildMask.isOff(n)) return NULL;
+    if (mChildMask.isOff(n)) return nullptr;
     ChildT* child = mNodes[n].getChild();
-    return (boost::is_same<NodeT, ChildT>::value)
+    return (std::is_same<NodeT, ChildT>::value)
            ? reinterpret_cast<NodeT*>(child)
            : child->template probeNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
@@ -1061,14 +1217,14 @@ template<typename NodeT, typename AccessorT>
 inline NodeT*
 InternalNode<ChildT, Log2Dim>::probeNodeAndCache(const Coord& xyz, AccessorT& acc)
 {
-    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
-         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(std::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return nullptr;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     const Index n = this->coordToOffset(xyz);
-    if (mChildMask.isOff(n)) return NULL;
+    if (mChildMask.isOff(n)) return nullptr;
     ChildT* child = mNodes[n].getChild();
     acc.insert(xyz, child);
-    return (boost::is_same<NodeT, ChildT>::value)
+    return (std::is_same<NodeT, ChildT>::value)
            ? reinterpret_cast<NodeT*>(child)
            : child->template probeNodeAndCache<NodeT>(xyz, acc);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
@@ -1080,13 +1236,13 @@ template<typename NodeT>
 inline const NodeT*
 InternalNode<ChildT, Log2Dim>::probeConstNode(const Coord& xyz) const
 {
-    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
-         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(std::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return nullptr;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     const Index n = this->coordToOffset(xyz);
-    if (mChildMask.isOff(n)) return NULL;
+    if (mChildMask.isOff(n)) return nullptr;
     const ChildT* child = mNodes[n].getChild();
-    return (boost::is_same<NodeT, ChildT>::value)
+    return (std::is_same<NodeT, ChildT>::value)
             ? reinterpret_cast<const NodeT*>(child)
             : child->template probeConstNode<NodeT>(xyz);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
@@ -1098,14 +1254,14 @@ template<typename NodeT, typename AccessorT>
 inline const NodeT*
 InternalNode<ChildT, Log2Dim>::probeConstNodeAndCache(const Coord& xyz, AccessorT& acc) const
 {
-    if ((NodeT::LEVEL == ChildT::LEVEL && !(boost::is_same<NodeT, ChildT>::value)) ||
-         NodeT::LEVEL >  ChildT::LEVEL) return NULL;
+    if ((NodeT::LEVEL == ChildT::LEVEL && !(std::is_same<NodeT, ChildT>::value)) ||
+         NodeT::LEVEL >  ChildT::LEVEL) return nullptr;
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     const Index n = this->coordToOffset(xyz);
-    if (mChildMask.isOff(n)) return NULL;
+    if (mChildMask.isOff(n)) return nullptr;
     const ChildT* child = mNodes[n].getChild();
     acc.insert(xyz, child);
-    return (boost::is_same<NodeT, ChildT>::value)
+    return (std::is_same<NodeT, ChildT>::value)
             ? reinterpret_cast<const NodeT*>(child)
             : child->template probeConstNodeAndCache<NodeT>(xyz, acc);
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
@@ -1165,10 +1321,10 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::addLeaf(LeafNodeType* leaf)
 {
-    assert(leaf != NULL);
+    assert(leaf != nullptr);
     const Coord& xyz = leaf->origin();
     const Index n = this->coordToOffset(xyz);
-    ChildT* child = NULL;
+    ChildT* child = nullptr;
     if (mChildMask.isOff(n)) {
         if (ChildT::LEVEL>0) {
             child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
@@ -1194,10 +1350,10 @@ template<typename AccessorT>
 inline void
 InternalNode<ChildT, Log2Dim>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
 {
-    assert(leaf != NULL);
+    assert(leaf != nullptr);
     const Coord& xyz = leaf->origin();
     const Index n = this->coordToOffset(xyz);
-    ChildT* child = NULL;
+    ChildT* child = nullptr;
     if (mChildMask.isOff(n)) {
         if (ChildT::LEVEL>0) {
             child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
@@ -1306,7 +1462,7 @@ inline typename ChildT::LeafNodeType*
 InternalNode<ChildT, Log2Dim>::touchLeaf(const Coord& xyz)
 {
     const Index n = this->coordToOffset(xyz);
-    ChildT* child = NULL;
+    ChildT* child = nullptr;
     if (mChildMask.isOff(n)) {
         child = new ChildT(xyz, mNodes[n].getValue(), mValueMask.isOn(n));
         this->setChildNode(n, child);
@@ -1336,47 +1492,45 @@ InternalNode<ChildT, Log2Dim>::touchLeafAndCache(const Coord& xyz, AccessorT& ac
 
 template<typename ChildT, Index Log2Dim>
 inline bool
-InternalNode<ChildT, Log2Dim>::isConstant(ValueType& constValue, bool& state,
-    const ValueType& tolerance) const
+InternalNode<ChildT, Log2Dim>::isConstant(ValueType& firstValue, bool& state,
+                                          const ValueType& tolerance) const
 {
-    bool allEqual = true, firstValue = true, valueState = true;
-    ValueType value = zeroVal<ValueType>();
-    for (Index i = 0; allEqual && i < NUM_VALUES; ++i) {
-        if (this->isChildMaskOff(i)) {
-            // If entry i is a value, check if it is within tolerance
-            // and whether its active state matches the other entries.
-            if (firstValue) {
-                firstValue = false;
-                valueState = isValueMaskOn(i);
-                value = mNodes[i].getValue();
-            } else {
-                allEqual = (isValueMaskOn(i) == valueState)
-                    && math::isApproxEqual(mNodes[i].getValue(), value, tolerance);
-            }
-        } else {
-            // If entry i is a child, check if the child is constant and within tolerance
-            // and whether its active state matches the other entries.
-            ValueType childValue = zeroVal<ValueType>();
-            bool isChildOn = false;
-            if (mNodes[i].getChild()->isConstant(childValue, isChildOn, tolerance)) {
-                if (firstValue) {
-                    firstValue = false;
-                    valueState = isChildOn;
-                    value = childValue;
-                } else {
-                    allEqual = (isChildOn == valueState)
-                        && math::isApproxEqual(childValue, value, tolerance);
-                }
-            } else { // child is not constant
-                allEqual = false;
-            }
+    if (!mChildMask.isOff() || !mValueMask.isConstant(state)) return false;// early termination
+
+    firstValue = mNodes[0].getValue();
+    for (Index i = 1; i < NUM_VALUES; ++i) {
+        if (!math::isApproxEqual(mNodes[i].getValue(), firstValue, tolerance)) {
+            return false; // early termination
         }
     }
-    if (allEqual) {
-        constValue = value;
-        state = valueState;
+    return true;
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline bool
+InternalNode<ChildT, Log2Dim>::isConstant(ValueType& minValue,
+                                          ValueType& maxValue,
+                                          bool& state,
+                                          const ValueType& tolerance) const
+{
+
+    if (!mChildMask.isOff() || !mValueMask.isConstant(state)) return false;// early termination
+    minValue = maxValue = mNodes[0].getValue();
+    for (Index i = 1; i < NUM_VALUES; ++i) {
+        const ValueType& v = mNodes[i].getValue();
+        if (v < minValue) {
+            if ((maxValue - v) > tolerance) return false;// early termination
+            minValue = v;
+        } else if (v > maxValue) {
+            if ((v - minValue) > tolerance) return false;// early termination
+            maxValue = v;
+        }
     }
-    return allEqual;
+    return true;
 }
 
 
@@ -1387,12 +1541,14 @@ template<typename ChildT, Index Log2Dim>
 inline bool
 InternalNode<ChildT, Log2Dim>::hasActiveTiles() const
 {
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     const bool anyActiveTiles = !mValueMask.isOff();
     if (LEVEL==1 || anyActiveTiles) return anyActiveTiles;
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
         if (iter->hasActiveTiles()) return true;
     }
     return false;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 }
 
 
@@ -1821,14 +1977,70 @@ InternalNode<ChildT, Log2Dim>::modifyValueAndActiveStateAndCache(
 
 template<typename ChildT, Index Log2Dim>
 inline void
+InternalNode<ChildT, Log2Dim>::clip(const CoordBBox& clipBBox, const ValueType& background)
+{
+    CoordBBox nodeBBox = this->getNodeBoundingBox();
+    if (!clipBBox.hasOverlap(nodeBBox)) {
+        // This node lies completely outside the clipping region.  Fill it with background tiles.
+        this->fill(nodeBBox, background, /*active=*/false);
+    } else if (clipBBox.isInside(nodeBBox)) {
+        // This node lies completely inside the clipping region.  Leave it intact.
+        return;
+    }
+
+    // This node isn't completely contained inside the clipping region.
+    // Clip tiles and children, and replace any that lie outside the region
+    // with background tiles.
+
+    for (Index pos = 0; pos < NUM_VALUES; ++pos) {
+        const Coord xyz = this->offsetToGlobalCoord(pos); // tile or child origin
+        CoordBBox tileBBox(xyz, xyz.offsetBy(ChildT::DIM - 1)); // tile or child bounds
+        if (!clipBBox.hasOverlap(tileBBox)) {
+            // This table entry lies completely outside the clipping region.
+            // Replace it with a background tile.
+            this->makeChildNodeEmpty(pos, background);
+            mValueMask.setOff(pos);
+        } else if (!clipBBox.isInside(tileBBox)) {
+            // This table entry does not lie completely inside the clipping region
+            // and must be clipped.
+            if (this->isChildMaskOn(pos)) {
+                mNodes[pos].getChild()->clip(clipBBox, background);
+            } else {
+                // Replace this tile with a background tile, then fill the clip region
+                // with the tile's original value.  (This might create a child branch.)
+                tileBBox.intersect(clipBBox);
+                const ValueType val = mNodes[pos].getValue();
+                const bool on = this->isValueMaskOn(pos);
+                mNodes[pos].setValue(background);
+                mValueMask.setOff(pos);
+                this->fill(tileBBox, val, on);
+            }
+        } else {
+            // This table entry lies completely inside the clipping region.  Leave it intact.
+        }
+    }
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+inline void
 InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& value, bool active)
 {
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    // Iterate over the fill region in axis-aligned, tile-sized chunks.
+    // (The first and last chunks along each axis might be smaller than a tile.)
     Coord xyz, tileMin, tileMax;
-    for (int x = bbox.min().x(); x <= bbox.max().x(); x = tileMax.x() + 1) {
+    for (int x = clippedBBox.min().x(); x <= clippedBBox.max().x(); x = tileMax.x() + 1) {
         xyz.setX(x);
-        for (int y = bbox.min().y(); y <= bbox.max().y(); y = tileMax.y() + 1) {
+        for (int y = clippedBBox.min().y(); y <= clippedBBox.max().y(); y = tileMax.y() + 1) {
             xyz.setY(y);
-            for (int z = bbox.min().z(); z <= bbox.max().z(); z = tileMax.z() + 1) {
+            for (int z = clippedBBox.min().z(); z <= clippedBBox.max().z(); z = tileMax.z() + 1) {
                 xyz.setZ(z);
 
                 // Get the bounds of the tile that contains voxel (x, y, z).
@@ -1836,15 +2048,15 @@ InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& valu
                 tileMin = this->offsetToGlobalCoord(n);
                 tileMax = tileMin.offsetBy(ChildT::DIM - 1);
 
-                if (xyz != tileMin || Coord::lessThan(bbox.max(), tileMax)) {
-                    // If the box defined by (xyz, bbox.max()) doesn't completely enclose
+                if (xyz != tileMin || Coord::lessThan(clippedBBox.max(), tileMax)) {
+                    // If the box defined by (xyz, clippedBBox.max()) doesn't completely enclose
                     // the tile to which xyz belongs, create a child node (or retrieve
                     // the existing one).
-                    ChildT* child = NULL;
+                    ChildT* child = nullptr;
                     if (this->isChildMaskOff(n)) {
                         // Replace the tile with a newly-created child that is initialized
                         // with the tile's value and active state.
-                        child = new ChildT(xyz, mNodes[n].getValue(), this->isValueMaskOn(n));
+                        child = new ChildT{xyz, mNodes[n].getValue(), this->isValueMaskOn(n)};
                         this->setChildNode(n, child);
                     } else {
                         child = mNodes[n].getChild();
@@ -1852,17 +2064,61 @@ InternalNode<ChildT, Log2Dim>::fill(const CoordBBox& bbox, const ValueType& valu
 
                     // Forward the fill request to the child.
                     if (child) {
-                        child->fill(CoordBBox(xyz, Coord::minComponent(bbox.max(), tileMax)),
-                            value, active);
+                        const Coord tmp = Coord::minComponent(clippedBBox.max(), tileMax);
+                        child->fill(CoordBBox(xyz, tmp), value, active);
                     }
 
                 } else {
-                    // If the box given by (xyz, bbox.max()) completely encloses
+                    // If the box given by (xyz, clippedBBox.max()) completely encloses
                     // the tile to which xyz belongs, create the tile (if it
                     // doesn't already exist) and give it the fill value.
                     this->makeChildNodeEmpty(n, value);
                     mValueMask.set(n, active);
                 }
+            }
+        }
+    }
+}
+
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::denseFill(const CoordBBox& bbox, const ValueType& value, bool active)
+{
+    auto clippedBBox = this->getNodeBoundingBox();
+    clippedBBox.intersect(bbox);
+    if (!clippedBBox) return;
+
+    // Iterate over the fill region in axis-aligned, tile-sized chunks.
+    // (The first and last chunks along each axis might be smaller than a tile.)
+    Coord xyz, tileMin, tileMax;
+    for (int x = clippedBBox.min().x(); x <= clippedBBox.max().x(); x = tileMax.x() + 1) {
+        xyz.setX(x);
+        for (int y = clippedBBox.min().y(); y <= clippedBBox.max().y(); y = tileMax.y() + 1) {
+            xyz.setY(y);
+            for (int z = clippedBBox.min().z(); z <= clippedBBox.max().z(); z = tileMax.z() + 1) {
+                xyz.setZ(z);
+
+                // Get the table index of the tile that contains voxel (x, y, z).
+                const auto n = this->coordToOffset(xyz);
+
+                // Retrieve the child node at index n, or replace the tile at index n with a child.
+                ChildT* child = nullptr;
+                if (this->isChildMaskOn(n)) {
+                    child = mNodes[n].getChild();
+                } else {
+                    // Replace the tile with a newly-created child that is filled
+                    // with the tile's value and active state.
+                    child = new ChildT{xyz, mNodes[n].getValue(), this->isValueMaskOn(n)};
+                    this->setChildNode(n, child);
+                }
+
+                // Get the bounds of the tile that contains voxel (x, y, z).
+                tileMin = this->offsetToGlobalCoord(n);
+                tileMax = tileMin.offsetBy(ChildT::DIM - 1);
+
+                // Forward the fill request to the child.
+                child->denseFill(CoordBBox{xyz, clippedBBox.max()}, value, active);
             }
         }
     }
@@ -1877,7 +2133,7 @@ template<typename DenseT>
 inline void
 InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 {
-    typedef typename DenseT::ValueType DenseValueType;
+    using DenseValueType = typename DenseT::ValueType;
 
     const size_t xStride = dense.xStride(), yStride = dense.yStride(), zStride = dense.zStride();
     const Coord& min = dense.bbox().min();
@@ -1901,7 +2157,9 @@ InternalNode<ChildT, Log2Dim>::copyToDense(const CoordBBox& bbox, DenseT& dense)
                         DenseValueType* a1 = a0 + x*xStride;
                         for (Int32 y=sub.min()[1], ey=sub.max()[1]+1; y<ey; ++y) {
                             DenseValueType* a2 = a1 + y*yStride;
-                            for (Int32 z=sub.min()[2], ez=sub.max()[2]+1; z<ez; ++z, a2 += zStride) {
+                            for (Int32 z = sub.min()[2], ez = sub.max()[2]+1;
+                                z < ez; ++z, a2 += zStride)
+                            {
                                 *a2 = DenseValueType(value);
                             }
                         }
@@ -1925,13 +2183,14 @@ InternalNode<ChildT, Log2Dim>::writeTopology(std::ostream& os, bool toHalf) cons
 
     {
         // Copy all of this node's values into an array.
-        boost::shared_array<ValueType> values(new ValueType[NUM_VALUES]);
+        std::unique_ptr<ValueType[]> valuePtr(new ValueType[NUM_VALUES]);
+        ValueType* values = valuePtr.get();
         const ValueType zero = zeroVal<ValueType>();
         for (Index i = 0; i < NUM_VALUES; ++i) {
             values[i] = (mChildMask.isOff(i) ? mNodes[i].getValue() : zero);
         }
         // Compress (optionally) and write out the contents of the array.
-        io::writeCompressedValues(os, values.get(), NUM_VALUES, mValueMask, mChildMask, toHalf);
+        io::writeCompressedValues(os, values, NUM_VALUES, mValueMask, mChildMask, toHalf);
     }
     // Write out the child nodes in order.
     for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
@@ -1944,6 +2203,11 @@ template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
 {
+#if OPENVDB_ABI_VERSION_NUMBER >= 3
+    const ValueType background = (!io::getGridBackgroundValuePtr(is) ? zeroVal<ValueType>()
+        : *static_cast<const ValueType*>(io::getGridBackgroundValuePtr(is)));
+#endif
+
     mChildMask.load(is);
     mValueMask.load(is);
 
@@ -1951,7 +2215,11 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         for (Index i = 0; i < NUM_VALUES; ++i) {
             if (this->isChildMaskOn(i)) {
                 ChildNodeType* child =
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
                     new ChildNodeType(offsetToGlobalCoord(i), zeroVal<ValueType>());
+#else
+                    new ChildNodeType(PartialCreate(), offsetToGlobalCoord(i), background);
+#endif
                 mNodes[i].setChild(child);
                 child->readTopology(is);
             } else {
@@ -1967,8 +2235,9 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         {
             // Read in (and uncompress, if necessary) all of this node's values
             // into a contiguous array.
-            boost::shared_array<ValueType> values(new ValueType[numValues]);
-            io::readCompressedValues(is, values.get(), numValues, mValueMask, fromHalf);
+            std::unique_ptr<ValueType[]> valuePtr(new ValueType[numValues]);
+            ValueType* values = valuePtr.get();
+            io::readCompressedValues(is, values, numValues, mValueMask, fromHalf);
 
             // Copy values from the array into this node's table.
             if (oldVersion) {
@@ -1985,7 +2254,11 @@ InternalNode<ChildT, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
         }
         // Read in all child nodes and insert them into the table at their proper locations.
         for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+#if OPENVDB_ABI_VERSION_NUMBER <= 2
             ChildNodeType* child = new ChildNodeType(iter.getCoord(), zeroVal<ValueType>());
+#else
+            ChildNodeType* child = new ChildNodeType(PartialCreate(), iter.getCoord(), background);
+#endif
             mNodes[iter.pos()].setChild(child);
             child->readTopology(is, fromHalf);
         }
@@ -2018,56 +2291,6 @@ InternalNode<ChildT, Log2Dim>::getLastValue() const
 
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::signedFloodFill(const ValueType& background)
-{
-    this->signedFloodFill(background, math::negative(background));
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::signedFloodFill(const ValueType& outsideValue,
-                                               const ValueType& insideValue)
-{
-    // First, flood fill all child nodes.
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        iter->signedFloodFill(outsideValue, insideValue);
-    }
-    const Index first = mChildMask.findFirstOn();
-    if (first < NUM_VALUES) {
-        bool xInside = math::isNegative(mNodes[first].getChild()->getFirstValue()),
-            yInside = xInside, zInside = xInside;
-        for (Index x = 0; x != (1 << Log2Dim); ++x) {
-            const int x00 = x << (2 * Log2Dim); // offset for block(x, 0, 0)
-            if (isChildMaskOn(x00)) {
-                xInside = math::isNegative(mNodes[x00].getChild()->getLastValue());
-            }
-            yInside = xInside;
-            for (Index y = 0; y != (1 << Log2Dim); ++y) {
-                const Index xy0 = x00 + (y << Log2Dim); // offset for block(x, y, 0)
-                if (isChildMaskOn(xy0)) {
-                    yInside = math::isNegative(mNodes[xy0].getChild()->getLastValue());
-                }
-                zInside = yInside;
-                for (Index z = 0; z != (1 << Log2Dim); ++z) {
-                    const Index xyz = xy0 + z; // offset for block(x, y, z)
-                    if (isChildMaskOn(xyz)) {
-                        zInside = math::isNegative(mNodes[xyz].getChild()->getLastValue());
-                    } else {
-                        mNodes[xyz].setValue(zInside ? insideValue : outsideValue);
-                    }
-                }
-            }
-        }
-    } else {//no child nodes exist simply use the sign of the first tile value.
-        const ValueType v =  math::isNegative(mNodes[0].getValue()) ? insideValue : outsideValue;
-        for (Index i = 0; i < NUM_VALUES; ++i) mNodes[i].setValue(v);
-    }
-}
-
-
-template<typename ChildT, Index Log2Dim>
-inline void
 InternalNode<ChildT, Log2Dim>::negate()
 {
     for (Index i = 0; i < NUM_VALUES; ++i) {
@@ -2081,14 +2304,49 @@ InternalNode<ChildT, Log2Dim>::negate()
 }
 
 
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+struct InternalNode<ChildT, Log2Dim>::VoxelizeActiveTiles
+{
+    VoxelizeActiveTiles(InternalNode &node) : mNode(&node) {
+        //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//single thread for debugging
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
+
+        node.mChildMask |= node.mValueMask;
+        node.mValueMask.setOff();
+    }
+    void operator()(const tbb::blocked_range<Index> &r) const
+    {
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (mNode->mChildMask.isOn(i)) {// Loop over node's child nodes
+                mNode->mNodes[i].getChild()->voxelizeActiveTiles(true);
+            } else if (mNode->mValueMask.isOn(i)) {// Loop over node's active tiles
+                const Coord &ijk = mNode->offsetToGlobalCoord(i);
+                ChildNodeType *child = new ChildNodeType(ijk, mNode->mNodes[i].getValue(), true);
+                child->voxelizeActiveTiles(true);
+                mNode->mNodes[i].setChild(child);
+            }
+        }
+    }
+    InternalNode* mNode;
+};// VoxelizeActiveTiles
+
 template<typename ChildT, Index Log2Dim>
 inline void
-InternalNode<ChildT, Log2Dim>::voxelizeActiveTiles()
+InternalNode<ChildT, Log2Dim>::voxelizeActiveTiles(bool threaded)
 {
-    for (ValueOnIter iter = this->beginValueOn(); iter; ++iter) {
-        this->setChildNode(iter.pos(), new ChildNodeType(iter.getCoord(), iter.getValue(), true));
+    if (threaded) {
+        VoxelizeActiveTiles tmp(*this);
+    } else {
+        for (ValueOnIter iter = this->beginValueOn(); iter; ++iter) {
+            this->setChildNode(iter.pos(),
+                new ChildNodeType(iter.getCoord(), iter.getValue(), true));
+        }
+        for (ChildOnIter iter = this->beginChildOn(); iter; ++iter)
+            iter->voxelizeActiveTiles(false);
     }
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) iter->voxelizeActiveTiles();
 }
 
 
@@ -2236,70 +2494,151 @@ InternalNode<ChildT, Log2Dim>::merge(const ValueType& tileValue, bool tileActive
 
 
 template<typename ChildT, Index Log2Dim>
-template<typename OtherChildT>
-inline void
-InternalNode<ChildT, Log2Dim>::topologyUnion(const InternalNode<OtherChildT, Log2Dim>& other)
+template<typename OtherInternalNode>
+struct InternalNode<ChildT, Log2Dim>::TopologyUnion
 {
-    typedef typename InternalNode<OtherChildT, Log2Dim>::ChildOnCIter OtherChildIter;
-    typedef typename InternalNode<OtherChildT, Log2Dim>::ValueOnCIter OtherValueIter;
+    using W = typename NodeMaskType::Word;
+    struct A { inline void operator()(W &tV, const W& sV, const W& tC) const
+        { tV = (tV | sV) & ~tC; }
+    };
+    TopologyUnion(const OtherInternalNode* source, InternalNode* target) : s(source), t(target) {
+        //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//single thread for debugging
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
 
-    // Loop over other node's child nodes
-    for (OtherChildIter iter = other.cbeginChildOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        if (mChildMask.isOn(i)) {//this has a child node
-            mNodes[i].getChild()->topologyUnion(*iter);
-        } else {// this is a tile so replace it with a child branch with identical topology
-            ChildNodeType* child = new ChildNodeType(*iter, mNodes[i].getValue(), TopologyCopy());
-            if (mValueMask.isOn(i)) {
-                mValueMask.isOff(i);//we're replacing the active tile with a child branch
-                child->setValuesOn();//activate all values since it was an active tile
+        // Bit processing is done in a single thread!
+        t->mChildMask |= s->mChildMask;//serial but very fast bitwise post-process
+        A op;
+        t->mValueMask.foreach(s->mValueMask, t->mChildMask, op);
+        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
+    }
+    void operator()(const tbb::blocked_range<Index> &r) const {
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (s->mChildMask.isOn(i)) {// Loop over other node's child nodes
+                const typename OtherInternalNode::ChildNodeType& other = *(s->mNodes[i].getChild());
+                if (t->mChildMask.isOn(i)) {//this has a child node
+                    t->mNodes[i].getChild()->topologyUnion(other);
+                } else {// this is a tile so replace it with a child branch with identical topology
+                    ChildT* child = new ChildT(other, t->mNodes[i].getValue(), TopologyCopy());
+                    if (t->mValueMask.isOn(i)) child->setValuesOn();//activate all values
+                    t->mNodes[i].setChild(child);
+                }
+            } else if (s->mValueMask.isOn(i) && t->mChildMask.isOn(i)) {
+                t->mNodes[i].getChild()->setValuesOn();
             }
-            mChildMask.setOn(i);
-            mNodes[i].setChild(child);
         }
     }
-    // Loop over other node's active tiles
-    for (OtherValueIter iter = other.cbeginValueOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        if (mChildMask.isOn(i)) {
-            mNodes[i].getChild()->setValuesOn();
-        } else if (mValueMask.isOff(i)) { //inactive tile
-            mValueMask.setOn(i);
-        }
-    }
-}
+    const OtherInternalNode* s;
+    InternalNode* t;
+};// TopologyUnion
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildT>
 inline void
-InternalNode<ChildT, Log2Dim>::topologyIntersection(const InternalNode<OtherChildT, Log2Dim>& other,
-                                                    const ValueType& background)
+InternalNode<ChildT, Log2Dim>::topologyUnion(const InternalNode<OtherChildT, Log2Dim>& other)
 {
-    // Loop over this node's child nodes
-    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        if (other.mChildMask.isOn(i)) {//other also has a child node
-            iter->topologyIntersection(*(other.mNodes[i].getChild()),  background);
-        } else if (other.mValueMask.isOff(i)) {//other is an inactive tile
-            delete mNodes[i].getChild();//convert child to an inactive tile
-            mNodes[i].setValue(background);
-            mChildMask.setOff(i);
-            mValueMask.setOff(i);
-        }
-    }
-
-    // Loop over this node's active tiles
-    for (ValueOnCIter iter = this->cbeginValueOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        if (other.mChildMask.isOn(i)) {//other has a child node
-            ChildNodeType* child = new ChildNodeType(*(other.mNodes[i].getChild()),
-                                                     *iter, TopologyCopy());
-            this->setChildNode(i, child);//replace the active tile with a child branch
-        } else if (other.mValueMask.isOff(i)) {//other is an inactive tile
-            mValueMask.setOff(i);//convert active tile to an inactive tile
-        }
-    }
+    TopologyUnion<InternalNode<OtherChildT, Log2Dim> > tmp(&other, this);
 }
+
+template<typename ChildT, Index Log2Dim>
+template<typename OtherInternalNode>
+struct InternalNode<ChildT, Log2Dim>::TopologyIntersection
+{
+    using W = typename NodeMaskType::Word;
+    struct A { inline void operator()(W &tC, const W& sC, const W& sV, const W& tV) const
+        { tC = (tC & (sC | sV)) | (tV & sC); }
+    };
+    TopologyIntersection(const OtherInternalNode* source, InternalNode* target,
+                         const ValueType& background) : s(source), t(target), b(background) {
+        //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//single thread for debugging
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
+
+        // Bit processing is done in a single thread!
+        A op;
+        t->mChildMask.foreach(s->mChildMask, s->mValueMask, t->mValueMask, op);
+
+        t->mValueMask &= s->mValueMask;
+        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
+    }
+    void operator()(const tbb::blocked_range<Index> &r) const {
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (t->mChildMask.isOn(i)) {// Loop over this node's child nodes
+                ChildT* child = t->mNodes[i].getChild();
+                if (s->mChildMask.isOn(i)) {//other also has a child node
+                    child->topologyIntersection(*(s->mNodes[i].getChild()), b);
+                } else if (s->mValueMask.isOff(i)) {//other is an inactive tile
+                    delete child;//convert child to an inactive tile
+                    t->mNodes[i].setValue(b);
+                }
+            } else if (t->mValueMask.isOn(i) && s->mChildMask.isOn(i)) {//active tile -> a branch
+                t->mNodes[i].setChild(new ChildT(*(s->mNodes[i].getChild()),
+                                                 t->mNodes[i].getValue(), TopologyCopy()));
+            }
+        }
+    }
+    const OtherInternalNode* s;
+    InternalNode* t;
+    const ValueType& b;
+};// TopologyIntersection
+
+template<typename ChildT, Index Log2Dim>
+template<typename OtherChildT>
+inline void
+InternalNode<ChildT, Log2Dim>::topologyIntersection(
+    const InternalNode<OtherChildT, Log2Dim>& other, const ValueType& background)
+{
+    TopologyIntersection<InternalNode<OtherChildT, Log2Dim> > tmp(&other, this, background);
+}
+
+template<typename ChildT, Index Log2Dim>
+template<typename OtherInternalNode>
+struct InternalNode<ChildT, Log2Dim>::TopologyDifference
+{
+    using W = typename NodeMaskType::Word;
+    struct A {inline void operator()(W &tC, const W& sC, const W& sV, const W& tV) const
+        { tC = (tC & (sC | ~sV)) | (tV & sC); }
+    };
+    struct B {inline void operator()(W &tV, const W& sC, const W& sV, const W& tC) const
+        { tV &= ~((tC & sV) | (sC | sV)); }
+    };
+    TopologyDifference(const OtherInternalNode* source, InternalNode* target,
+                       const ValueType& background) : s(source), t(target), b(background) {
+        //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//single thread for debugging
+        tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
+
+        // Bit processing is done in a single thread!
+        const NodeMaskType oldChildMask(t->mChildMask);//important to avoid cross pollution
+        A op1;
+        t->mChildMask.foreach(s->mChildMask, s->mValueMask, t->mValueMask, op1);
+
+        B op2;
+        t->mValueMask.foreach(t->mChildMask, s->mValueMask, oldChildMask, op2);
+        assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
+    }
+    void operator()(const tbb::blocked_range<Index> &r) const {
+        for (Index i = r.begin(), end=r.end(); i!=end; ++i) {
+            if (t->mChildMask.isOn(i)) {// Loop over this node's child nodes
+                ChildT* child = t->mNodes[i].getChild();
+                if (s->mChildMask.isOn(i)) {
+                    child->topologyDifference(*(s->mNodes[i].getChild()), b);
+                } else if (s->mValueMask.isOn(i)) {
+                    delete child;//convert child to an inactive tile
+                    t->mNodes[i].setValue(b);
+                }
+            } else if (t->mValueMask.isOn(i)) {//this is an active tile
+                if (s->mChildMask.isOn(i)) {
+                    const typename OtherInternalNode::ChildNodeType& other =
+                        *(s->mNodes[i].getChild());
+                    ChildT* child = new ChildT(other.origin(), t->mNodes[i].getValue(), true);
+                    child->topologyDifference(other, b);
+                    t->mNodes[i].setChild(child);//replace the active tile with a child branch
+                }
+            }
+        }
+    }
+    const OtherInternalNode* s;
+    InternalNode* t;
+    const ValueType& b;
+};// TopologyDifference
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildT>
@@ -2307,34 +2646,9 @@ inline void
 InternalNode<ChildT, Log2Dim>::topologyDifference(const InternalNode<OtherChildT, Log2Dim>& other,
                                                   const ValueType& background)
 {
-    typedef typename InternalNode<OtherChildT, Log2Dim>::ChildOnCIter OtherChildIter;
-    typedef typename InternalNode<OtherChildT, Log2Dim>::ValueOnCIter OtherValueIter;
-
-    // Loop over other node's child nodes
-    for (OtherChildIter iter = other.cbeginChildOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        if (mChildMask.isOn(i)) {//this has a child node
-            mNodes[i].getChild()->topologyDifference(*iter, background);
-        } else if (mValueMask.isOn(i)) {// this is an active tile
-            ChildNodeType* child = new ChildNodeType(iter.getCoord(), mNodes[i].getValue(), true);
-            child->topologyDifference(*iter, background);
-            this->setChildNode(i, child);//we're replacing the active tile with a child branch
-        }
-    }
-
-    // Loop over other node's active tiles
-    for (OtherValueIter iter = other.cbeginValueOn(); iter; ++iter) {
-        const Index i = iter.pos();
-        if (mChildMask.isOn(i)) {//this has a child node
-            delete mNodes[i].getChild();//convert child to an inactive tile
-            mNodes[i].setValue(background);
-            mChildMask.setOff(i);
-            mValueMask.setOff(i);
-        } else if (mValueMask.isOn(i)) {//this is an active tile
-            mValueMask.setOff(i);//convert active tile to an inactive tile
-        }
-    }
+    TopologyDifference<InternalNode<OtherChildT, Log2Dim> > tmp(&other, this, background);
 }
+
 
 ////////////////////////////////////////
 
@@ -2635,8 +2949,10 @@ inline void
 InternalNode<ChildT, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp& op)
 {
     // Allow the two nodes to have different ValueTypes, but not different dimensions.
-    BOOST_STATIC_ASSERT(OtherNodeT::NUM_VALUES == NodeT::NUM_VALUES);
-    BOOST_STATIC_ASSERT(OtherNodeT::LEVEL == NodeT::LEVEL);
+    static_assert(OtherNodeT::NUM_VALUES == NodeT::NUM_VALUES,
+        "visit2() requires nodes to have the same dimensions");
+    static_assert(OtherNodeT::LEVEL == NodeT::LEVEL,
+        "visit2() requires nodes to be at the same tree level");
 
     typename NodeT::ValueType val;
     typename OtherNodeT::ValueType otherVal;
@@ -2649,15 +2965,15 @@ InternalNode<ChildT, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, Visi
         const size_t skipBranch = static_cast<size_t>(op(iter, otherIter));
 
         typename ChildAllIterT::ChildNodeType* child =
-            (skipBranch & 1U) ? NULL : iter.probeChild(val);
+            (skipBranch & 1U) ? nullptr : iter.probeChild(val);
         typename OtherChildAllIterT::ChildNodeType* otherChild =
-            (skipBranch & 2U) ? NULL : otherIter.probeChild(otherVal);
+            (skipBranch & 2U) ? nullptr : otherIter.probeChild(otherVal);
 
-        if (child != NULL && otherChild != NULL) {
+        if (child != nullptr && otherChild != nullptr) {
             child->visit2Node(*otherChild, op);
-        } else if (child != NULL) {
+        } else if (child != nullptr) {
             child->visit2(otherIter, op);
-        } else if (otherChild != NULL) {
+        } else if (otherChild != nullptr) {
             otherChild->visit2(iter, op, /*otherIsLHS=*/true);
         }
     }
@@ -2705,9 +3021,9 @@ InternalNode<ChildT, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIt
             otherIsLHS ? op(otherIter, iter) : op(iter, otherIter));
 
         typename ChildAllIterT::ChildNodeType* child =
-            (skipBranch & skipBitMask) ? NULL : iter.probeChild(val);
+            (skipBranch & skipBitMask) ? nullptr : iter.probeChild(val);
 
-        if (child != NULL) child->visit2(otherIter, op, otherIsLHS);
+        if (child != nullptr) child->visit2(otherIter, op, otherIsLHS);
     }
 }
 
@@ -2732,6 +3048,28 @@ InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is, bool fromHalf)
     for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
         iter->readBuffers(is, fromHalf);
     }
+}
+
+
+template<typename ChildT, Index Log2Dim>
+inline void
+InternalNode<ChildT, Log2Dim>::readBuffers(std::istream& is,
+    const CoordBBox& clipBBox, bool fromHalf)
+{
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        // Stream in the branch rooted at this child.
+        // (We can't skip over children that lie outside the clipping region,
+        // because buffers are serialized in depth-first order and need to be
+        // unserialized in the same order.)
+        iter->readBuffers(is, clipBBox, fromHalf);
+    }
+
+    // Get this tree's background value.
+    ValueType background = zeroVal<ValueType>();
+    if (const void* bgPtr = io::getGridBackgroundValuePtr(is)) {
+        background = *static_cast<const ValueType*>(bgPtr);
+    }
+    this->clip(clipBBox, background);
 }
 
 
@@ -2784,6 +3122,78 @@ InternalNode<ChildT, Log2Dim>::offsetToGlobalCoord(Index n) const
 
 
 template<typename ChildT, Index Log2Dim>
+template<typename ArrayT>
+inline void
+InternalNode<ChildT, Log2Dim>::getNodes(ArrayT& array)
+{
+    using T = typename ArrayT::value_type;
+    static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
+    using ArrayChildT = typename std::conditional<
+        std::is_const<typename std::remove_pointer<T>::type>::value, const ChildT, ChildT>::type;
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (std::is_same<T, ArrayChildT*>::value) {
+            array.push_back(reinterpret_cast<T>(mNodes[iter.pos()].getChild()));
+        } else {
+            iter->getNodes(array);//descent
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+}
+
+template<typename ChildT, Index Log2Dim>
+template<typename ArrayT>
+inline void
+InternalNode<ChildT, Log2Dim>::getNodes(ArrayT& array) const
+{
+    using T = typename ArrayT::value_type;
+    static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
+    static_assert(std::is_const<typename std::remove_pointer<T>::type>::value,
+        "argument to getNodes() must be an array of const node pointers");
+    for (ChildOnCIter iter = this->cbeginChildOn(); iter; ++iter) {
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+        if (std::is_same<T, const ChildT*>::value) {
+            array.push_back(reinterpret_cast<T>(mNodes[iter.pos()].getChild()));
+        } else {
+            iter->getNodes(array);//descent
+        }
+        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+    }
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
+template<typename ArrayT>
+inline void
+InternalNode<ChildT, Log2Dim>::stealNodes(ArrayT& array, const ValueType& value, bool state)
+{
+    using T = typename ArrayT::value_type;
+    static_assert(std::is_pointer<T>::value, "argument to stealNodes() must be a pointer array");
+    using ArrayChildT = typename std::conditional<
+        std::is_const<typename std::remove_pointer<T>::type>::value, const ChildT, ChildT>::type;
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
+    for (ChildOnIter iter = this->beginChildOn(); iter; ++iter) {
+        const Index n = iter.pos();
+        if (std::is_same<T, ArrayChildT*>::value) {
+            array.push_back(reinterpret_cast<T>(mNodes[n].getChild()));
+            mValueMask.set(n, state);
+            mNodes[n].setValue(value);
+        } else {
+            iter->stealNodes(array, value, state);//descent
+        }
+    }
+    if (std::is_same<T, ArrayChildT*>::value) mChildMask.setOff();
+    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+}
+
+
+////////////////////////////////////////
+
+
+template<typename ChildT, Index Log2Dim>
 inline void
 InternalNode<ChildT, Log2Dim>::resetBackground(const ValueType& oldBackground,
                                                const ValueType& newBackground)
@@ -2801,7 +3211,6 @@ InternalNode<ChildT, Log2Dim>::resetBackground(const ValueType& oldBackground,
        }
     }
 }
-
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildNodeType, Index OtherLog2Dim>
@@ -2850,7 +3259,7 @@ InternalNode<ChildT, Log2Dim>::unsetChildNode(Index i, const ValueType& value)
 {
     if (this->isChildMaskOff(i)) {
         mNodes[i].setValue(value);
-        return NULL;
+        return nullptr;
     }
     ChildNodeType* child = mNodes[i].getChild();
     mChildMask.setOff(i);
@@ -2889,6 +3298,6 @@ InternalNode<ChildT, Log2Dim>::getChildNode(Index n) const
 
 #endif // OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -37,7 +37,8 @@
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Vec3.h>
 #include "ValueTransformer.h" // for tools::foreach()
-#include <boost/utility/enable_if.hpp>
+#include <type_traits>
+
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -95,9 +96,12 @@ struct MatMulNormalize
 };
 
 
+//{
+/// @cond OPENVDB_VECTOR_TRANSFORMER_INTERNAL
+
 /// @internal This overload is enabled only for scalar-valued grids.
 template<typename GridType> inline
-typename boost::disable_if_c<VecTraits<typename GridType::ValueType>::IsVec, void>::type
+typename std::enable_if<!VecTraits<typename GridType::ValueType>::IsVec, void>::type
 doTransformVectors(GridType&, const Mat4d&)
 {
     OPENVDB_THROW(TypeError, "tools::transformVectors() requires a vector-valued grid");
@@ -105,7 +109,7 @@ doTransformVectors(GridType&, const Mat4d&)
 
 /// @internal This overload is enabled only for vector-valued grids.
 template<typename GridType> inline
-typename boost::enable_if_c<VecTraits<typename GridType::ValueType>::IsVec, void>::type
+typename std::enable_if<VecTraits<typename GridType::ValueType>::IsVec, void>::type
 doTransformVectors(GridType& grid, const Mat4d& mat)
 {
     if (!grid.isInWorldSpace()) return;
@@ -139,6 +143,9 @@ doTransformVectors(GridType& grid, const Mat4d& mat)
     }
 }
 
+/// @endcond
+//}
+
 
 template<typename GridType>
 inline void
@@ -153,6 +160,6 @@ transformVectors(GridType& grid, const Mat4d& mat)
 
 #endif // OPENVDB_TOOLS_VECTORTRANSFORMER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,14 +33,14 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/Platform.h>
-#include <iomanip>
-#include <assert.h>
-#include <math.h>
-#include <algorithm>
 #include "Math.h"
 #include "Mat3.h"
 #include "Vec3.h"
 #include "Vec4.h"
+#include <algorithm> // for std::copy(), std::swap()
+#include <cassert>
+#include <iomanip>
+#include <cmath>
 
 
 namespace openvdb {
@@ -58,9 +58,9 @@ class Mat4: public Mat<4, T>
 {
 public:
     /// Data type held by the matrix.
-    typedef T                   value_type;
-    typedef T                   ValueType;
-    typedef Mat<4, T>           MyBase;
+    using value_type = T;
+    using ValueType = T;
+    using MyBase = Mat<4, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
     Mat4() {}
@@ -93,33 +93,38 @@ public:
          Source i, Source j, Source k, Source l,
          Source m, Source n, Source o, Source p)
     {
-        MyBase::mm[ 0] = a;
-        MyBase::mm[ 1] = b;
-        MyBase::mm[ 2] = c;
-        MyBase::mm[ 3] = d;
+        MyBase::mm[ 0] = T(a);
+        MyBase::mm[ 1] = T(b);
+        MyBase::mm[ 2] = T(c);
+        MyBase::mm[ 3] = T(d);
 
-        MyBase::mm[ 4] = e;
-        MyBase::mm[ 5] = f;
-        MyBase::mm[ 6] = g;
-        MyBase::mm[ 7] = h;
+        MyBase::mm[ 4] = T(e);
+        MyBase::mm[ 5] = T(f);
+        MyBase::mm[ 6] = T(g);
+        MyBase::mm[ 7] = T(h);
 
-        MyBase::mm[ 8] = i;
-        MyBase::mm[ 9] = j;
-        MyBase::mm[10] = k;
-        MyBase::mm[11] = l;
+        MyBase::mm[ 8] = T(i);
+        MyBase::mm[ 9] = T(j);
+        MyBase::mm[10] = T(k);
+        MyBase::mm[11] = T(l);
 
-        MyBase::mm[12] = m;
-        MyBase::mm[13] = n;
-        MyBase::mm[14] = o;
-        MyBase::mm[15] = p;
+        MyBase::mm[12] = T(m);
+        MyBase::mm[13] = T(n);
+        MyBase::mm[14] = T(o);
+        MyBase::mm[15] = T(p);
     }
 
-    /// Construct matrix given basis vectors (columns)
+    /// Construct matrix from rows or columns vectors (defaults to rows
+    /// for historical reasons)
     template<typename Source>
     Mat4(const Vec4<Source> &v1, const Vec4<Source> &v2,
-         const Vec4<Source> &v3, const Vec4<Source> &v4)
+         const Vec4<Source> &v3, const Vec4<Source> &v4, bool rows = true)
     {
-        setBasis(v1, v2, v3, v4);
+        if (rows) {
+            this->setRows(v1, v2, v3, v4);
+        } else {
+            this->setColumns(v1, v2, v3, v4);
+        }
     }
 
     /// Copy constructor
@@ -145,11 +150,23 @@ public:
 
     /// Predefined constant for identity matrix
     static const Mat4<T>& identity() {
+        static const Mat4<T> sIdentity = Mat4<T>(
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 0, 1
+        );
         return sIdentity;
     }
 
     /// Predefined constant for zero matrix
     static const Mat4<T>& zero() {
+        static const Mat4<T> sZero = Mat4<T>(
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0,
+            0, 0, 0, 0
+        );
         return sZero;
     }
 
@@ -219,9 +236,9 @@ public:
         return MyBase::mm[4*i+j];
     }
 
-    /// Set the columns of "this" matrix to the vectors v1, v2, v3, v4
-    void setBasis(const Vec4<T> &v1, const Vec4<T> &v2,
-                         const Vec4<T> &v3, const Vec4<T> &v4)
+    /// Set the rows of this matrix to the vectors v1, v2, v3, v4
+    void setRows(const Vec4<T> &v1, const Vec4<T> &v2,
+                 const Vec4<T> &v3, const Vec4<T> &v4)
     {
         MyBase::mm[ 0] = v1[0];
         MyBase::mm[ 1] = v1[1];
@@ -244,8 +261,32 @@ public:
         MyBase::mm[15] = v4[3];
     }
 
+    /// Set the columns of this matrix to the vectors v1, v2, v3, v4
+    void setColumns(const Vec4<T> &v1, const Vec4<T> &v2,
+                    const Vec4<T> &v3, const Vec4<T> &v4)
+    {
+        MyBase::mm[ 0] = v1[0];
+        MyBase::mm[ 1] = v2[0];
+        MyBase::mm[ 2] = v3[0];
+        MyBase::mm[ 3] = v4[0];
 
-    // Set "this" matrix to zero
+        MyBase::mm[ 4] = v1[1];
+        MyBase::mm[ 5] = v2[1];
+        MyBase::mm[ 6] = v3[1];
+        MyBase::mm[ 7] = v4[1];
+
+        MyBase::mm[ 8] = v1[2];
+        MyBase::mm[ 9] = v2[2];
+        MyBase::mm[10] = v3[2];
+        MyBase::mm[11] = v4[2];
+
+        MyBase::mm[12] = v1[3];
+        MyBase::mm[13] = v2[3];
+        MyBase::mm[14] = v3[3];
+        MyBase::mm[15] = v4[3];
+    }
+
+    // Set this matrix to zero
     void setZero()
     {
         MyBase::mm[ 0] = 0;
@@ -266,7 +307,7 @@ public:
         MyBase::mm[15] = 0;
     }
 
-    /// Set "this" matrix to identity
+    /// Set this matrix to identity
     void setIdentity()
     {
         MyBase::mm[ 0] = 1;
@@ -334,7 +375,7 @@ public:
         return *this;
     }
 
-    /// Test if "this" is equivalent to m with tolerance of eps value
+    /// Return @c true if this matrix is equivalent to @a m within a tolerance of @a eps.
     bool eq(const Mat4 &m, T eps=1.0e-8) const
     {
         for (int i = 0; i < 16; i++) {
@@ -355,7 +396,7 @@ public:
                        );
     } // trivial
 
-    /// Return m, where \f$m_{i,j} *= scalar\f$ for \f$i, j \in [0, 3]\f$
+    /// Multiply each element of this matrix by @a scalar.
     template <typename S>
     const Mat4<T>& operator*=(S scalar)
     {
@@ -381,7 +422,7 @@ public:
         return *this;
     }
 
-    /// @brief Returns m0, where \f$m0_{i,j} += m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+    /// Add each element of the given matrix to the corresponding element of this matrix.
     template <typename S>
     const Mat4<T> &operator+=(const Mat4<S> &m1)
     {
@@ -410,7 +451,7 @@ public:
         return *this;
     }
 
-    /// @brief Returns m0, where \f$m0_{i,j} -= m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+    /// Subtract each element of the given matrix from the corresponding element of this matrix.
     template <typename S>
     const Mat4<T> &operator-=(const Mat4<S> &m1)
     {
@@ -439,7 +480,7 @@ public:
         return *this;
     }
 
-    /// Return m, where \f$m_{i,j} = \sum_{k} m0_{i,k}*m1_{k,j}\f$ for \f$i, j \in [0, 3]\f$
+    /// Multiply this matrix by the given matrix.
     template <typename S>
     const Mat4<T> &operator*=(const Mat4<S> &m1)
     {
@@ -667,13 +708,6 @@ public:
 
         return det;
     }
-
-    /// This function snaps a specific axis to a specific direction,
-    /// preserving scaling. It does this using minimum energy, thus
-    /// posing a unique solution if basis & direction arent parralel.
-    /// Direction need not be unit.
-    Mat4 snapBasis(Axis axis, const Vec3<T> &direction)
-    {return snapBasis(*this, axis, direction);}
 
     /// Sets the matrix to a matrix that translates by v
     static Mat4 translation(const Vec3d& v)
@@ -1040,7 +1074,8 @@ public:
         T0  w;
 
         // w = p * (*this).col(3);
-        w = p[0] * MyBase::mm[ 3] + p[1] * MyBase::mm[ 7] + p[2] * MyBase::mm[11] + MyBase::mm[15];
+        w = static_cast<T0>(p[0] * MyBase::mm[ 3] + p[1] * MyBase::mm[ 7]
+            + p[2] * MyBase::mm[11] + MyBase::mm[15]);
 
         if ( !isExactlyEqual(w , 0.0) ) {
             return Vec3<T0>(static_cast<T0>((p[0] * MyBase::mm[ 0] + p[1] * MyBase::mm[ 4] +
@@ -1102,23 +1137,8 @@ private:
             a.mm[i0row+j1]*det2(a, i1,i2, j2,j0) +
             a.mm[i0row+j2]*det2(a, i1,i2, j0,j1);
     }
-
-    static const Mat4<T> sIdentity;
-    static const Mat4<T> sZero;
 }; // class Mat4
 
-
-template <typename T>
-const Mat4<T> Mat4<T>::sIdentity = Mat4<T>(1, 0, 0, 0,
-                                           0, 1, 0, 0,
-                                           0, 0, 1, 0,
-                                           0, 0, 0, 1);
-
-template <typename T>
-const Mat4<T> Mat4<T>::sZero = Mat4<T>(0, 0, 0, 0,
-                                       0, 0, 0, 0,
-                                       0, 0, 0, 0,
-                                       0, 0, 0, 0);
 
 /// @relates Mat4
 /// @brief Equality operator, does exact floating point comparisons
@@ -1138,7 +1158,7 @@ template <typename T0, typename T1>
 bool operator!=(const Mat4<T0> &m0, const Mat4<T1> &m1) { return !(m0 == m1); }
 
 /// @relates Mat4
-/// @brief Returns M, where \f$M_{i,j} = m_{i,j} * scalar\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Multiply each element of the given matrix by @a scalar and return the result.
 template <typename S, typename T>
 Mat4<typename promote<S, T>::type> operator*(S scalar, const Mat4<T> &m)
 {
@@ -1146,7 +1166,7 @@ Mat4<typename promote<S, T>::type> operator*(S scalar, const Mat4<T> &m)
 }
 
 /// @relates Mat4
-/// @brief Returns M, where \f$M_{i,j} = m_{i,j} * scalar\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Multiply each element of the given matrix by @a scalar and return the result.
 template <typename S, typename T>
 Mat4<typename promote<S, T>::type> operator*(const Mat4<T> &m, S scalar)
 {
@@ -1156,7 +1176,7 @@ Mat4<typename promote<S, T>::type> operator*(const Mat4<T> &m, S scalar)
 }
 
 /// @relates Mat4
-/// @brief Returns v, where \f$v_{i} = \sum_{n=0}^3 m_{i,n} * v_n \f$ for \f$i \in [0, 3]\f$
+/// @brief Multiply @a _m by @a _v and return the resulting vector.
 template<typename T, typename MT>
 inline Vec4<typename promote<T, MT>::type>
 operator*(const Mat4<MT> &_m,
@@ -1171,7 +1191,7 @@ operator*(const Mat4<MT> &_m,
 }
 
 /// @relates Mat4
-/// @brief Returns v, where \f$v_{i} = \sum_{n=0}^3 m_{n,i} * v_n \f$ for \f$i \in [0, 3]\f$
+/// @brief Multiply @a _v by @a _m and return the resulting vector.
 template<typename T, typename MT>
 inline Vec4<typename promote<T, MT>::type>
 operator*(const Vec4<T> &_v,
@@ -1186,12 +1206,10 @@ operator*(const Vec4<T> &_v,
 }
 
 /// @relates Mat4
-/// @brief Returns v, where
-///     \f$v_{i} = \sum_{n=0}^3\left(m_{i,n} * v_n + m_{i,3}\right)\f$ for \f$i \in [0, 2]\f$
+/// @brief Multiply @a _m by @a _v and return the resulting vector.
 template<typename T, typename MT>
 inline Vec3<typename promote<T, MT>::type>
-operator*(const Mat4<MT> &_m,
-          const Vec3<T> &_v)
+operator*(const Mat4<MT> &_m, const Vec3<T> &_v)
 {
     MT const *m = _m.asPointer();
     return Vec3<typename promote<T, MT>::type>(
@@ -1201,12 +1219,10 @@ operator*(const Mat4<MT> &_m,
 }
 
 /// @relates Mat4
-/// @brief Returns v, where
-///     \f$v_{i} = \sum_{n=0}^3\left(m_{n,i} * v_n + m_{3,i}\right)\f$ for \f$i \in [0, 2]\f$
+/// @brief Multiply @a _v by @a _m and return the resulting vector.
 template<typename T, typename MT>
 inline Vec3<typename promote<T, MT>::type>
-operator*(const Vec3<T> &_v,
-          const Mat4<MT> &_m)
+operator*(const Vec3<T> &_v, const Mat4<MT> &_m)
 {
     MT const *m = _m.asPointer();
     return Vec3<typename promote<T, MT>::type>(
@@ -1216,7 +1232,7 @@ operator*(const Vec3<T> &_v,
 }
 
 /// @relates Mat4
-/// @brief Returns M, where  \f$M_{i,j} = m0_{i,j} + m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Add corresponding elements of @a m0 and @a m1 and return the result.
 template <typename T0, typename T1>
 Mat4<typename promote<T0, T1>::type>
 operator+(const Mat4<T0> &m0, const Mat4<T1> &m1)
@@ -1227,7 +1243,7 @@ operator+(const Mat4<T0> &m0, const Mat4<T1> &m1)
 }
 
 /// @relates Mat4
-/// @brief Returns M, where  \f$M_{i,j} = m0_{i,j} - m1_{i,j}\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Subtract corresponding elements of @a m0 and @a m1 and return the result.
 template <typename T0, typename T1>
 Mat4<typename promote<T0, T1>::type>
 operator-(const Mat4<T0> &m0, const Mat4<T1> &m1)
@@ -1238,8 +1254,7 @@ operator-(const Mat4<T0> &m0, const Mat4<T1> &m1)
 }
 
 /// @relates Mat4
-/// @brief Returns M, where
-///     \f$M_{ij} = \sum_{n=0}^3\left(m0_{nj} + m1_{in}\right)\f$ for \f$i, j \in [0, 3]\f$
+/// @brief Multiply @a m0 by @a m1 and return the resulting matrix.
 template <typename T0, typename T1>
 Mat4<typename promote<T0, T1>::type>
 operator*(const Mat4<T0> &m0, const Mat4<T1> &m1)
@@ -1342,14 +1357,9 @@ inline bool hasTranslation(const Mat4<T>& m) {
 }
 
 
-typedef Mat4<float>  Mat4s;
-typedef Mat4<double> Mat4d;
-
-#if DWREAL_IS_DOUBLE == 1
-typedef Mat4d    Mat4f;
-#else
-typedef Mat4s    Mat4f;
-#endif // DWREAL_IS_DOUBLE
+using Mat4s = Mat4<float>;
+using Mat4d = Mat4<double>;
+using Mat4f = Mat4d;
 
 } // namespace math
 
@@ -1362,6 +1372,6 @@ template<> inline math::Mat4d zeroVal<math::Mat4d>() { return math::Mat4d::ident
 
 #endif // OPENVDB_UTIL_MAT4_H_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

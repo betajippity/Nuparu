@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -33,6 +33,7 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for negative()
+#include "io.h" // for getDataCompression(), etc.
 #include <boost/scoped_array.hpp>
 #include <algorithm>
 #include <iostream>
@@ -53,10 +54,11 @@ namespace io {
 ///     On read, the input stream contains uncompressed data.
 ///
 /// <dt><tt>COMPRESS_ZIP</tt>
-/// <dd>When writing grids other than level sets or fog volumes, apply ZIP compression
-///     to internal and leaf node value buffers.<br>
-///     On read of grids other than level sets or fog volumes, the value buffers
-///     of internal and leaf nodes are ZIP-compressed.
+/// <dd>When writing grids other than level sets or fog volumes, apply
+///     ZLIB compression to internal and leaf node value buffers.<br>
+///     When reading grids other than level sets or fog volumes, indicate that
+///     the value buffers of internal and leaf nodes are ZLIB-compressed.<br>
+///     ZLIB compresses well but is slow.
 ///
 /// <dt><tt>COMPRESS_ACTIVE_MASK</tt>
 /// <dd>When writing a grid of any class, don't output a node's inactive values
@@ -64,11 +66,19 @@ namespace io {
 ///     to permit the lossless reconstruction of inactive values.<br>
 ///     On read, nodes might have been stored without inactive values.
 ///     Where necessary, reconstruct inactive values from available information.
+///
+/// <dt><tt>COMPRESS_BLOSC</tt>
+/// <dd>When writing grids other than level sets or fog volumes, apply
+///     Blosc compression to internal and leaf node value buffers.<br>
+///     When reading grids other than level sets or fog volumes, indicate that
+///     the value buffers of internal and leaf nodes are Blosc-compressed.<br>
+///     Blosc is much faster than ZLIB and produces comparable file sizes.
 /// </dl>
 enum {
     COMPRESS_NONE           = 0,
     COMPRESS_ZIP            = 0x1,
-    COMPRESS_ACTIVE_MASK    = 0x2
+    COMPRESS_ACTIVE_MASK    = 0x2,
+    COMPRESS_BLOSC          = 0x4
 };
 
 /// Return a string describing the given compression flags.
@@ -100,13 +110,41 @@ template<typename T>
 struct RealToHalf {
     enum { isReal = false }; // unless otherwise specified, type T is not a floating-point type
     typedef T HalfT; // type T's half float analogue is T itself
+    static HalfT convert(const T& val) { return val; }
 };
-template<> struct RealToHalf<float>  { enum { isReal = true }; typedef half  HalfT; };
-template<> struct RealToHalf<double> { enum { isReal = true }; typedef half  HalfT; };
-template<> struct RealToHalf<Vec2s>  { enum { isReal = true }; typedef Vec2H HalfT; };
-template<> struct RealToHalf<Vec2d>  { enum { isReal = true }; typedef Vec2H HalfT; };
-template<> struct RealToHalf<Vec3s>  { enum { isReal = true }; typedef Vec3H HalfT; };
-template<> struct RealToHalf<Vec3d>  { enum { isReal = true }; typedef Vec3H HalfT; };
+template<> struct RealToHalf<float> {
+    enum { isReal = true };
+    typedef half HalfT;
+    static HalfT convert(float val) { return HalfT(val); }
+};
+template<> struct RealToHalf<double> {
+    enum { isReal = true };
+    typedef half HalfT;
+    // A half can only be constructed from a float, so cast the value to a float first.
+    static HalfT convert(double val) { return HalfT(float(val)); }
+};
+template<> struct RealToHalf<Vec2s> {
+    enum { isReal = true };
+    typedef Vec2H HalfT;
+    static HalfT convert(const Vec2s& val) { return HalfT(val); }
+};
+template<> struct RealToHalf<Vec2d> {
+    enum { isReal = true };
+    typedef Vec2H HalfT;
+    // A half can only be constructed from a float, so cast the vector's elements to floats first.
+    static HalfT convert(const Vec2d& val) { return HalfT(Vec2s(val)); }
+};
+template<> struct RealToHalf<Vec3s> {
+    enum { isReal = true };
+    typedef Vec3H HalfT;
+    static HalfT convert(const Vec3s& val) { return HalfT(val); }
+};
+template<> struct RealToHalf<Vec3d> {
+    enum { isReal = true };
+    typedef Vec3H HalfT;
+    // A half can only be constructed from a float, so cast the vector's elements to floats first.
+    static HalfT convert(const Vec3d& val) { return HalfT(Vec3s(val)); }
+};
 
 
 /// Return the given value truncated to 16-bit float precision.
@@ -114,7 +152,7 @@ template<typename T>
 inline T
 truncateRealToHalf(const T& val)
 {
-    return T(typename RealToHalf<T>::HalfT(val));
+    return T(RealToHalf<T>::convert(val));
 }
 
 
@@ -123,29 +161,41 @@ truncateRealToHalf(const T& val)
 
 OPENVDB_API void zipToStream(std::ostream&, const char* data, size_t numBytes);
 OPENVDB_API void unzipFromStream(std::istream&, char* data, size_t numBytes);
+OPENVDB_API void bloscToStream(std::ostream&, const char* data, size_t valSize, size_t numVals);
+OPENVDB_API void bloscFromStream(std::istream&, char* data, size_t numBytes);
 
 /// @brief Read data from a stream.
-/// @param is          the input stream
-/// @param data        the contiguous array of data to read in
-/// @param count       the number of elements to read in
-/// @param compressed  if @c true, assume the data is ZIP compressed and uncompress it
-/// This default implementation is instantiated only for types whose size
-/// can be determined by the sizeof() operator.
+/// @param is           the input stream
+/// @param data         the contiguous array of data to read in
+/// @param count        the number of elements to read in
+/// @param compression  whether and how the data is compressed (either COMPRESS_NONE,
+///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
+/// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
+/// without Blosc support.
+/// @details This default implementation is instantiated only for types
+/// whose size can be determined by the sizeof() operator.
 template<typename T>
 inline void
-readData(std::istream& is, T* data, Index count, bool compressed)
+readData(std::istream& is, T* data, Index count, uint32_t compression)
 {
-    if (compressed) {
+    if (compression & COMPRESS_BLOSC) {
+        bloscFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
+    } else if (compression & COMPRESS_ZIP) {
         unzipFromStream(is, reinterpret_cast<char*>(data), sizeof(T) * count);
     } else {
-        is.read(reinterpret_cast<char*>(data), sizeof(T) * count);
+        if (data == nullptr) {
+            assert(!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable());
+            is.seekg(sizeof(T) * count, std::ios_base::cur);
+        } else {
+            is.read(reinterpret_cast<char*>(data), sizeof(T) * count);
+        }
     }
 }
 
 /// Specialization for std::string input
 template<>
 inline void
-readData<std::string>(std::istream& is, std::string* data, Index count, bool /*compressed*/)
+readData<std::string>(std::istream& is, std::string* data, Index count, uint32_t /*compression*/)
 {
     for (Index i = 0; i < count; ++i) {
         size_t len = 0;
@@ -154,8 +204,8 @@ readData<std::string>(std::istream& is, std::string* data, Index count, bool /*c
         //is.read(&(data[i][0]), len);
 
         std::string buffer(len+1, ' ');
-        is.read(&buffer[0], len+1 );
-        data[i].assign(buffer, 0, len);
+        is.read(&buffer[0], len+1);
+        if (data != nullptr) data[i].assign(buffer, 0, len);
     }
 }
 
@@ -167,36 +217,46 @@ template<bool IsReal, typename T> struct HalfReader;
 /// Partial specialization for non-floating-point types (no half to float promotion)
 template<typename T>
 struct HalfReader</*IsReal=*/false, T> {
-    static inline void read(std::istream& is, T* data, Index count, bool compressed) {
-        readData(is, data, count, compressed);
+    static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
+        readData(is, data, count, compression);
     }
 };
 /// Partial specialization for floating-point types
 template<typename T>
 struct HalfReader</*IsReal=*/true, T> {
     typedef typename RealToHalf<T>::HalfT HalfT;
-    static inline void read(std::istream& is, T* data, Index count, bool compressed) {
+    static inline void read(std::istream& is, T* data, Index count, uint32_t compression) {
         if (count < 1) return;
-        std::vector<HalfT> halfData(count); // temp buffer into which to read half float values
-        readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compressed);
-        // Copy half float values from the temporary buffer to the full float output array.
-        std::copy(halfData.begin(), halfData.end(), data);
+        if (data == nullptr) {
+            // seek mode - pass through null pointer
+            readData<HalfT>(is, nullptr, count, compression);
+        } else {
+            std::vector<HalfT> halfData(count); // temp buffer into which to read half float values
+            readData<HalfT>(is, reinterpret_cast<HalfT*>(&halfData[0]), count, compression);
+            // Copy half float values from the temporary buffer to the full float output array.
+            std::copy(halfData.begin(), halfData.end(), data);
+        }
     }
 };
 
 
 /// Write data to a stream.
-/// @param os        the output stream
-/// @param data      the contiguous array of data to write
-/// @param count     the number of elements to write out
-/// @param compress  if @c true, apply ZIP compression to the data
-/// This default implementation is instantiated only for types whose size
-/// can be determined by the sizeof() operator.
+/// @param os           the output stream
+/// @param data         the contiguous array of data to write
+/// @param count        the number of elements to write out
+/// @param compression  whether and how to compress the data (either COMPRESS_NONE,
+///                     COMPRESS_ZIP, COMPRESS_ACTIVE_MASK or COMPRESS_BLOSC)
+/// @throw IoError if @a compression is COMPRESS_BLOSC but OpenVDB was compiled
+/// without Blosc support.
+/// @details This default implementation is instantiated only for types
+/// whose size can be determined by the sizeof() operator.
 template<typename T>
 inline void
-writeData(std::ostream &os, const T *data, Index count, bool compress)
+writeData(std::ostream &os, const T *data, Index count, uint32_t compression)
 {
-    if (compress) {
+    if (compression & COMPRESS_BLOSC) {
+        bloscToStream(os, reinterpret_cast<const char*>(data), sizeof(T), count);
+    } else if (compression & COMPRESS_ZIP) {
         zipToStream(os, reinterpret_cast<const char*>(data), sizeof(T) * count);
     } else {
         os.write(reinterpret_cast<const char*>(data), sizeof(T) * count);
@@ -204,10 +264,10 @@ writeData(std::ostream &os, const T *data, Index count, bool compress)
 }
 
 /// Specialization for std::string output
-/// @todo Add compression
 template<>
 inline void
-writeData<std::string>(std::ostream& os, const std::string* data, Index count, bool /*compress*/)
+writeData<std::string>(std::ostream& os, const std::string* data, Index count,
+    uint32_t /*compression*/) ///< @todo add compression
 {
     for (Index i = 0; i < count; ++i) {
         const size_t len = data[i].size();
@@ -225,20 +285,20 @@ template<bool IsReal, typename T> struct HalfWriter;
 /// Partial specialization for non-floating-point types (no float to half quantization)
 template<typename T>
 struct HalfWriter</*IsReal=*/false, T> {
-    static inline void write(std::ostream& os, const T* data, Index count, bool compress) {
-        writeData(os, data, count, compress);
+    static inline void write(std::ostream& os, const T* data, Index count, uint32_t compression) {
+        writeData(os, data, count, compression);
     }
 };
 /// Partial specialization for floating-point types
 template<typename T>
 struct HalfWriter</*IsReal=*/true, T> {
     typedef typename RealToHalf<T>::HalfT HalfT;
-    static inline void write(std::ostream& os, const T* data, Index count, bool compress) {
+    static inline void write(std::ostream& os, const T* data, Index count, uint32_t compression) {
         if (count < 1) return;
         // Convert full float values to half float, then output the half float array.
         std::vector<HalfT> halfData(count);
-        std::copy(data, data + count, halfData.begin());
-        writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compress);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<T>::convert(data[i]);
+        writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
     }
 };
 #ifdef _MSC_VER
@@ -246,12 +306,14 @@ struct HalfWriter</*IsReal=*/true, T> {
 template<>
 struct HalfWriter</*IsReal=*/true, double> {
     typedef RealToHalf<double>::HalfT HalfT;
-    static inline void write(std::ostream& os, const double* data, Index count, bool compress) {
+    static inline void write(std::ostream& os, const double* data, Index count,
+        uint32_t compression)
+    {
         if (count < 1) return;
         // Convert full float values to half float, then output the half float array.
         std::vector<HalfT> halfData(count);
-        for (Index i = 0; i < count; ++i) halfData[i] = float(data[i]);
-        writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compress);
+        for (Index i = 0; i < count; ++i) halfData[i] = RealToHalf<double>::convert(data[i]);
+        writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
     }
 };
 #endif // _MSC_VER
@@ -278,16 +340,21 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     const MaskT& valueMask, bool fromHalf)
 {
     // Get the stream's compression settings.
-    const std::uint32_t compression = getDataCompression(is);
-    const bool
-        zipped = compression & COMPRESS_ZIP,
-        maskCompressed = compression & COMPRESS_ACTIVE_MASK;
+    const uint32_t compression = getDataCompression(is);
+    const bool maskCompressed = compression & COMPRESS_ACTIVE_MASK;
 
-    std::int8_t metadata = NO_MASK_AND_ALL_VALS;
+    const bool seek = (destBuf == nullptr);
+    assert(!seek || (!getStreamMetadataPtr(is) || getStreamMetadataPtr(is)->seekable()));
+
+    int8_t metadata = NO_MASK_AND_ALL_VALS;
     if (getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION) {
         // Read the flag that specifies what, if any, additional metadata
         // (selection mask and/or inactive value(s)) is saved.
-        is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
+        if (seek && !maskCompressed) {
+            is.seekg(/*bytes=*/1, std::ios_base::cur);
+        } else {
+            is.read(reinterpret_cast<char*>(&metadata), /*bytes=*/1);
+        }
     }
 
     ValueT background = zeroVal<ValueT>();
@@ -303,10 +370,18 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
         metadata == MASK_AND_TWO_INACTIVE_VALS)
     {
         // Read one of at most two distinct inactive values.
-        is.read(reinterpret_cast<char*>(&inactiveVal0), sizeof(ValueT));
+        if (seek) {
+            is.seekg(/*bytes=*/sizeof(ValueT), std::ios_base::cur);
+        } else {
+            is.read(reinterpret_cast<char*>(&inactiveVal0), /*bytes=*/sizeof(ValueT));
+        }
         if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
             // Read the second of two distinct inactive values.
-            is.read(reinterpret_cast<char*>(&inactiveVal1), sizeof(ValueT));
+            if (seek) {
+                is.seekg(/*bytes=*/sizeof(ValueT), std::ios_base::cur);
+            } else {
+                is.read(reinterpret_cast<char*>(&inactiveVal1), /*bytes=*/sizeof(ValueT));
+            }
         }
     }
 
@@ -317,18 +392,23 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
     {
         // For use in mask compression (only), read the bitmask that selects
         // between two distinct inactive values.
-        selectionMask.load(is);
+        if (seek) {
+            is.seekg(/*bytes=*/selectionMask.memUsage(), std::ios_base::cur);
+        } else {
+            selectionMask.load(is);
+        }
     }
 
     ValueT* tempBuf = destBuf;
     boost::scoped_array<ValueT> scopedTempBuf;
 
     Index tempCount = destCount;
+
     if (maskCompressed && metadata != NO_MASK_AND_ALL_VALS
         && getFormatVersion(is) >= OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION)
     {
         tempCount = valueMask.countOn();
-        if (tempCount != destCount) {
+        if (!seek && tempCount != destCount) {
             // If this node has inactive voxels, allocate a temporary buffer
             // into which to read just the active values.
             scopedTempBuf.reset(new ValueT[tempCount]);
@@ -338,15 +418,16 @@ readCompressedValues(std::istream& is, ValueT* destBuf, Index destCount,
 
     // Read in the buffer.
     if (fromHalf) {
-        HalfReader<RealToHalf<ValueT>::isReal, ValueT>::read(is, tempBuf, tempCount, zipped);
+        HalfReader<RealToHalf<ValueT>::isReal, ValueT>::read(
+            is, (seek ? nullptr : tempBuf), tempCount, compression);
     } else {
-        readData<ValueT>(is, tempBuf, tempCount, zipped);
+        readData<ValueT>(is, (seek ? nullptr : tempBuf), tempCount, compression);
     }
 
     // If mask compression is enabled and the number of active values read into
     // the temp buffer is smaller than the size of the destination buffer,
     // then there are missing (inactive) values.
-    if (maskCompressed && tempCount != destCount) {
+    if (!seek && maskCompressed && tempCount != destCount) {
         // Restore inactive values, using the background value and, if available,
         // the inside/outside mask.  (For fog volumes, the destination buffer is assumed
         // to be initialized to background value zero, so inactive values can be ignored.)
@@ -389,16 +470,14 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
     };
 
     // Get the stream's compression settings.
-    const std::uint32_t compress = getDataCompression(os);
-    const bool
-        zip = compress & COMPRESS_ZIP,
-        maskCompress = compress & COMPRESS_ACTIVE_MASK;
+    const uint32_t compress = getDataCompression(os);
+    const bool maskCompress = compress & COMPRESS_ACTIVE_MASK;
 
     Index tempCount = srcCount;
     ValueT* tempBuf = srcBuf;
     boost::scoped_array<ValueT> scopedTempBuf;
 
-    std::int8_t metadata = NO_MASK_AND_ALL_VALS;
+    int8_t metadata = NO_MASK_AND_ALL_VALS;
 
     if (!maskCompress) {
         os.write(reinterpret_cast<const char*>(&metadata), /*bytes=*/1);
@@ -500,7 +579,7 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
                 }
             } else {
                 // Write one of at most two distinct inactive values.
-                ValueT truncatedVal = truncateRealToHalf(inactiveVal[0]);
+                ValueT truncatedVal = static_cast<ValueT>(truncateRealToHalf(inactiveVal[0]));
                 os.write(reinterpret_cast<const char*>(&truncatedVal), sizeof(ValueT));
                 if (metadata == MASK_AND_TWO_INACTIVE_VALS) {
                     // Write the second of two distinct inactive values.
@@ -554,9 +633,9 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 
     // Write out the buffer.
     if (toHalf) {
-        HalfWriter<RealToHalf<ValueT>::isReal, ValueT>::write(os, tempBuf, tempCount, zip);
+        HalfWriter<RealToHalf<ValueT>::isReal, ValueT>::write(os, tempBuf, tempCount, compress);
     } else {
-        writeData(os, tempBuf, tempCount, zip);
+        writeData(os, tempBuf, tempCount, compress);
     }
 }
 
@@ -566,6 +645,6 @@ writeCompressedValues(std::ostream& os, ValueT* srcBuf, Index srcCount,
 
 #endif // OPENVDB_IO_COMPRESSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

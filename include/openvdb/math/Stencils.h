@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -29,17 +29,24 @@
 ///////////////////////////////////////////////////////////////////////////
 //
 /// @author Ken Museth
+///
 /// @file Stencils.h
+///
+/// @brief Defines various finite difference stencils by means of the
+///        "curiously recurring template pattern" on a BaseStencil
+///        that caches stencil values and stores a ValueAccessor for
+///        fast lookup.
 
 #ifndef OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 
 #include <algorithm>
 #include <vector>
-#include <openvdb/math/Math.h>             // for Pow2, needed by WENO and  Gudonov
+#include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
 #include <openvdb/math/Coord.h>            // for Coord
-#include <openvdb/math/FiniteDifference.h> // for WENO5 and GudonovsNormSqrd
+#include <openvdb/math/FiniteDifference.h> // for WENO5 and GodunovsNormSqrd
+#include <openvdb/tree/ValueAccessor.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -49,17 +56,16 @@ namespace math {
 
 ////////////////////////////////////////
 
-
-template<typename _GridType, typename StencilType>
+template<typename DerivedType, typename GridT, bool IsSafe>
 class BaseStencil
 {
 public:
-    typedef _GridType                        GridType;
-    typedef typename GridType::TreeType      TreeType;
-    typedef typename GridType::ValueType     ValueType;
-    typedef std::vector<ValueType>           BufferType;
-    typedef typename BufferType::iterator    IterType;
-    typedef typename GridType::ConstAccessor AccessorType;
+    typedef GridT                                       GridType;
+    typedef typename GridT::TreeType                    TreeType;
+    typedef typename GridT::ValueType                   ValueType;
+    typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
+    typedef std::vector<ValueType>                      BufferType;
+    typedef typename BufferType::iterator               IterType;
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
@@ -68,9 +74,9 @@ public:
     {
         mCenter = ijk;
         mStencil[0] = mCache.getValue(ijk);
-        static_cast<StencilType&>(*this).init(mCenter);
+        static_cast<DerivedType&>(*this).init(mCenter);
     }
-    
+
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors. The method also takes a value of the center
     /// element of the stencil, assuming it is already known.
@@ -80,9 +86,9 @@ public:
     {
         mCenter = ijk;
         mStencil[0] = centerValue;
-        static_cast<StencilType&>(*this).init(mCenter);
+        static_cast<DerivedType&>(*this).init(mCenter);
     }
-    
+
     /// @brief Initialize the stencil buffer with the values of voxel
     /// (x, y, z) and its neighbors.
     ///
@@ -93,7 +99,7 @@ public:
     {
         mCenter = iter.getCoord();
         mStencil[0] = *iter;
-        static_cast<StencilType&>(*this).init(mCenter);
+        static_cast<DerivedType&>(*this).init(mCenter);
     }
 
     /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
@@ -102,14 +108,15 @@ public:
     /// @details This method will check to see if it is necessary to
     /// update the stencil based on the cached index coordinates of
     /// the center point.
-    inline void moveTo(const Vec3R& xyz)
+    template<typename RealType>
+    inline void moveTo(const Vec3<RealType>& xyz)
     {
         Coord ijk = openvdb::Coord::floor(xyz);
         if (ijk != mCenter) this->moveTo(ijk);
     }
 
     /// @brief Return the value from the stencil buffer with linear
-    /// offset pos. 
+    /// offset pos.
     ///
     /// @note The default (@a pos = 0) corresponds to the first element
     /// which is typically the center point of the stencil.
@@ -123,14 +130,14 @@ public:
     template<int i, int j, int k>
     inline const ValueType& getValue() const
     {
-        return mStencil[static_cast<const StencilType&>(*this).template pos<i,j,k>()];
+        return mStencil[static_cast<const DerivedType&>(*this).template pos<i,j,k>()];
     }
 
     /// @brief Set the value at the specified location relative to the center of the stencil
     template<int i, int j, int k>
     inline void setValue(const ValueType& value)
     {
-        mStencil[static_cast<const StencilType&>(*this).template pos<i,j,k>()] = value;
+        mStencil[static_cast<const DerivedType&>(*this).template pos<i,j,k>()] = value;
     }
 
     /// @brief Return the size of the stencil buffer.
@@ -139,7 +146,7 @@ public:
     /// @brief Return the median value of the current stencil.
     inline ValueType median() const
     {
-        std::vector<ValueType> tmp(mStencil);//local copy
+        BufferType tmp(mStencil);//local copy
         assert(!tmp.empty());
         size_t midpoint = (tmp.size() - 1) >> 1;
         // Partially sort the vector until the median value is at the midpoint.
@@ -151,7 +158,7 @@ public:
     inline ValueType mean() const
     {
         ValueType sum = 0.0;
-        for (int n=0, s=mStencil.size(); n<s; ++n) sum += mStencil[n];
+        for (int n = 0, s = int(mStencil.size()); n < s; ++n) sum += mStencil[n];
         return sum / mStencil.size();
     }
 
@@ -198,9 +205,11 @@ public:
 
 protected:
     // Constructor is protected to prevent direct instantiation.
-    BaseStencil(const GridType& grid, int size):
-        mGrid(&grid), mCache(grid.getConstAccessor()),
-        mStencil(size), mCenter(Coord::max())
+    BaseStencil(const GridType& grid, int size)
+        : mGrid(&grid)
+        , mCache(grid.tree())
+        , mStencil(size)
+        , mCenter(Coord::max())
     {
     }
 
@@ -209,7 +218,7 @@ protected:
     BufferType      mStencil;
     Coord           mCenter;
 
-}; // class BaseStencil
+}; // BaseStencil class
 
 
 ////////////////////////////////////////
@@ -230,17 +239,19 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridType>
-class SevenPointStencil: public BaseStencil<GridType, SevenPointStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class SevenPointStencil: public BaseStencil<SevenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef SevenPointStencil<GridT, IsSafe>  SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef BaseStencil<GridType, SevenPointStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType   BufferType;
-    typedef typename GridType::ValueType    ValueType;
-    typedef math::Vec3<ValueType>           Vec3Type;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridT::ValueType         ValueType;
+
     static const int SIZE = 7;
 
-    SevenPointStencil(const GridType& grid): BaseType(grid, SIZE) {}
+    SevenPointStencil(const GridT& grid): BaseType(grid, SIZE) {}
 
     /// Return linear offset for the specified stencil point relative to its center
     template<int i, int j, int k>
@@ -259,10 +270,10 @@ private:
         BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};
+};// SevenPointStencil class
 
 
 ////////////////////////////////////////
@@ -282,14 +293,16 @@ namespace { // anonymous namespace for stencil-layout map
     template<> struct BoxPt< 1, 1, 0> { enum { idx = 7 }; };
 }
 
-template<typename GridType>
-class BoxStencil: public BaseStencil<GridType, BoxStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class BoxStencil: public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef BoxStencil<GridT, IsSafe>         SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef BaseStencil<GridType, BoxStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType   BufferType;
-    typedef typename GridType::ValueType    ValueType;
-    typedef math::Vec3<ValueType>           Vec3Type;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridT::ValueType         ValueType;
+
     static const int SIZE = 8;
 
     BoxStencil(const GridType& grid): BaseType(grid, SIZE) {}
@@ -319,25 +332,25 @@ public:
     /// @note Trilinear interpolation kernal reads as:
     ///       v000 (1-u)(1-v)(1-w) + v001 (1-u)(1-v)w + v010 (1-u)v(1-w) + v011 (1-u)vw
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
-    inline ValueType interpolation(const Vec3Type& xyz) const
+    inline ValueType interpolation(const math::Vec3<ValueType>& xyz) const
     {
-        const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
-        
+        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
+        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
+        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+
         ValueType V = BaseType::template getValue<0,0,0>();
-        ValueType A = V + (BaseType::template getValue<0,0,1>() - V) * w;
+        ValueType A = static_cast<ValueType>(V + (BaseType::template getValue<0,0,1>() - V) * w);
         V = BaseType::template getValue< 0, 1, 0>();
-        ValueType B = V + (BaseType::template getValue<0,1,1>() - V) * w;
-        ValueType C = A + (B - A) * v;
+        ValueType B = static_cast<ValueType>(V + (BaseType::template getValue<0,1,1>() - V) * w);
+        ValueType C = static_cast<ValueType>(A + (B - A) * v);
 
         V = BaseType::template getValue<1,0,0>();
-        A = V + (BaseType::template getValue<1,0,1>() - V) * w;
+        A = static_cast<ValueType>(V + (BaseType::template getValue<1,0,1>() - V) * w);
         V = BaseType::template getValue<1,1,0>();
-        B = V + (BaseType::template getValue<1,1,1>() - V) * w;
-        ValueType D = A + (B - A) * v;
-        
-        return C + (D - C) * u;
+        B = static_cast<ValueType>(V + (BaseType::template getValue<1,1,1>() - V) * w);
+        ValueType D = static_cast<ValueType>(A + (B - A) * v);
+
+        return static_cast<ValueType>(C + (D - C) * u);
     }
 
     /// @brief Return the gradient in world space of the trilinear interpolation kernel.
@@ -347,30 +360,32 @@ public:
     /// @note Computed as partial derivatives of the trilinear interpolation kernel:
     ///       v000 (1-u)(1-v)(1-w) + v001 (1-u)(1-v)w + v010 (1-u)v(1-w) + v011 (1-u)vw
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
-    inline Vec3Type gradient(const Vec3Type& xyz) const
+    inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& xyz) const
     {
-        const Real u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
-        const Real v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
-        const Real w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
-        
+        const ValueType u = xyz[0] - BaseType::mCenter[0]; assert(u>=0 && u<=1);
+        const ValueType v = xyz[1] - BaseType::mCenter[1]; assert(v>=0 && v<=1);
+        const ValueType w = xyz[2] - BaseType::mCenter[2]; assert(w>=0 && w<=1);
+
         ValueType D[4]={BaseType::template getValue<0,0,1>()-BaseType::template getValue<0,0,0>(),
                         BaseType::template getValue<0,1,1>()-BaseType::template getValue<0,1,0>(),
                         BaseType::template getValue<1,0,1>()-BaseType::template getValue<1,0,0>(),
                         BaseType::template getValue<1,1,1>()-BaseType::template getValue<1,1,0>()};
 
         // Z component
-        ValueType A = D[0] + (D[1]- D[0]) * v;
-        ValueType B = D[2] + (D[3]- D[2]) * v;
-        Vec3Type grad(zeroVal<ValueType>(), zeroVal<ValueType>(), A + (B - A) * u);
+        ValueType A = static_cast<ValueType>(D[0] + (D[1]- D[0]) * v);
+        ValueType B = static_cast<ValueType>(D[2] + (D[3]- D[2]) * v);
+        math::Vec3<ValueType> grad(zeroVal<ValueType>(),
+                                   zeroVal<ValueType>(),
+                                   static_cast<ValueType>(A + (B - A) * u));
 
-        D[0] = BaseType::template getValue<0,0,0>() + D[0] * w;
-        D[1] = BaseType::template getValue<0,1,0>() + D[1] * w;
-        D[2] = BaseType::template getValue<1,0,0>() + D[2] * w;
-        D[3] = BaseType::template getValue<1,1,0>() + D[3] * w;
+        D[0] = static_cast<ValueType>(BaseType::template getValue<0,0,0>() + D[0] * w);
+        D[1] = static_cast<ValueType>(BaseType::template getValue<0,1,0>() + D[1] * w);
+        D[2] = static_cast<ValueType>(BaseType::template getValue<1,0,0>() + D[2] * w);
+        D[3] = static_cast<ValueType>(BaseType::template getValue<1,1,0>() + D[3] * w);
 
         // X component
-        A = D[0] + (D[1] - D[0]) * v;
-        B = D[2] + (D[3] - D[2]) * v;
+        A = static_cast<ValueType>(D[0] + (D[1] - D[0]) * v);
+        B = static_cast<ValueType>(D[2] + (D[3] - D[2]) * v);
 
         grad[0] = B - A;
 
@@ -378,7 +393,7 @@ public:
         A = D[1] - D[0];
         B = D[3] - D[2];
 
-        grad[1] = A + (B - A) * u;
+        grad[1] = static_cast<ValueType>(A + (B - A) * u);
 
         return BaseType::mGrid->transform().baseMap()->applyIJT(grad, xyz);
     }
@@ -395,10 +410,10 @@ private:
         BaseType::template setValue< 1, 1, 0>(mCache.getValue(ijk.offsetBy( 1, 1, 0)));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};    
+};// BoxStencil class
 
 
 ////////////////////////////////////////
@@ -437,14 +452,16 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridType>
-class SecondOrderDenseStencil: public BaseStencil<GridType, SecondOrderDenseStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class SecondOrderDenseStencil
+    : public BaseStencil<SecondOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe >
 {
+    typedef SecondOrderDenseStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe >     BaseType;
 public:
-    typedef BaseStencil<GridType,SecondOrderDenseStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType   BufferType;
-    typedef typename GridType::ValueType    ValueType;
-    typedef math::Vec3<ValueType>           Vec3Type;
+    typedef GridT                                  GridType;
+    typedef typename GridT::TreeType               TreeType;
+    typedef typename GridType::ValueType           ValueType;
 
     static const int SIZE = 19;
 
@@ -481,10 +498,10 @@ private:
         mStencil[DensePt< 0, 1, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,  1,  1));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};
+};// SecondOrderDenseStencil class
 
 
 ////////////////////////////////////////
@@ -515,14 +532,16 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridType>
-class ThirteenPointStencil: public BaseStencil<GridType, ThirteenPointStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class ThirteenPointStencil
+    : public BaseStencil<ThirteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef ThirteenPointStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe >  BaseType;
 public:
-    typedef BaseStencil<GridType, ThirteenPointStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType   BufferType;
-    typedef typename GridType::ValueType    ValueType;
-    typedef math::Vec3<ValueType>           Vec3Type;
+    typedef GridT                               GridType;
+    typedef typename GridT::TreeType            TreeType;
+    typedef typename GridType::ValueType        ValueType;
 
     static const int SIZE = 13;
 
@@ -551,10 +570,10 @@ private:
         mStencil[ThirteenPt< 0, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -2));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};
+};// ThirteenPointStencil class
 
 
 ////////////////////////////////////////
@@ -644,14 +663,16 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridType>
-class FourthOrderDenseStencil: public BaseStencil<GridType, FourthOrderDenseStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class FourthOrderDenseStencil
+    : public BaseStencil<FourthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef FourthOrderDenseStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe >     BaseType;
 public:
-    typedef BaseStencil<GridType, FourthOrderDenseStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType   BufferType;
-    typedef typename GridType::ValueType    ValueType;
-    typedef math::Vec3<ValueType>           Vec3Type;
+    typedef GridT                                  GridType;
+    typedef typename GridT::TreeType               TreeType;
+    typedef typename GridType::ValueType           ValueType;
 
     static const int SIZE = 61;
 
@@ -739,10 +760,10 @@ private:
         mStencil[FourthDensePt< 0, 2,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 2,-2));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};
+};// FourthOrderDenseStencil class
 
 
 ////////////////////////////////////////
@@ -781,14 +802,16 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridType>
-class NineteenPointStencil: public BaseStencil<GridType, NineteenPointStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class NineteenPointStencil
+    : public BaseStencil<NineteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef NineteenPointStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe >  BaseType;
 public:
-    typedef BaseStencil<GridType, NineteenPointStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType   BufferType;
-    typedef typename GridType::ValueType    ValueType;
-    typedef math::Vec3<ValueType>           Vec3Type;
+    typedef GridT                               GridType;
+    typedef typename GridT::TreeType            TreeType;
+    typedef typename GridType::ValueType        ValueType;
 
     static const int SIZE = 19;
 
@@ -823,10 +846,10 @@ private:
         mStencil[NineteenPt< 0, 0,-3>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -3));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};
+};// NineteenPointStencil class
 
 
 ////////////////////////////////////////
@@ -995,14 +1018,16 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 
-template<typename GridType>
-class SixthOrderDenseStencil: public BaseStencil<GridType, SixthOrderDenseStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class SixthOrderDenseStencil
+    : public BaseStencil<SixthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef SixthOrderDenseStencil<GridT, IsSafe> SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe >    BaseType;
 public:
-    typedef BaseStencil<GridType, SixthOrderDenseStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType   BufferType;
-    typedef typename GridType::ValueType    ValueType;
-    typedef math::Vec3<ValueType>           Vec3Type;
+    typedef GridT                                 GridType;
+    typedef typename GridT::TreeType              TreeType;
+    typedef typename GridType::ValueType          ValueType;
 
     static const int SIZE = 127;
 
@@ -1161,14 +1186,26 @@ private:
         mStencil[SixthDensePt< 0, 3,-3>::idx] = mCache.getValue(ijk.offsetBy( 0, 3,-3));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
-};
+};// SixthOrderDenseStencil class
 
 
 //////////////////////////////////////////////////////////////////////
 
+namespace { // anonymous namespace for stencil-layout map
+
+    // the seven point stencil with a different layout from SevenPt
+    template<int i, int j, int k> struct GradPt {};
+    template<> struct GradPt< 0, 0, 0> { enum { idx = 0 }; };
+    template<> struct GradPt< 1, 0, 0> { enum { idx = 2 }; };
+    template<> struct GradPt< 0, 1, 0> { enum { idx = 4 }; };
+    template<> struct GradPt< 0, 0, 1> { enum { idx = 6 }; };
+    template<> struct GradPt<-1, 0, 0> { enum { idx = 1 }; };
+    template<> struct GradPt< 0,-1, 0> { enum { idx = 3 }; };
+    template<> struct GradPt< 0, 0,-1> { enum { idx = 5 }; };
+}
 
 /// This is a simple 7-point nearest neighbor stencil that supports
 /// gradient by second-order central differencing, first-order upwinding,
@@ -1176,39 +1213,40 @@ private:
 ///
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
-template<typename GridType>
-class GradStencil: public BaseStencil<GridType, GradStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class GradStencil : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef GradStencil<GridT, IsSafe>         SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe > BaseType;
 public:
-    typedef BaseStencil<GridType, GradStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType                 BufferType;
-    typedef typename GridType::ValueType                  ValueType;
-    typedef math::Vec3<ValueType>                         Vec3Type;
+    typedef GridT                              GridType;
+    typedef typename GridT::TreeType           TreeType;
+    typedef typename GridType::ValueType       ValueType;
 
     static const int SIZE = 7;
 
-    GradStencil(const GridType& grid):
-        BaseType(grid, SIZE),
-        mInv2Dx(ValueType(0.5 / grid.voxelSize()[0])),
-        mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
+    GradStencil(const GridType& grid)
+        : BaseType(grid, SIZE)
+        , mInv2Dx(ValueType(0.5 / grid.voxelSize()[0]))
+        , mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
     {
     }
 
-    GradStencil(const GridType& grid, Real dx):
-        BaseType(grid, SIZE),
-        mInv2Dx(ValueType(0.5 / dx)),
-        mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
+    GradStencil(const GridType& grid, Real dx)
+        : BaseType(grid, SIZE)
+        , mInv2Dx(ValueType(0.5 / dx))
+        , mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
     {
     }
 
     /// @brief Return the norm square of the single-sided upwind gradient
-    /// (computed via Gudonov's scheme) at the previously buffered location.
+    /// (computed via Godunov's scheme) at the previously buffered location.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType normSqGrad() const
     {
-        return mInvDx2 * math::GudonovsNormSqrd(mStencil[0] > 0,
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > zeroVal<ValueType>(),
                                                 mStencil[0] - mStencil[1],
                                                 mStencil[2] - mStencil[0],
                                                 mStencil[0] - mStencil[3],
@@ -1222,21 +1260,22 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline Vec3Type gradient() const
+    inline math::Vec3<ValueType> gradient() const
     {
-        return Vec3Type(mStencil[2] - mStencil[1],
-                        mStencil[4] - mStencil[3],
-                        mStencil[6] - mStencil[5])*mInv2Dx;
+        return math::Vec3<ValueType>(mStencil[2] - mStencil[1],
+                                     mStencil[4] - mStencil[3],
+                                     mStencil[6] - mStencil[5])*mInv2Dx;
     }
     /// @brief Return the first-order upwind gradient corresponding to the direction V.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline Vec3Type gradient(const Vec3Type& V) const
+    inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& V) const
     {
-        return Vec3Type(V[0]>0 ? mStencil[0] - mStencil[1] : mStencil[2] - mStencil[0],
-                        V[1]>0 ? mStencil[0] - mStencil[3] : mStencil[4] - mStencil[0],
-                        V[2]>0 ? mStencil[0] - mStencil[5] : mStencil[6] - mStencil[0])*2*mInv2Dx;
+        return math::Vec3<ValueType>(
+               V[0]>0 ? mStencil[0] - mStencil[1] : mStencil[2] - mStencil[0],
+               V[1]>0 ? mStencil[0] - mStencil[3] : mStencil[4] - mStencil[0],
+               V[2]>0 ? mStencil[0] - mStencil[5] : mStencil[6] - mStencil[0])*2*mInv2Dx;
     }
 
     /// Return the Laplacian computed at the previously buffered
@@ -1252,7 +1291,7 @@ public:
     /// is different from the signs of any of its six nearest neighbors.
     inline bool zeroCrossing() const
     {
-        const BufferType& v = mStencil;
+        const typename BaseType::BufferType& v = mStencil;
         return (v[0]>0 ? (v[1]<0 || v[2]<0 || v[3]<0 || v[4]<0 || v[5]<0 || v[6]<0)
                        : (v[1]>0 || v[2]>0 || v[3]>0 || v[4]>0 || v[5]>0 || v[6]>0));
     }
@@ -1264,35 +1303,38 @@ public:
     /// @note This method assumes that the grid represents a level set
     /// with distances in world units and a simple affine transfrom
     /// with uniform scaling.
-    inline Vec3Type cpt()
+    inline math::Vec3<ValueType> cpt()
     {
         const Coord& ijk = BaseType::getCenterCoord();
         const ValueType d = ValueType(mStencil[0] * 0.5 * mInvDx2); // distance in voxels / (2dx^2)
-        return Vec3Type(ijk[0] - d*(mStencil[2] - mStencil[1]),
-                        ijk[1] - d*(mStencil[4] - mStencil[3]),
-                        ijk[2] - d*(mStencil[6] - mStencil[5]));
+        return math::Vec3<ValueType>(ijk[0] - d*(mStencil[2] - mStencil[1]),
+                                     ijk[1] - d*(mStencil[4] - mStencil[3]),
+                                     ijk[2] - d*(mStencil[6] - mStencil[5]));
     }
 
+    /// Return linear offset for the specified stencil point relative to its center
+    template<int i, int j, int k>
+    unsigned int pos() const { return GradPt<i,j,k>::idx; }
+    
 private:
     
     inline void init(const Coord& ijk)
     {
-        mStencil[1] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
-        mStencil[2] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
+        BaseType::template setValue<-1, 0, 0>(mCache.getValue(ijk.offsetBy(-1, 0, 0)));
+        BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
 
-        mStencil[3] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
-        mStencil[4] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
+        BaseType::template setValue< 0,-1, 0>(mCache.getValue(ijk.offsetBy( 0,-1, 0)));
+        BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
 
-        mStencil[5] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
-        mStencil[6] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
+        BaseType::template setValue< 0, 0,-1>(mCache.getValue(ijk.offsetBy( 0, 0,-1)));
+        BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
     }
     
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
     const ValueType mInv2Dx, mInvDx2;
-}; // class GradStencil
-
+}; // GradStencil class
 
 ////////////////////////////////////////
 
@@ -1302,41 +1344,42 @@ private:
 ///
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
-template<typename GridType>
-class WenoStencil: public BaseStencil<GridType, WenoStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class WenoStencil: public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef WenoStencil<GridT, IsSafe>         SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe > BaseType;
 public:
-    typedef BaseStencil<GridType, WenoStencil<GridType> > BaseType;
-    typedef typename BaseType::BufferType                 BufferType;
-    typedef typename GridType::ValueType                  ValueType;
-    typedef math::Vec3<ValueType>                         Vec3Type;
+    typedef GridT                              GridType;
+    typedef typename GridT::TreeType           TreeType;
+    typedef typename GridType::ValueType       ValueType;
 
     static const int SIZE = 19;
 
-    WenoStencil(const GridType& grid):
-        BaseType(grid, SIZE),
-        mDx2(ValueType(math::Pow2(grid.voxelSize()[0]))),
-        mInv2Dx(ValueType(0.5 / grid.voxelSize()[0])),
-        mInvDx2(ValueType(1.0 / mDx2))
+    WenoStencil(const GridType& grid)
+        : BaseType(grid, SIZE)
+        , mDx2(ValueType(math::Pow2(grid.voxelSize()[0])))
+        , mInv2Dx(ValueType(0.5 / grid.voxelSize()[0]))
+        , mInvDx2(ValueType(1.0 / mDx2))
     {
     }
 
-    WenoStencil(const GridType& grid, Real dx):
-        BaseType(grid, SIZE),
-        mDx2(ValueType(dx * dx)),
-        mInv2Dx(ValueType(0.5 / dx)),
-        mInvDx2(ValueType(1.0 / mDx2))
+    WenoStencil(const GridType& grid, Real dx)
+        : BaseType(grid, SIZE)
+        , mDx2(ValueType(dx * dx))
+        , mInv2Dx(ValueType(0.5 / dx))
+        , mInvDx2(ValueType(1.0 / mDx2))
     {
     }
 
     /// @brief Return the norm-square of the WENO upwind gradient (computed via
-    /// WENO upwinding and Gudonov's scheme) at the previously buffered location.
+    /// WENO upwinding and Godunov's scheme) at the previously buffered location.
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline ValueType normSqGrad() const
+    inline ValueType normSqGrad(const ValueType &isoValue = zeroVal<ValueType>()) const
     {
-        const BufferType& v = mStencil;
+        const typename BaseType::BufferType& v = mStencil;
 #ifdef DWA_OPENVDB
         // SSE optimized
         const simd::Float4
@@ -1349,7 +1392,7 @@ public:
             dP_m = math::WENO5(v1, v2, v3, v4, v5, mDx2),
             dP_p = math::WENO5(v6, v5, v4, v3, v2, mDx2);
 
-        return mInvDx2 * math::GudonovsNormSqrd(mStencil[0] > 0, dP_m, dP_p);
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > isoValue, dP_m, dP_p);
 #else
         const Real
             dP_xm = math::WENO5(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3],v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2),
@@ -1358,7 +1401,8 @@ public:
             dP_yp = math::WENO5(v[12]-v[11],v[11]-v[10],v[10]-v[ 0],v[ 0]-v[ 9],v[ 9]-v[ 8],mDx2),
             dP_zm = math::WENO5(v[14]-v[13],v[15]-v[14],v[ 0]-v[15],v[16]-v[ 0],v[17]-v[16],mDx2),
             dP_zp = math::WENO5(v[18]-v[17],v[17]-v[16],v[16]-v[ 0],v[ 0]-v[15],v[15]-v[14],mDx2);
-        return mInvDx2*math::GudonovsNormSqrd(v[0]>0,dP_xm,dP_xp,dP_ym,dP_yp,dP_zm,dP_zp);
+        return static_cast<ValueType>(
+            mInvDx2*math::GodunovsNormSqrd(v[0]>isoValue, dP_xm, dP_xp, dP_ym, dP_yp, dP_zm, dP_zp));
 #endif
     }
 
@@ -1367,10 +1411,10 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline Vec3Type gradient(const Vec3Type& V) const
+    inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& V) const
     {
-        const BufferType& v = mStencil;
-        return 2*mInv2Dx * Vec3Type(
+        const typename BaseType::BufferType& v = mStencil;
+        return 2*mInv2Dx * math::Vec3<ValueType>(
             V[0]>0 ? math::WENO5(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3], v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2)
                 : math::WENO5(v[ 6]-v[ 5],v[ 5]-v[ 4],v[ 4]-v[ 0], v[ 0]-v[ 3],v[ 3]-v[ 2],mDx2),
             V[1]>0 ? math::WENO5(v[ 8]-v[ 7],v[ 9]-v[ 8],v[ 0]-v[ 9], v[10]-v[ 0],v[11]-v[10],mDx2)
@@ -1383,12 +1427,11 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline Vec3Type gradient() const
+    inline math::Vec3<ValueType> gradient() const
     {
-        return mInv2Dx * Vec3Type(
-            mStencil[ 4] - mStencil[ 3],
-            mStencil[10] - mStencil[ 9],
-            mStencil[16] - mStencil[15]);
+        return mInv2Dx * math::Vec3<ValueType>(mStencil[ 4] - mStencil[ 3],
+                                               mStencil[10] - mStencil[ 9],
+                                               mStencil[16] - mStencil[15]);
     }
 
     /// Return the Laplacian computed at the previously buffered
@@ -1408,7 +1451,7 @@ public:
     /// differs from the sign of any of its six nearest neighbors
     inline bool zeroCrossing() const
     {
-        const BufferType& v = mStencil;
+        const typename BaseType::BufferType& v = mStencil;
         return (v[ 0]>0 ? (v[ 3]<0 || v[ 4]<0 || v[ 9]<0 || v[10]<0 || v[15]<0 || v[16]<0)
                         : (v[ 3]>0 || v[ 4]>0 || v[ 9]>0 || v[10]>0 || v[15]>0 || v[16]>0));
     }
@@ -1438,36 +1481,39 @@ private:
         mStencil[18] = mCache.getValue(ijk.offsetBy( 0,  0,  3));
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
     const ValueType mDx2, mInv2Dx, mInvDx2;
-}; // class WenoStencil
+}; // WenoStencil class
 
 
 //////////////////////////////////////////////////////////////////////
 
 
-template<typename GridType>
-class CurvatureStencil: public BaseStencil<GridType, CurvatureStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class CurvatureStencil: public BaseStencil<CurvatureStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef CurvatureStencil<GridT, IsSafe>   SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef BaseStencil<GridType, CurvatureStencil<GridType> > BaseType;
-    typedef typename GridType::ValueType                       ValueType;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridT::ValueType         ValueType;
 
      static const int SIZE = 19;
 
-    CurvatureStencil(const GridType& grid):
-        BaseType(grid, SIZE),
-        mInv2Dx(ValueType(0.5 / grid.voxelSize()[0])),
-        mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
+    CurvatureStencil(const GridType& grid)
+        : BaseType(grid, SIZE)
+        , mInv2Dx(ValueType(0.5 / grid.voxelSize()[0]))
+        , mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
     {
     }
 
-    CurvatureStencil(const GridType& grid, Real dx):
-        BaseType(grid, SIZE),
-        mInv2Dx(ValueType(0.5 / dx)),
-        mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
+    CurvatureStencil(const GridType& grid, Real dx)
+        : BaseType(grid, SIZE)
+        , mInv2Dx(ValueType(0.5 / dx))
+        , mInvDx2(ValueType(4.0 * mInv2Dx * mInv2Dx))
     {
     }
 
@@ -1572,27 +1618,30 @@ private:
         return true;
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
     const ValueType mInv2Dx, mInvDx2;
-}; // class CurvatureStencil
+}; // CurvatureStencil class
 
 
 //////////////////////////////////////////////////////////////////////
 
 
 /// @brief Dense stencil of a given width
-template<typename GridType>
-class DenseStencil: public BaseStencil<GridType, DenseStencil<GridType> >
+template<typename GridT, bool IsSafe = true>
+class DenseStencil: public BaseStencil<DenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
+    typedef DenseStencil<GridT, IsSafe>       SelfT;
+    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
 public:
-    typedef BaseStencil<GridType, DenseStencil<GridType> > BaseType;
-    typedef typename GridType::ValueType                   ValueType;
+    typedef GridT                             GridType;
+    typedef typename GridT::TreeType          TreeType;
+    typedef typename GridType::ValueType      ValueType;
 
-    DenseStencil(const GridType& grid, int halfWidth) :
-        BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1)),
-        mHalfWidth(halfWidth)
+    DenseStencil(const GridType& grid, int halfWidth)
+        : BaseType(grid, /*size=*/math::Pow3(2 * halfWidth + 1))
+        , mHalfWidth(halfWidth)
     {
         assert(halfWidth>0);
     }
@@ -1630,11 +1679,11 @@ private:
         }
     }
 
-    template<typename, typename> friend class BaseStencil; // allow base class to call init()
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mCache;
     using BaseType::mStencil;
     const int mHalfWidth;
-};
+};// DenseStencil class
 
 
 } // end math namespace
@@ -1643,6 +1692,6 @@ private:
 
 #endif // OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

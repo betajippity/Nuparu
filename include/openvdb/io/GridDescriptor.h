@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -48,7 +48,8 @@ class OPENVDB_API GridDescriptor
 public:
     GridDescriptor();
     GridDescriptor(const Name& name, const Name& gridType, bool saveFloatAsHalf = false);
-
+    GridDescriptor(const GridDescriptor&) = default;
+    GridDescriptor& operator=(const GridDescriptor&) = default;
     ~GridDescriptor();
 
     const Name& gridType() const { return mGridType; }
@@ -130,6 +131,6 @@ private:
 
 #endif // OPENVDB_IO_GRIDDESCRIPTOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

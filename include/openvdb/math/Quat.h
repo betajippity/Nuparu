@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -31,14 +31,15 @@
 #ifndef OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 
-#include <iostream>
-#include <cmath>
-
 #include "Mat.h"
 #include "Mat3.h"
 #include "Math.h"
 #include "Vec3.h"
 #include <openvdb/Exceptions.h>
+#include <cmath>
+#include <iostream>
+#include <sstream>
+#include <string>
 
 
 namespace openvdb {
@@ -98,7 +99,7 @@ Quat<T> slerp(const Quat<T> &q1, const Quat<T> &q2, T t, T tolerance=0.00001)
                        a * q1[2] + b * q2[2], a * q1[3] + b * q2[3]);
     }
 
-} 
+}
 
 template<typename T>
 class Quat
@@ -133,45 +134,45 @@ public:
     {
         // assert( REL_EQ(axis.length(), 1.) );
 
-        T s = sin(angle*T(0.5));
+        T s = T(sin(angle*T(0.5)));
 
         mm[0] = axis.x() * s;
         mm[1] = axis.y() * s;
         mm[2] = axis.z() * s;
 
-        mm[3] = cos(angle*T(0.5));
+        mm[3] = T(cos(angle*T(0.5)));
 
     }
 
     /// Constructor given rotation as axis and angle
     Quat(math::Axis axis, T angle)
     {
-        T s = sin(angle*T(0.5));
+        T s = T(sin(angle*T(0.5)));
 
         mm[0] = (axis==math::X_AXIS) * s;
         mm[1] = (axis==math::Y_AXIS) * s;
         mm[2] = (axis==math::Z_AXIS) * s;
 
-        mm[3] = cos(angle*T(0.5));
+        mm[3] = T(cos(angle*T(0.5)));
     }
 
     /// Constructor given a rotation matrix
     template<typename T1>
-    Quat(const Mat3<T1> &rot) { 
-       
+    Quat(const Mat3<T1> &rot) {
+
         // verify that the matrix is really a rotation
         if(!isUnitary(rot)) {  // unitary is reflection or rotation
              OPENVDB_THROW(ArithmeticError,
                 "A non-rotation matrix can not be used to construct a quaternion");
         }
-        if (!isApproxEqual(rot.det(), (T1)1)) { // rule out reflection
+        if (!isApproxEqual(rot.det(), T1(1))) { // rule out reflection
              OPENVDB_THROW(ArithmeticError,
                 "A reflection matrix can not be used to construct a quaternion");
         }
 
-        T trace = (T)rot.trace();
+        T trace(rot.trace());
         if (trace > 0) {
-            
+
             T q_w = 0.5 * std::sqrt(trace+1);
             T factor = 0.25 / q_w;
 
@@ -257,7 +258,7 @@ public:
 
         if ( sqrLength > 1.0e-8 ) {
 
-            return T(2.0) * acos(mm[3]);
+            return T(T(2.0) * acos(mm[3]));
 
         } else {
 
@@ -272,7 +273,7 @@ public:
 
         if ( sqrLength > 1.0e-8 ) {
 
-            T invLength = T(1)/sqrt(sqrLength);
+            T invLength = T(T(1)/sqrt(sqrLength));
 
             return Vec3<T>( mm[0]*invLength, mm[1]*invLength, mm[2]*invLength );
         } else {
@@ -296,14 +297,14 @@ public:
     /// the axis must be unit vector
     Quat& setAxisAngle(const Vec3<T>& axis, T angle)
     {
-     
-        T s = sin(angle*T(0.5));
+
+        T s = T(sin(angle*T(0.5)));
 
         mm[0] = axis.x() * s;
         mm[1] = axis.y() * s;
         mm[2] = axis.z() * s;
 
-        mm[3] = cos(angle*T(0.5));
+        mm[3] = T(cos(angle*T(0.5)));
 
         return *this;
     } // axisAngleTest
@@ -446,7 +447,7 @@ public:
         mm[3] = q1.mm[3] + q2.mm[3];
 
         return *this;
-    } 
+    }
 
     /// this = q1 - q2
     /// "this", q1 and q2 need not be distinct objects, e.g. q.sub(q1,q);
@@ -458,7 +459,7 @@ public:
         mm[3] = q1.mm[3] - q2.mm[3];
 
         return *this;
-    } 
+    }
 
     /// this = q1 * q2
     /// q1 and q2 must be distinct objects than "this", e.g.  q.mult(q1,q2);
@@ -474,7 +475,7 @@ public:
                 q1.mm[1]*q2.mm[1] - q1.mm[2]*q2.mm[2];
 
         return *this;
-    } 
+    }
 
     /// this =  scalar*q, q need not be distinct object than "this",
     /// e.g. q.scale(1.5,q1);
@@ -487,7 +488,7 @@ public:
 
         return *this;
     }
-    
+
     /// Dot product
     T dot(const Quat &q) const
     {
@@ -502,16 +503,16 @@ public:
                         +z()*omega.x() +w()*omega.y() -x()*omega.z() ,
                         -y()*omega.x() +x()*omega.y() +w()*omega.z() ,
                         -x()*omega.x() -y()*omega.y() -z()*omega.z() );
-    } 
+    }
 
     /// this = normalized this
-    bool normalize(T eps =1.0e-8)
+    bool normalize(T eps = T(1.0e-8))
     {
-        T d = sqrt(mm[0]*mm[0] + mm[1]*mm[1] + mm[2]*mm[2] + mm[3]*mm[3]);
+        T d = T(sqrt(mm[0]*mm[0] + mm[1]*mm[1] + mm[2]*mm[2] + mm[3]*mm[3]));
         if( isApproxEqual(d, T(0.0), eps) ) return false;
         *this *= ( T(1)/d );
         return true;
-    } 
+    }
 
     /// this = normalized this
     Quat unit() const
@@ -521,10 +522,10 @@ public:
             OPENVDB_THROW(ArithmeticError,
                 "Normalizing degenerate quaternion");
         return *this / d;
-    } 
+    }
 
     /// returns inverse of this
-    Quat inverse(T tolerance = 0)
+    Quat inverse(T tolerance = T(0))
     {
         T d = mm[0]*mm[0] + mm[1]*mm[1] + mm[2]*mm[2] + mm[3]*mm[3];
         if( isApproxEqual(d, T(0.0), tolerance) )
@@ -533,7 +534,7 @@ public:
         Quat result = *this/-d;
         result.mm[3] = -result.mm[3];
         return result;
-    } 
+    }
 
 
     /// Return the conjugate of "this", same as invert without
@@ -541,22 +542,22 @@ public:
     Quat conjugate() const
     {
         return Quat<T>(-mm[0], -mm[1], -mm[2], mm[3]);
-    } 
+    }
 
     /// Return rotated vector by "this" quaternion
     Vec3<T> rotateVector(const Vec3<T> &v) const
     {
         Mat3<T> m(*this);
         return m.transform(v);
-    } 
+    }
 
     /// Predefined constants, e.g.   Quat q = Quat::identity();
     static Quat zero() { return Quat<T>(0,0,0,0); }
     static Quat identity() { return Quat<T>(0,0,0,1); }
 
      /// @return string representation of Classname
-    std::string
-    str() const {
+    std::string str() const
+    {
         std::ostringstream buffer;
 
         buffer << "[";
@@ -581,36 +582,31 @@ public:
 
     friend Quat slerp<>(const Quat &q1, const Quat &q2, T t, T tolerance);
 
-
-    void write(std::ostream& os) const {
-        os.write((char*)&mm, sizeof(T)*4);
-    }
-    void read(std::istream& is) {
-        is.read((char*)&mm, sizeof(T)*4);
-    }
+    void write(std::ostream& os) const { os.write(static_cast<char*>(&mm), sizeof(T) * 4); }
+    void read(std::istream& is) { is.read(static_cast<char*>(&mm), sizeof(T) * 4); }
 
 protected:
     T mm[4];
 };
 
-/// Returns V, where \f$V_i = v_i * scalar\f$ for \f$i \in [0, 3]\f$
+/// Multiply each element of the given quaternion by @a scalar and return the result.
 template <typename S, typename T>
 Quat<T> operator*(S scalar, const Quat<T> &q) { return q*scalar; }
 
 
-/// @brief Interpolate between m1 and m2. 
+/// @brief Interpolate between m1 and m2.
 /// Converts to quaternion  form and uses slerp
 /// m1 and m2 must be rotation matrices!
 template <typename T, typename T0>
 Mat3<T> slerp(const Mat3<T0> &m1, const Mat3<T0> &m2, T t)
 {
-    typedef Mat3<T> MatType;
+    using MatType = Mat3<T>;
 
     Quat<T> q1(m1);
     Quat<T> q2(m2);
-   
+
     if (q1.dot(q2) < 0) q2 *= -1;
-    
+
     Quat<T> qslerp = slerp<T>(q1, q2, static_cast<T>(t));
     MatType m = rotation<MatType>(qslerp);
     return m;
@@ -632,27 +628,31 @@ Mat3<T> bezLerp(const Mat3<T0> &m1, const Mat3<T0> &m2,
                 T t)
 {
     Mat3<T> m00, m01, m02, m10, m11;
-    
+
     m00 = slerp(m1, m2, t);
     m01 = slerp(m2, m3, t);
     m02 = slerp(m3, m4, t);
-    
+
     m10 = slerp(m00, m01, t);
     m11 = slerp(m01, m02, t);
 
     return slerp(m10, m11, t);
 }
 
-typedef Quat<float> Quats;
-typedef Quat<double> Quatd;
+using Quats = Quat<float>;
+using Quatd = Quat<double>;
 
 } // namespace math
+
+
+template<> inline math::Quats zeroVal<math::Quats >() { return math::Quats::zero(); }
+template<> inline math::Quatd zeroVal<math::Quatd >() { return math::Quatd::zero(); }
+
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif //OPENVDB_MATH_QUAT_H_HAS_BEEN_INCLUDED
 
-// ---------------------------------------------------------------------------
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

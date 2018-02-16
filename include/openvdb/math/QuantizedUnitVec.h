@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,33 +34,25 @@
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
 #include "Vec3.h"
-#include <tbb/atomic.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
 
-
-// Bit compression method that effciently represents a unit vector using
-// 2 bytes i.e. 16 bits of data by only storing two quantized components.
-// Based on "Higher Accuracy Quantized Normals" article from GameDev.Net LLC, 2000
-
+/// @brief Unit vector occupying only 16 bits
+/// @details Stores two quantized components.  Based on the
+/// "Higher Accuracy Quantized Normals" article from GameDev.Net LLC, 2000
 class OPENVDB_API QuantizedUnitVec
 {
 public:
-
-    template <typename T>
-    static uint16_t pack(const Vec3<T>& vec);    
+    template<typename T> static uint16_t pack(const Vec3<T>& vec);
     static Vec3s unpack(const uint16_t data);
 
     static void flipSignBits(uint16_t&);
 
 private:
     QuantizedUnitVec() {}
-
-    // threadsafe initialization function for the normalization weights.
-    static void init();
 
     // bit masks
     static const uint16_t MASK_SLOTS = 0x1FFF; // 0001111111111111
@@ -70,9 +62,6 @@ private:
     static const uint16_t MASK_YSIGN = 0x4000; // 0100000000000000
     static const uint16_t MASK_ZSIGN = 0x2000; // 0010000000000000
 
-    // initialization flag.
-    static bool sInitialized;
-
     // normalization weights, 32 kilobytes.
     static float sNormalizationWeights[MASK_SLOTS + 1];
 }; // class QuantizedUnitVec
@@ -81,10 +70,12 @@ private:
 ////////////////////////////////////////
 
 
-template <typename T>
+template<typename T>
 inline uint16_t
 QuantizedUnitVec::pack(const Vec3<T>& vec)
 {
+    if (math::isZero(vec)) return 0;
+
     uint16_t data = 0;
     T x(vec[0]), y(vec[1]), z(vec[2]);
 
@@ -97,23 +88,23 @@ QuantizedUnitVec::pack(const Vec3<T>& vec)
     // The z component is discarded and x & y are quantized in
     // the 0 to 126 range.
     T w = T(126.0) / (x + y + z);
-    uint16_t xbits = uint16_t((x * w) + T(0.5));
-    uint16_t ybits = uint16_t((y * w) + T(0.5));
+    uint16_t xbits = static_cast<uint16_t>((x * w));
+    uint16_t ybits = static_cast<uint16_t>((y * w));
 
-    // The remaining 13 bits in our 16 bit word are dividied into a 
+    // The remaining 13 bits in our 16 bit word are dividied into a
     // 6-bit x-slot and a 7-bit y-slot. Both the xbits and the ybits
     // can still be represented using (2^7 - 1) quantization levels.
 
     // If the xbits requre more than 6-bits, store the complement.
     // (xbits + ybits < 127, thus if xbits > 63 => ybits <= 63)
-    if(xbits > 63) {
-        xbits = 127 - xbits;
-        ybits = 127 - ybits;
+    if (xbits > 63) {
+        xbits = static_cast<uint16_t>(127 - xbits);
+        ybits = static_cast<uint16_t>(127 - ybits);
     }
 
-    // pack components into their respetive slot
-    data |= xbits << 7;
-    data |= ybits;
+    // Pack components into their respective slots.
+    data = static_cast<uint16_t>(data | (xbits << 7));
+    data = static_cast<uint16_t>(data | ybits);
     return data;
 }
 
@@ -121,24 +112,22 @@ QuantizedUnitVec::pack(const Vec3<T>& vec)
 inline Vec3s
 QuantizedUnitVec::unpack(const uint16_t data)
 {
-    if (!sInitialized) init();
-
     const float w = sNormalizationWeights[data & MASK_SLOTS];
-   
-    uint16_t xbits = (data & MASK_XSLOT) >> 7;
-    uint16_t ybits = data & MASK_YSLOT;
+
+    uint16_t xbits = static_cast<uint16_t>((data & MASK_XSLOT) >> 7);
+    uint16_t ybits = static_cast<uint16_t>(data & MASK_YSLOT);
 
     // Check if the complement components where stored and revert.
-    if ((xbits + ybits) > 126) { 
-        xbits = 127 - xbits;
-        ybits = 127 - ybits;
+    if ((xbits + ybits) > 126) {
+        xbits = static_cast<uint16_t>(127 - xbits);
+        ybits = static_cast<uint16_t>(127 - ybits);
     }
 
     Vec3s vec(float(xbits) * w, float(ybits) * w, float(126 - xbits - ybits) * w);
 
-    if(data & MASK_XSIGN) vec[0] = -vec[0];
-    if(data & MASK_YSIGN) vec[1] = -vec[1];
-    if(data & MASK_ZSIGN) vec[2] = -vec[2];
+    if (data & MASK_XSIGN) vec[0] = -vec[0];
+    if (data & MASK_YSIGN) vec[1] = -vec[1];
+    if (data & MASK_ZSIGN) vec[2] = -vec[2];
     return vec;
 }
 
@@ -149,9 +138,8 @@ QuantizedUnitVec::unpack(const uint16_t data)
 inline void
 QuantizedUnitVec::flipSignBits(uint16_t& v)
 {
-    v = (v & MASK_SLOTS) | (~v & ~MASK_SLOTS);
+    v = static_cast<uint16_t>((v & MASK_SLOTS) | (~v & ~MASK_SLOTS));
 }
-
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
@@ -159,6 +147,6 @@ QuantizedUnitVec::flipSignBits(uint16_t& v)
 
 #endif // OPENVDB_MATH_QUANTIZED_UNIT_VEC_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

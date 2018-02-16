@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -43,17 +43,21 @@ namespace OPENVDB_VERSION_NAME {
 class OPENVDB_API Exception: public std::exception
 {
 public:
-    virtual const char* what() const throw()
+    Exception(const Exception&) = default;
+    Exception(Exception&&) = default;
+    Exception& operator=(const Exception&) = default;
+    Exception& operator=(Exception&&) = default;
+    ~Exception() override = default;
+
+    const char* what() const noexcept override
     {
-        try { return mMessage.c_str(); } catch (...) {};
-        return NULL;
+        try { return mMessage.c_str(); } catch (...) {}
+        return nullptr;
     }
 
-    virtual ~Exception() throw() {}
-
 protected:
-    Exception() throw() {}
-    explicit Exception(const char* eType, const std::string* const msg = NULL) throw()
+    Exception() noexcept {}
+    explicit Exception(const char* eType, const std::string* const msg = nullptr) noexcept
     {
         try {
             if (eType) mMessage = eType;
@@ -70,13 +74,12 @@ private:
 class OPENVDB_API _classname: public Exception \
 { \
 public: \
-    _classname() throw() : Exception( #_classname ) {} \
-    explicit _classname(const std::string &msg) throw() : Exception( #_classname , &msg) {} \
+    _classname() noexcept: Exception( #_classname ) {} \
+    explicit _classname(const std::string& msg) noexcept: Exception( #_classname , &msg) {} \
 }
 
 
 OPENVDB_EXCEPTION(ArithmeticError);
-OPENVDB_EXCEPTION(IllegalValueException);
 OPENVDB_EXCEPTION(IndexError);
 OPENVDB_EXCEPTION(IoError);
 OPENVDB_EXCEPTION(KeyError);
@@ -87,8 +90,16 @@ OPENVDB_EXCEPTION(RuntimeError);
 OPENVDB_EXCEPTION(TypeError);
 OPENVDB_EXCEPTION(ValueError);
 
-
 #undef OPENVDB_EXCEPTION
+
+
+/// @deprecated Use ValueError instead.
+class OPENVDB_API IllegalValueException: public Exception {
+public:
+    OPENVDB_DEPRECATED IllegalValueException() noexcept: Exception("IllegalValueException") {}
+    OPENVDB_DEPRECATED explicit IllegalValueException(const std::string& msg) noexcept:
+        Exception("IllegalValueException", &msg) {}
+};
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
@@ -107,6 +118,6 @@ OPENVDB_EXCEPTION(ValueError);
 
 #endif // OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

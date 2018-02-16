@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,6 +34,8 @@
 #define OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 
 #include "PlatformConfig.h"
+
+#define PRAGMA(x) _Pragma(#x)
 
 /// Use OPENVDB_DEPRECATED to mark functions as deprecated.
 /// It should be placed right before the signature of the function,
@@ -117,21 +119,26 @@
         _Pragma("warning (disable:280)")
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END \
         _Pragma("warning (pop)")
+#elif defined(__clang__)
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN \
+        PRAGMA(clang diagnostic push) \
+        PRAGMA(clang diagnostic ignored "-Wunreachable-code")
+    #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END \
+        PRAGMA(clang diagnostic pop)
 #else
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 #endif
 
 
-/// Visual C++ does not have constants like M_PI unless this is defined.
-/// @note This is needed even though the core library is built with this but
-/// hcustom 12.1 doesn't define it. So this is needed for HDK operators.
-#ifndef _USE_MATH_DEFINES
-    #define _USE_MATH_DEFINES
-#endif
-
-/// Visual C++ does not have round
 #ifdef _MSC_VER
+    /// Visual C++ does not have constants like M_PI unless this is defined.
+    /// @note This is needed even though the core library is built with this but
+    /// hcustom 12.1 doesn't define it. So this is needed for HDK operators.
+    #ifndef _USE_MATH_DEFINES
+        #define _USE_MATH_DEFINES
+    #endif
+    /// Visual C++ does not have round
     #include <boost/math/special_functions/round.hpp>
     using boost::math::round;
 #endif
@@ -197,6 +204,6 @@ using boost::uint64_t;
 
 #endif // OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

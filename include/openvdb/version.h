@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,26 +28,142 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
+/// @file version.h
+/// @brief Library and file format version numbers
+///
+/// @details
+/// When the library is built with the latest ABI, its namespace has the form
+/// <B>openvdb::vX_Y</B>, where @e X and @e Y are the major and minor version numbers.
+///
+/// The library can be built using an older ABI by changing the value of the
+/// @b OPENVDB_ABI_VERSION_NUMBER macro (e.g., via <TT>-DOPENVDB_ABI_VERSION_NUMBER=<I>N</I></TT>).
+/// In that case, the namespace has the form <B>openvdb::vX_YabiN</B>,
+/// where N is the ABI version number.
+/// The ABI version must be set consistently when building code that depends on OpenVDB.
+///
+/// The ABI version number defaults to the library major version number,
+/// which gets incremented whenever changes are made to the ABI of the
+/// Grid class or related classes (Tree, Transform, Metadata, etc.).
+/// Setting the ABI version number to an earlier library version number
+/// disables grid ABI changes made since that library version.
+/// The OpenVDB 1.x ABI is no longer supported, and support for other old ABIs
+/// might also eventually be dropped.
+///
+/// The library minor version number gets incremented whenever a change is made
+/// to any aspect of the public API (not just the grid API) that necessitates
+/// changes to client code.  Changes to APIs in private or internal namespaces
+/// do not trigger a minor version number increment; such APIs should not be used
+/// in client code.
+///
+/// A patch version number increment indicates a change&mdash;usually a new feature
+/// or a bug fix&mdash;that does not necessitate changes to client code but rather
+/// only recompilation of that code (because the library namespace incorporates
+/// the version number).
+///
+/// The file format version number gets incremented when it becomes possible
+/// to write files that cannot safely be read with older versions of the library.
+/// Not all files written in a newer format are incompatible with older libraries, however.
+/// And in general, files containing grids of unknown type can be read safely,
+/// although the unknown grids will not be accessible.
+
 #ifndef OPENVDB_VERSION_HAS_BEEN_INCLUDED
 #define OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
 #include "Platform.h"
-#include <iosfwd> // for std::istream
-#include <string>
 
+/// @name Utilities
+/// @{
+/// @cond OPENVDB_VERSION_INTERNAL
+#define OPENVDB_PREPROC_STRINGIFY_(x) #x
+/// @endcond
+/// @brief Return @a x as a string literal.  If @a x is a macro,
+/// return its value as a string literal.
+/// @hideinitializer
+#define OPENVDB_PREPROC_STRINGIFY(x) OPENVDB_PREPROC_STRINGIFY_(x)
 
-/// The version namespace name for this library version
-///
-/// Fully-namespace-qualified symbols are named as follows:
-/// vdb::vX_Y_Z::Vec3i, vdb::vX_Y_Z::io::File, vdb::vX_Y_Z::tree::Tree, etc.,
-/// where X, Y and Z are OPENVDB_LIBRARY_MAJOR_VERSION, OPENVDB_LIBRARY_MINOR_VERSION
-/// and OPENVDB_LIBRARY_PATCH_VERSION, respectively (defined below).
-#define OPENVDB_VERSION_NAME v2_3_0
+/// @cond OPENVDB_VERSION_INTERNAL
+#define OPENVDB_PREPROC_CONCAT_(x, y) x ## y
+/// @endcond
+/// @brief Form a new token by concatenating two existing tokens.
+/// If either token is a macro, concatenate its value.
+/// @hideinitializer
+#define OPENVDB_PREPROC_CONCAT(x, y) OPENVDB_PREPROC_CONCAT_(x, y)
+/// @}
+
 
 // Library major, minor and patch version numbers
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 2
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 3
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 5
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+
+// If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
+// use that ABI version.  Otherwise, use this library version's default ABI.
+#ifdef OPENVDB_ABI_VERSION_NUMBER
+    #if OPENVDB_ABI_VERSION_NUMBER > OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
+        #error expected OPENVDB_ABI_VERSION_NUMBER <= OPENVDB_LIBRARY_MAJOR VERSION_NUMBER
+    #endif
+#else
+    // Older versions of the library used the macros OPENVDB_2_ABI_COMPATIBLE
+    // and OPENVDB_3_ABI_COMPATIBLE.  For now, continue to support them.
+    #if defined OPENVDB_2_ABI_COMPATIBLE ///< @todo deprecated
+        #define OPENVDB_ABI_VERSION_NUMBER 2
+    #elif defined OPENVDB_3_ABI_COMPATIBLE ///< @todo deprecated
+        #define OPENVDB_ABI_VERSION_NUMBER 3
+    #else
+        #define OPENVDB_ABI_VERSION_NUMBER OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
+    #endif
+#endif
+
+#if OPENVDB_ABI_VERSION_NUMBER == OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
+    /// @brief The version namespace name for this library version
+    /// @hideinitializer
+    ///
+    /// When the ABI version number matches the library major version number,
+    /// symbols are named as in the following examples:
+    /// - @b openvdb::vX_Y::Vec3i
+    /// - @b openvdb::vX_Y::io::File
+    /// - @b openvdb::vX_Y::tree::Tree
+    ///
+    /// where X and Y are the major and minor version numbers.
+    ///
+    /// When the ABI version number does not match the library major version number,
+    /// symbol names include the ABI version:
+    /// - @b openvdb::vX_YabiN::Vec3i
+    /// - @b openvdb::vX_YabiN::io::File
+    /// - @b openvdb::vX_YabiN::tree::Tree
+    ///
+    /// where X, Y and N are the major, minor and ABI version numbers, respectively.
+    #define OPENVDB_VERSION_NAME                                            \
+        OPENVDB_PREPROC_CONCAT(v,                                           \
+        OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER,        \
+        OPENVDB_PREPROC_CONCAT(_, OPENVDB_LIBRARY_MINOR_VERSION_NUMBER)))
+#else
+    // This duplication of code is necessary to avoid issues with recursive macro expansion.
+    #define OPENVDB_VERSION_NAME                                            \
+        OPENVDB_PREPROC_CONCAT(v,                                           \
+        OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER,        \
+        OPENVDB_PREPROC_CONCAT(_,                                           \
+        OPENVDB_PREPROC_CONCAT(OPENVDB_LIBRARY_MINOR_VERSION_NUMBER,        \
+        OPENVDB_PREPROC_CONCAT(abi, OPENVDB_ABI_VERSION_NUMBER)))))
+#endif
+
+/// @brief Library version number string of the form "<major>.<minor>.<patch>"
+/// @details This is a macro rather than a static constant because we typically
+/// want the compile-time version number, not the runtime version number
+/// (although the two are usually the same).
+/// @hideinitializer
+#define OPENVDB_LIBRARY_VERSION_STRING \
+    OPENVDB_PREPROC_STRINGIFY(OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER) "." \
+    OPENVDB_PREPROC_STRINGIFY(OPENVDB_LIBRARY_MINOR_VERSION_NUMBER) "." \
+    OPENVDB_PREPROC_STRINGIFY(OPENVDB_LIBRARY_PATCH_VERSION_NUMBER)
+
+/// @brief Library version number string of the form "<major>.<minor>.<patch>abi<abi>"
+/// @details This is a macro rather than a static constant because we typically
+/// want the compile-time version number, not the runtime version number
+/// (although the two are usually the same).
+/// @hideinitializer
+#define OPENVDB_LIBRARY_ABI_VERSION_STRING \
+    OPENVDB_LIBRARY_VERSION_STRING "abi" OPENVDB_PREPROC_STRINGIFY(OPENVDB_ABI_VERSION_NUMBER)
 
 /// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
 #define OPENVDB_LIBRARY_VERSION_NUMBER \
@@ -55,15 +171,20 @@
     ((OPENVDB_LIBRARY_MINOR_VERSION_NUMBER & 0xFF) << 16) | \
     (OPENVDB_LIBRARY_PATCH_VERSION_NUMBER & 0xFFFF))
 
-/// If OPENVDB_REQUIRE_VERSION_NAME is undefined, symbols from the version
-/// namespace are promoted to the top-level namespace (e.g., vdb::v1_0_0::io::File
-/// can be referred to simply as vdb::io::File).  Otherwise, symbols must be fully
-/// namespace-qualified.
+
+/// By default, the @b OPENVDB_REQUIRE_VERSION_NAME macro is undefined, and
+/// symbols from the version namespace are promoted to the top-level namespace
+/// so that, for example, @b openvdb::v5_0::io::File can be referred to
+/// simply as @b openvdb::io::File.
+///
+/// When @b OPENVDB_REQUIRE_VERSION_NAME is defined, symbols must be
+/// fully namespace-qualified.
+/// @hideinitializer
 #ifdef OPENVDB_REQUIRE_VERSION_NAME
 #define OPENVDB_USE_VERSION_NAMESPACE
 #else
-/// @note The empty namespace clause below ensures that
-/// OPENVDB_VERSION_NAME is recognized as a namespace name.
+// The empty namespace clause below ensures that OPENVDB_VERSION_NAME
+// is recognized as a namespace name.
 #define OPENVDB_USE_VERSION_NAMESPACE \
     namespace OPENVDB_VERSION_NAME {} \
     using namespace OPENVDB_VERSION_NAME;
@@ -85,11 +206,13 @@ const uint32_t
     OPENVDB_LIBRARY_PATCH_VERSION = OPENVDB_LIBRARY_PATCH_VERSION_NUMBER;
 /// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
 const uint32_t OPENVDB_LIBRARY_VERSION = OPENVDB_LIBRARY_VERSION_NUMBER;
+// ABI version number
+const uint32_t OPENVDB_ABI_VERSION = OPENVDB_ABI_VERSION_NUMBER;
 
 /// @brief The current version number of the VDB file format
-/// @details  This can be used to enable various backwards compatability switches
+/// @details  This can be used to enable various backwards compatibility switches
 /// or to reject files that cannot be read.
-const uint32_t OPENVDB_FILE_VERSION = 222;
+const uint32_t OPENVDB_FILE_VERSION = 224;
 
 /// Notable file format version numbers
 enum {
@@ -103,51 +226,32 @@ enum {
     OPENVDB_FILE_VERSION_NEW_TRANSFORM = 219,
     OPENVDB_FILE_VERSION_SELECTIVE_COMPRESSION = 220,
     OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX = 221,
-    OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION = 222
+    OPENVDB_FILE_VERSION_NODE_MASK_COMPRESSION = 222,
+    OPENVDB_FILE_VERSION_BLOSC_COMPRESSION = 223,
+    OPENVDB_FILE_VERSION_POINT_INDEX_GRID = 223,
+    OPENVDB_FILE_VERSION_MULTIPASS_IO = 224
 };
 
 
-struct VersionId { uint32_t first, second; VersionId(): first(0), second(0) {} };
+/// Return a library version number string of the form "<major>.<minor>.<patch>".
+inline constexpr const char* getLibraryVersionString() { return OPENVDB_LIBRARY_VERSION_STRING; }
+/// Return a library version number string of the form "<major>.<minor>.<patch>abi<abi>".
+inline constexpr const char* getLibraryAbiVersionString() {
+    return OPENVDB_LIBRARY_ABI_VERSION_STRING;
+}
 
-namespace io {
-/// @brief Return the file format version number associated with the given input stream.
-OPENVDB_API uint32_t getFormatVersion(std::istream&);
-/// @brief Return the (major, minor) library version number associated with the given input stream.
-OPENVDB_API VersionId getLibraryVersion(std::istream&);
-/// @brief Return a string of the form "<major>.<minor>/<format>", giving the library
-/// and file format version numbers associated with the given input stream.
-OPENVDB_API std::string getVersion(std::istream&);
-// Associate the current file format and library version numbers with the given input stream.
-OPENVDB_API void setCurrentVersion(std::istream&);
-// Associate specific file format and library version numbers with the given stream.
-OPENVDB_API void setVersion(std::ios_base&, const VersionId& libraryVersion, uint32_t fileVersion);
-// Return a bitwise OR of compression option flags (COMPRESS_ZIP, COMPRESS_ACTIVE_MASK, etc.)
-// specifying whether and how input data is compressed or output data should be compressed.
-OPENVDB_API uint32_t getDataCompression(std::ios_base&);
-// Associate with the given stream a bitwise OR of compression option flags (COMPRESS_ZIP,
-// COMPRESS_ACTIVE_MASK, etc.) specifying whether and how input data is compressed
-// or output data should be compressed.
-OPENVDB_API void setDataCompression(std::ios_base&, uint32_t compressionFlags);
-// Return the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.) of the grid
-// currently being read from or written to the given stream.
-OPENVDB_API uint32_t getGridClass(std::ios_base&);
-// brief Associate with the given stream the class (GRID_LEVEL_SET, GRID_UNKNOWN, etc.)
-// of the grid currently being read or written.
-OPENVDB_API void setGridClass(std::ios_base&, uint32_t);
-// Return a pointer to the background value of the grid currently being
-// read from or written to the given stream.
-OPENVDB_API const void* getGridBackgroundValuePtr(std::ios_base&);
-// Specify (a pointer to) the background value of the grid currently being
-// read from or written to the given stream.
-// The pointer must remain valid until the entire grid has been read or written.
-OPENVDB_API void setGridBackgroundValuePtr(std::ios_base&, const void* background);
-} // namespace io
+
+struct VersionId {
+    uint32_t first, second;
+    VersionId(): first(0), second(0) {}
+    VersionId(uint32_t major, uint32_t minor): first(major), second(minor) {}
+};
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

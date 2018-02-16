@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -48,14 +48,15 @@ class Transform;
 
 /// @brief Calculate an axis-aligned bounding box in index space from an
 /// axis-aligned bounding box in world space.
+/// @see Transform::worldToIndex(const BBoxd&) const
 OPENVDB_API void
 calculateBounds(const Transform& t, const Vec3d& minWS, const Vec3d& maxWS,
     Vec3d& minIS, Vec3d& maxIS);
 
-/// @brief Calculate an axis-aligned bounding box in index space from a
+/// @todo Calculate an axis-aligned bounding box in index space from a
 /// bounding sphere in world space.
-/// @todo void calculateBounds(const Transform& t, const Vec3d& center, const Real radius,
-///     Vec3d& minIS, Vec3d& maxIS);
+//void calculateBounds(const Transform& t, const Vec3d& center, const Real radius,
+//    Vec3d& minIS, Vec3d& maxIS);
 
 
 ////////////////////////////////////////
@@ -65,8 +66,8 @@ calculateBounds(const Transform& t, const Vec3d& minWS, const Vec3d& maxWS,
 class OPENVDB_API Transform
 {
 public:
-    typedef boost::shared_ptr<Transform> Ptr;
-    typedef boost::shared_ptr<const Transform> ConstPtr;
+    using Ptr = SharedPtr<Transform>;
+    using ConstPtr = SharedPtr<const Transform>;
 
     Transform(): mMap(MapBase::Ptr(new ScaleMap())) {}
     Transform(const MapBase::Ptr&);
@@ -94,8 +95,8 @@ public:
 
     //@{
     /// @brief Update the linear (affine) map by prepending or
-    /// postfixing the appropriate operation.  In the case of 
-    /// a frustum, the pre-operations apply to the linear part 
+    /// postfixing the appropriate operation.  In the case of
+    /// a frustum, the pre-operations apply to the linear part
     /// of the transform and not the entire transform, while the
     /// post-operations are allways applied last.
     void preRotate(double radians, const Axis axis = X_AXIS);
@@ -136,6 +137,20 @@ public:
     Vec3d worldToIndex(const Vec3d& xyz) const { return mMap->applyInverseMap(xyz); }
     Coord worldToIndexCellCentered(const Vec3d& xyz) const {return Coord::round(worldToIndex(xyz));}
     Coord worldToIndexNodeCentered(const Vec3d& xyz) const {return Coord::floor(worldToIndex(xyz));}
+    //@}
+
+    //@{
+    /// @brief Apply this transformation to the given index-space bounding box.
+    /// @return an axis-aligned world-space bounding box
+    BBoxd indexToWorld(const CoordBBox&) const;
+    BBoxd indexToWorld(const BBoxd&) const;
+    //@}
+    //@{
+    /// @brief Apply the inverse of this transformation to the given world-space bounding box.
+    /// @return an axis-aligned index-space bounding box
+    BBoxd worldToIndex(const BBoxd&) const;
+    CoordBBox worldToIndexCellCentered(const BBoxd&) const;
+    CoordBBox worldToIndexNodeCentered(const BBoxd&) const;
     //@}
 
     //@{
@@ -181,7 +196,7 @@ inline typename MapType::Ptr
 Transform::map()
 {
     if (mMap->type() == MapType::mapType()) {
-        return boost::static_pointer_cast<MapType>(mMap);
+        return StaticPtrCast<MapType>(mMap);
     }
     return typename MapType::Ptr();
 }
@@ -191,7 +206,7 @@ template<typename MapType>
 inline typename MapType::ConstPtr
 Transform::map() const
 {
-    return boost::const_pointer_cast<const MapType>(
+    return ConstPtrCast<const MapType>(
         const_cast<Transform*>(this)->map<MapType>());
 }
 
@@ -290,6 +305,6 @@ processTypedMap(TransformType& transform, OpType& op)
 
 #endif // OPENVDB_MATH_TRANSFORM_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

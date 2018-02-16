@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -34,11 +34,12 @@
 #ifndef OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
-#include <math.h>
-#include <iostream>
-#include <boost/format.hpp>
-#include <openvdb/Exceptions.h>
 #include "Math.h"
+#include <openvdb/Exceptions.h>
+#include <algorithm> // for std::max()
+#include <cmath>
+#include <iostream>
+#include <string>
 
 
 namespace openvdb {
@@ -52,8 +53,8 @@ template<unsigned SIZE, typename T>
 class Mat
 {
 public:
-    typedef T value_type;
-    typedef T ValueType;
+    using value_type = T;
+    using ValueType = T;
     enum SIZE_ { size = SIZE };
 
     // Number of cols, rows, elements
@@ -70,6 +71,15 @@ public:
         for (unsigned i(0); i < numElements(); ++i) {
             mm[i] = src.mm[i];
         }
+    }
+
+    Mat& operator=(Mat const& src) {
+        if (&src != this) {
+            for (unsigned i = 0; i < numElements(); ++i) {
+                mm[i] = src.mm[i];
+            }
+        }
+        return *this;
     }
 
     /// @return string representation of matrix
@@ -102,16 +112,17 @@ public:
 
                 // Put a comma after everything except the last
                 if (j) ret.append(", ");
-                ret.append((boost::format("%1%") % mm[(i*SIZE)+j]).str());
+                ret.append(std::to_string(mm[(i*SIZE)+j]));
             }
 
             ret.append("]");
 
             // At the end of every row (except the last)...
-            if (i < SIZE-1 )
-                // ...suffix the row bracket with a comma, newline, and
-                // advance indentation
-                ret.append((boost::format(",\n%1%") % indent).str());
+            if (i < SIZE - 1) {
+                // ...suffix the row bracket with a comma, newline, and advance indentation.
+                ret.append(",\n");
+                ret.append(indent);
+            }
         }
 
         ret.append("]");
@@ -136,6 +147,46 @@ public:
         is.read(reinterpret_cast<char*>(&mm), sizeof(T)*SIZE*SIZE);
     }
 
+    /// Return the maximum of the absolute of all elements in this matrix
+    T absMax() const {
+        T x = static_cast<T>(std::fabs(mm[0]));
+        for (unsigned i = 1; i < numElements(); ++i) {
+            x = std::max(x, static_cast<T>(std::fabs(mm[i])));
+        }
+        return x;
+    }
+
+    /// True if a Nan is present in this matrix
+    bool isNan() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (std::isnan(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if an Inf is present in this matrix
+    bool isInfinite() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (std::isinf(mm[i])) return true;
+        }
+        return false;
+    }
+
+    /// True if no Nan or Inf values are present
+    bool isFinite() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (!std::isfinite(mm[i])) return false;
+        }
+        return true;
+    }
+
+    /// True if all elements are exactly zero
+    bool isZero() const {
+        for (unsigned i = 0; i < numElements(); ++i) {
+            if (!isZero(mm[i])) return false;
+        }
+        return true;
+    }
 
 protected:
     T mm[SIZE*SIZE];
@@ -150,15 +201,16 @@ template<typename T> class Vec3;
 /// Note that the matrix is transposed to match post-multiplication semantics.
 template<class MatType>
 MatType
-rotation(const Quat<typename MatType::value_type> &q, typename MatType::value_type eps = 1.0e-8)
+rotation(const Quat<typename MatType::value_type> &q,
+    typename MatType::value_type eps = static_cast<typename MatType::value_type>(1.0e-8))
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
 
     T qdot(q.dot(q));
     T s(0);
 
     if (!isApproxEqual(qdot, T(0.0),eps)) {
-        s = 2.0 / qdot;
+        s = T(2.0 / qdot);
     }
 
     T x  = s*q.x();
@@ -192,7 +244,7 @@ template<class MatType>
 MatType
 rotation(Axis axis, typename MatType::value_type angle)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     T c = static_cast<T>(cos(angle));
     T s = static_cast<T>(sin(angle));
 
@@ -230,7 +282,7 @@ template<class MatType>
 MatType
 rotation(const Vec3<typename MatType::value_type> &_axis, typename MatType::value_type angle)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     T txy, txz, tyz, sx, sy, sz;
 
     Vec3<T> axis(_axis.unit());
@@ -313,159 +365,159 @@ Vec3<typename MatType::value_type>
 eulerAngles(
     const MatType& mat,
     RotationOrder rotationOrder,
-    typename MatType::value_type eps=1.0e-8)
+    typename MatType::value_type eps = static_cast<typename MatType::value_type>(1.0e-8))
 {
-    typedef typename MatType::value_type ValueType;
-    typedef Vec3<ValueType> V;
+    using ValueType = typename MatType::value_type;
+    using V = Vec3<ValueType>;
     ValueType phi, theta, psi;
 
     switch(rotationOrder)
     {
     case XYZ_ROTATION:
         if (isApproxEqual(mat[2][0], ValueType(1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[1][2], mat[1][1]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[2][0], ValueType(-1.0), eps)) {
-            theta = -M_PI_2;
-            phi = 0.5 * atan2(mat[1][2], mat[1][1]);
+            theta = ValueType(-M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = -phi;
         } else {
-            psi = atan2(-mat[1][0],mat[0][0]);
-            phi = atan2(-mat[2][1],mat[2][2]);
-            theta = atan2(mat[2][0],
+            psi = ValueType(atan2(-mat[1][0],mat[0][0]));
+            phi = ValueType(atan2(-mat[2][1],mat[2][2]));
+            theta = ValueType(atan2(mat[2][0],
                 sqrt( mat[2][1]*mat[2][1] +
-                    mat[2][2]*mat[2][2]));
+                    mat[2][2]*mat[2][2])));
         }
         return V(phi, theta, psi);
     case ZXY_ROTATION:
         if (isApproxEqual(mat[1][2], ValueType(1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[0][1], mat[0][0]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[1][2], ValueType(-1.0), eps)) {
-            theta = -M_PI/2;
-            phi = 0.5 * atan2(mat[0][1],mat[2][1]);
+            theta = ValueType(-M_PI/2);
+            phi = ValueType(0.5 * atan2(mat[0][1],mat[2][1]));
             psi = -phi;
         } else {
-            psi = atan2(-mat[0][2], mat[2][2]);
-            phi = atan2(-mat[1][0], mat[1][1]);
-            theta = atan2(mat[1][2],
+            psi = ValueType(atan2(-mat[0][2], mat[2][2]));
+            phi = ValueType(atan2(-mat[1][0], mat[1][1]));
+            theta = ValueType(atan2(mat[1][2],
                         sqrt(mat[0][2] * mat[0][2] +
-                                mat[2][2] * mat[2][2]));
+                                mat[2][2] * mat[2][2])));
         }
         return V(theta, psi, phi);
 
     case YZX_ROTATION:
         if (isApproxEqual(mat[0][1], ValueType(1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[2][0], mat[2][2]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[2][0], mat[2][2]));
             psi = phi;
         } else if (isApproxEqual(mat[0][1], ValueType(-1.0), eps)) {
-            theta = -M_PI/2;
-            phi = 0.5 * atan2(mat[2][0], mat[1][0]);
+            theta = ValueType(-M_PI/2);
+            phi = ValueType(0.5 * atan2(mat[2][0], mat[1][0]));
             psi = -phi;
         } else {
-            psi = atan2(-mat[2][1], mat[1][1]);
-            phi = atan2(-mat[0][2], mat[0][0]);
-            theta = atan2(mat[0][1],
+            psi = ValueType(atan2(-mat[2][1], mat[1][1]));
+            phi = ValueType(atan2(-mat[0][2], mat[0][0]));
+            theta = ValueType(atan2(mat[0][1],
                 sqrt(mat[0][0] * mat[0][0] +
-                        mat[0][2] * mat[0][2]));
+                        mat[0][2] * mat[0][2])));
         }
         return V(psi, phi, theta);
 
     case XZX_ROTATION:
 
         if (isApproxEqual(mat[0][0], ValueType(1.0), eps)) {
-            theta = 0.0;
-            phi = 0.5 * atan2(mat[1][2], mat[1][1]);
+            theta = ValueType(0.0);
+            phi = ValueType(0.5 * atan2(mat[1][2], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[0][0], ValueType(-1.0), eps)) {
-            theta = M_PI;
-            psi = 0.5 * atan2(mat[2][1], -mat[1][1]);
+            theta = ValueType(M_PI);
+            psi = ValueType(0.5 * atan2(mat[2][1], -mat[1][1]));
             phi = - psi;
         } else {
-            psi = atan2(mat[2][0], -mat[1][0]);
-            phi = atan2(mat[0][2], mat[0][1]);
-            theta = atan2(sqrt(mat[0][1] * mat[0][1] +
+            psi = ValueType(atan2(mat[2][0], -mat[1][0]));
+            phi = ValueType(atan2(mat[0][2], mat[0][1]));
+            theta = ValueType(atan2(sqrt(mat[0][1] * mat[0][1] +
                                 mat[0][2] * mat[0][2]),
-                            mat[0][0]);
+                            mat[0][0]));
         }
         return V(phi, psi, theta);
 
     case ZXZ_ROTATION:
 
         if (isApproxEqual(mat[2][2], ValueType(1.0), eps)) {
-            theta = 0.0;
-            phi = 0.5 * atan2(mat[0][1], mat[0][0]);
+            theta = ValueType(0.0);
+            phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[2][2], ValueType(-1.0), eps)) {
-            theta = M_PI;
-            phi = 0.5 * atan2(mat[0][1], mat[0][0]);
+            theta = ValueType(M_PI);
+            phi = ValueType(0.5 * atan2(mat[0][1], mat[0][0]));
             psi = -phi;
         } else {
-            psi = atan2(mat[0][2], mat[1][2]);
-            phi = atan2(mat[2][0], -mat[2][1]);
-            theta = atan2(sqrt(mat[0][2] * mat[0][2] +
+            psi = ValueType(atan2(mat[0][2], mat[1][2]));
+            phi = ValueType(atan2(mat[2][0], -mat[2][1]));
+            theta = ValueType(atan2(sqrt(mat[0][2] * mat[0][2] +
                                 mat[1][2] * mat[1][2]),
-                            mat[2][2]);
+                            mat[2][2]));
         }
         return V(theta, psi, phi);
 
     case YXZ_ROTATION:
 
         if (isApproxEqual(mat[2][1], ValueType(1.0), eps)) {
-            theta =  - M_PI_2;
-            phi = 0.5 * atan2(-mat[1][0], mat[0][0]);
+            theta = ValueType(-M_PI_2);
+            phi = ValueType(0.5 * atan2(-mat[1][0], mat[0][0]));
             psi = phi;
         } else if (isApproxEqual(mat[2][1], ValueType(-1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[1][0], mat[0][0]);
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[1][0], mat[0][0]));
             psi = -phi;
         } else {
-            psi = atan2(mat[0][1], mat[1][1]);
-            phi = atan2(mat[2][0], mat[2][2]);
-            theta = atan2(-mat[2][1],
+            psi = ValueType(atan2(mat[0][1], mat[1][1]));
+            phi = ValueType(atan2(mat[2][0], mat[2][2]));
+            theta = ValueType(atan2(-mat[2][1],
                 sqrt(mat[0][1] * mat[0][1] +
-                        mat[1][1] * mat[1][1]));
+                        mat[1][1] * mat[1][1])));
         }
         return V(theta, phi, psi);
 
     case ZYX_ROTATION:
 
         if (isApproxEqual(mat[0][2], ValueType(1.0), eps)) {
-            theta =  -M_PI_2;
-            phi = 0.5 * atan2(-mat[1][0], mat[1][1]);
+            theta = ValueType(-M_PI_2);
+            phi = ValueType(0.5 * atan2(-mat[1][0], mat[1][1]));
             psi = phi;
         } else if (isApproxEqual(mat[0][2], ValueType(-1.0), eps)) {
-            theta = M_PI_2;
-            phi = 0.5 * atan2(mat[2][1], mat[2][0]);
-            psi = - phi;
+            theta = ValueType(M_PI_2);
+            phi = ValueType(0.5 * atan2(mat[2][1], mat[2][0]));
+            psi = -phi;
         } else {
-            psi = atan2(mat[1][2], mat[2][2]);
-            phi = atan2(mat[0][1], mat[0][0]);
-            theta = atan2(-mat[0][2],
+            psi = ValueType(atan2(mat[1][2], mat[2][2]));
+            phi = ValueType(atan2(mat[0][1], mat[0][0]));
+            theta = ValueType(atan2(-mat[0][2],
                 sqrt(mat[0][1] * mat[0][1] +
-                        mat[0][0] * mat[0][0]));
+                        mat[0][0] * mat[0][0])));
         }
         return V(psi, theta, phi);
 
     case XZY_ROTATION:
 
         if (isApproxEqual(mat[1][0], ValueType(-1.0), eps)) {
-            theta = M_PI_2;
-            psi = 0.5 * atan2(mat[2][1], mat[2][2]);
-            phi = - psi;
+            theta = ValueType(M_PI_2);
+            psi = ValueType(0.5 * atan2(mat[2][1], mat[2][2]));
+            phi = -psi;
         } else if (isApproxEqual(mat[1][0], ValueType(1.0), eps)) {
-            theta = - M_PI_2;
-            psi = 0.5 * atan2(- mat[2][1], mat[2][2]);
+            theta = ValueType(-M_PI_2);
+            psi = ValueType(0.5 * atan2(- mat[2][1], mat[2][2]));
             phi = psi;
         } else {
-            psi = atan2(mat[2][0], mat[0][0]);
-            phi = atan2(mat[1][2], mat[1][1]);
-            theta = atan2(- mat[1][0],
+            psi = ValueType(atan2(mat[2][0], mat[0][0]));
+            phi = ValueType(atan2(mat[1][2], mat[1][1]));
+            theta = ValueType(atan2(- mat[1][0],
                             sqrt(mat[1][1] * mat[1][1] +
-                                    mat[1][2] * mat[1][2]));
+                                    mat[1][2] * mat[1][2])));
         }
         return V(phi, psi, theta);
     }
@@ -483,7 +535,7 @@ rotation(
     const Vec3<typename MatType::value_type>& _v2,
     typename MatType::value_type eps=1.0e-8)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     Vec3<T> v1(_v1);
     Vec3<T> v2(_v2);
 
@@ -605,12 +657,12 @@ scale(const Vec3<typename MatType::value_type>& s)
 }
 
 
-/// Return a Vec3 representing the lengths of the passed matrix's upper 3x3's rows.
+/// Return a Vec3 representing the lengths of the passed matrix's upper 3&times;3's rows.
 template<class MatType>
 Vec3<typename MatType::value_type>
 getScale(const MatType &mat)
 {
-    typedef Vec3<typename MatType::value_type> V;
+    using V = Vec3<typename MatType::value_type>;
     return V(
         V(mat[0][0], mat[0][1], mat[0][2]).length(),
         V(mat[1][0], mat[1][1], mat[1][2]).length(),
@@ -618,7 +670,7 @@ getScale(const MatType &mat)
 }
 
 
-/// @brief Return a copy of the given matrix with its upper 3x3 rows normalized.
+/// @brief Return a copy of the given matrix with its upper 3&times;3 rows normalized.
 /// @details This can be geometrically interpreted as a matrix with no scaling
 /// along its major axes.
 template<class MatType>
@@ -630,7 +682,7 @@ unit(const MatType &mat, typename MatType::value_type eps = 1.0e-8)
 }
 
 
-/// @brief Return a copy of the given matrix with its upper 3x3 rows normalized,
+/// @brief Return a copy of the given matrix with its upper 3&times;3 rows normalized,
 /// and return the length of each of these rows in @a scaling.
 /// @details This can be geometrically interpretted as a matrix with no scaling
 /// along its major axes, and the scaling in the input vector
@@ -641,7 +693,7 @@ unit(
     typename MatType::value_type eps,
     Vec3<typename MatType::value_type>& scaling)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     MatType result(in);
 
     for (int i(0); i < 3; i++) {
@@ -685,7 +737,7 @@ template<class MatType>
 MatType
 skew(const Vec3<typename MatType::value_type> &skew)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
 
     MatType r;
     r[0][0] = T(0);      r[0][1] = skew.z();  r[0][2] = -skew.y();
@@ -704,7 +756,7 @@ MatType
 aim(const Vec3<typename MatType::value_type>& direction,
     const Vec3<typename MatType::value_type>& vertical)
 {
-    typedef typename MatType::value_type T;
+    using T = typename MatType::value_type;
     Vec3<T> forward(direction.unit());
     Vec3<T> horizontal(vertical.unit().cross(forward).unit());
     Vec3<T> up(forward.cross(horizontal).unit());
@@ -719,9 +771,43 @@ aim(const Vec3<typename MatType::value_type>& direction,
     return r;
 }
 
+/// @brief    This function snaps a specific axis to a specific direction,
+///           preserving scaling.
+/// @details  It does this using minimum energy, thus posing a unique solution if
+///           basis & direction aren't parallel.
+/// @note     @a direction need not be unit.
+template<class MatType>
+inline MatType
+snapMatBasis(const MatType& source, Axis axis, const Vec3<typename MatType::value_type>& direction)
+{
+    using T = typename MatType::value_type;
+
+    Vec3<T> unitDir(direction.unit());
+    Vec3<T> ourUnitAxis(source.row(axis).unit());
+
+    // Are the two parallel?
+    T parallel = unitDir.dot(ourUnitAxis);
+
+    // Already snapped!
+    if (isApproxEqual(parallel, T(1.0))) return source;
+
+    if (isApproxEqual(parallel, T(-1.0))) {
+        OPENVDB_THROW(ValueError, "Cannot snap to inverse axis");
+    }
+
+    // Find angle between our basis and the one specified
+    T angleBetween(angle(unitDir, ourUnitAxis));
+    // Caclulate axis to rotate along
+    Vec3<T> rotationAxis = unitDir.cross(ourUnitAxis);
+
+    MatType rotation;
+    rotation.setToRotation(rotationAxis, angleBetween);
+
+    return source * rotation;
+}
 
 /// @brief Write 0s along Mat4's last row and column, and a 1 on its diagonal.
-/// @details Useful initialization when we're initializing just the 3x3 block.
+/// @details Useful initialization when we're initializing just the 3&times;3 block.
 template<class MatType>
 static MatType&
 padMat4(MatType& dest)
@@ -736,94 +822,65 @@ padMat4(MatType& dest)
 
 /// @brief Solve for A=B*B, given A.
 /// @details Denman-Beavers square root iteration
-template <typename MatType>
+template<typename MatType>
 inline void
-sqrtSolve(const MatType &aA, MatType &aB, double aTol=0.01)
+sqrtSolve(const MatType& aA, MatType& aB, double aTol=0.01)
 {
-    unsigned int iterations = (unsigned int)(log(aTol)/log(0.5));
-    MatType Y[2];
-    MatType Z[2];
-    MatType invY;
-    MatType invZ;
+    unsigned int iterations = static_cast<unsigned int>(log(aTol)/log(0.5));
 
-    unsigned int current = 0;
-
-    Y[0]=aA;
+    MatType Y[2], Z[2];
+    Y[0] = aA;
     Z[0] = MatType::identity();
 
-    unsigned int iteration;
-    for (iteration=0; iteration<iterations; iteration++)
-    {
+    unsigned int current = 0;
+    for (unsigned int iteration=0; iteration < iterations; iteration++) {
         unsigned int last = current;
         current = !current;
 
-        invY = Y[last].inverse();
-        invZ = Z[last].inverse();
+        MatType invY = Y[last].inverse();
+        MatType invZ = Z[last].inverse();
 
-        Y[current]=0.5*(Y[last]+invZ);
-        Z[current]=0.5*(Z[last]+invY);
+        Y[current] = 0.5 * (Y[last] + invZ);
+        Z[current] = 0.5 * (Z[last] + invY);
     }
-
-    MatType &R = Y[current];
-
-    aB=R;
+    aB = Y[current];
 }
 
 
-template <typename MatType>
+template<typename MatType>
 inline void
-powSolve(const MatType &aA, MatType &aB, double aPower, double aTol=0.01)
+powSolve(const MatType& aA, MatType& aB, double aPower, double aTol=0.01)
 {
-    unsigned int iterations = (unsigned int)(log(aTol)/log(0.5));
+    unsigned int iterations = static_cast<unsigned int>(log(aTol)/log(0.5));
 
-    const bool inverted = ( aPower < 0.0 );
+    const bool inverted = (aPower < 0.0);
+    if (inverted) { aPower = -aPower; }
 
-    if (inverted) {
-        aPower = -aPower;
-    }
-
-    unsigned int whole = (unsigned int)aPower;
+    unsigned int whole = static_cast<unsigned int>(aPower);
     double fraction = aPower - whole;
 
-    MatType R;
-    R = MatType::identity();
-
+    MatType R = MatType::identity();
     MatType partial = aA;
 
     double contribution = 1.0;
-
-    unsigned int iteration;
-
-    for (iteration=0; iteration< iterations; iteration++)
-    {
+    for (unsigned int iteration = 0; iteration < iterations; iteration++) {
         sqrtSolve(partial, partial, aTol);
         contribution *= 0.5;
-
-        if (fraction>=contribution)
-        {
+        if (fraction >= contribution) {
             R *= partial;
-            fraction-=contribution;
+            fraction -= contribution;
         }
     }
 
     partial = aA;
-    while (whole)
-    {
-        if (whole & 1) {
-            R *= partial;
-        }
-        whole>>=1;
-        if(whole) {
-            partial*=partial;
-        }
+    while (whole) {
+        if (whole & 1) { R *= partial; }
+        whole >>= 1;
+        if (whole) { partial *= partial; }
     }
 
-    if (inverted) {
-        aB = R.inverse();
-    }
-    else {
-        aB = R;
-    }
+    if (inverted) { aB = R.inverse(); }
+    else { aB = R; }
 }
 
 
@@ -841,8 +898,8 @@ template<typename MatType>
 inline bool
 isInvertible(const MatType& m)
 {
-    typedef typename MatType::ValueType  value_type;
-    return !isApproxEqual(m.det(), (value_type)0);
+    using ValueType = typename MatType::ValueType;
+    return !isApproxEqual(m.det(), ValueType(0));
 }
 
 
@@ -861,8 +918,8 @@ template<typename MatType>
 inline bool
 isUnitary(const MatType& m)
 {
-    typedef typename MatType::ValueType value_type;
-    if (!isApproxEqual(std::abs(m.det()), value_type(1.0))) return false;
+    using ValueType = typename MatType::ValueType;
+    if (!isApproxEqual(std::abs(m.det()), ValueType(1.0))) return false;
     // check that the matrix transpose is the inverse
     MatType temp = m * m.transpose();
     return temp.eq(MatType::identity());
@@ -879,7 +936,7 @@ isDiagonal(const MatType& mat)
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             if (i != j) {
-                temp+=std::abs(mat(i,j));
+                temp += std::abs(mat(i,j));
             }
         }
     }
@@ -887,7 +944,7 @@ isDiagonal(const MatType& mat)
 }
 
 
-/// Return the @f$L_\infty@f$ norm of an N x N matrix.
+/// Return the <i>L</i><sub>&infin;</sub> norm of an <i>N</i>&times;<i>N</i> matrix.
 template<typename MatType>
 typename MatType::ValueType
 lInfinityNorm(const MatType& matrix)
@@ -908,7 +965,7 @@ lInfinityNorm(const MatType& matrix)
 }
 
 
-/// Return the @f$L_1@f$ norm of an N x N matrix.
+/// Return the <i>L</i><sub>1</sub> norm of an <i>N</i>&times;<i>N</i> matrix.
 template<typename MatType>
 typename MatType::ValueType
 lOneNorm(const MatType& matrix)
@@ -929,7 +986,7 @@ lOneNorm(const MatType& matrix)
 }
 
 
-/// @brief Decompose an invertible 3x3 matrix into a unitary matrix
+/// @brief Decompose an invertible 3&times;3 matrix into a unitary matrix
 /// followed by a symmetric matrix (positive semi-definite Hermitian),
 /// i.e., M = U * S.
 /// @details If det(U) = 1 it is a rotation, otherwise det(U) = -1,
@@ -986,6 +1043,6 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
 #endif // OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

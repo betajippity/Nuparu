@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -27,7 +27,7 @@
 // LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
 //
 ///////////////////////////////////////////////////////////////////////////
-//
+
 /// @file ValueAccessor.h
 ///
 /// When traversing a grid in a spatially coherent pattern (e.g., iterating
@@ -82,31 +82,61 @@ namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
 // Forward declarations of local classes that are not intended for general use
-template<typename TreeType> class ValueAccessor0;
-template<typename TreeType, Index L0 = 0> class ValueAccessor1;
-template<typename TreeType, Index L0 = 0, Index L1 = 1> class ValueAccessor2;
-template<typename TreeType, Index L0 = 0, Index L1 = 1, Index L2 = 2> class ValueAccessor3;
+// The IsSafe template parameter is explained in the warning below.
+template<typename TreeType, bool IsSafe = true>
+class ValueAccessor0;
+template<typename TreeType, bool IsSafe = true, Index L0 = 0>
+class ValueAccessor1;
+template<typename TreeType, bool IsSafe = true, Index L0 = 0, Index L1 = 1>
+class ValueAccessor2;
+template<typename TreeType, bool IsSafe = true, Index L0 = 0, Index L1 = 1, Index L2 = 2>
+class ValueAccessor3;
 template<typename TreeCacheT, typename NodeVecT, bool AtRoot> class CacheItem;
 
 
 /// @brief This base class for ValueAccessors manages registration of an accessor
 /// with a tree so that the tree can automatically clear the accessor whenever
 /// one of its nodes is deleted.
+///
 /// @internal A base class is needed because ValueAccessor is templated on both
 /// a Tree type and a mutex type.  The various instantiations of the template
 /// are distinct, unrelated types, so they can't easily be stored in a container
 /// such as the Tree's CacheRegistry.  This base class, in contrast, is templated
 /// only on the Tree type, so for any given Tree, only two distinct instantiations
 /// are possible, ValueAccessorBase<Tree> and ValueAccessorBase<const Tree>.
-template<typename TreeType>
+///
+/// @warning If IsSafe = false then the ValueAccessor will not register itself
+/// with the tree from which it is constructed. While in some rare cases this can
+/// lead to better performance (since it avoids the small overhead of insertion
+/// on creation and deletion on destruction) it is also unsafe if the tree is
+/// modified. So unless you're an expert it is highly recommended to set
+/// IsSafe = true, which is the default in all derived ValueAccessors defined
+/// below. However if you know that the tree is no being modifed for the lifespan
+/// of the ValueAccessor AND the work performed per ValueAccessor is small relative
+/// to overhead of registering it you should consider setting IsSafe = false. If
+/// this turns out to improve performance you should really rewrite your code so as
+/// to better amortize the construction of the ValueAccessor, i.e. reuse it as much
+/// as possible!
+template<typename TreeType, bool IsSafe>
 class ValueAccessorBase
 {
 public:
     static const bool IsConstTree = boost::is_const<TreeType>::value;
 
-    ValueAccessorBase(TreeType& tree): mTree(&tree) { tree.attachAccessor(*this); }
+    /// @brief Return true if this accessor is safe, i.e. registered
+    /// by the tree from which it is constructed. Un-registered
+    /// accessors can in rare cases be faster because it avoids the
+    /// (small) overhead of registration, but they are unsafe if the
+    /// tree is modified. So unless you're an expert it is highly
+    /// recommended to set IsSafe = true (which is the default).
+    static bool isSafe() { return IsSafe; }
 
-    virtual ~ValueAccessorBase() { if (mTree) mTree->releaseAccessor(*this); }
+    ValueAccessorBase(TreeType& tree): mTree(&tree)
+    {
+        if (IsSafe) tree.attachAccessor(*this);
+    }
+
+    virtual ~ValueAccessorBase() { if (IsSafe && mTree) mTree->releaseAccessor(*this); }
 
     /// @brief Return a pointer to the tree associated with this accessor.
     /// @details The pointer will be null only if the tree from which this accessor
@@ -118,15 +148,15 @@ public:
 
     ValueAccessorBase(const ValueAccessorBase& other): mTree(other.mTree)
     {
-        if (mTree) mTree->attachAccessor(*this);
+        if (IsSafe && mTree) mTree->attachAccessor(*this);
     }
 
     ValueAccessorBase& operator=(const ValueAccessorBase& other)
     {
         if (&other != this) {
-            if (mTree) mTree->releaseAccessor(*this);
+            if (IsSafe && mTree) mTree->releaseAccessor(*this);
             mTree = other.mTree;
-            if (mTree) mTree->attachAccessor(*this);
+            if (IsSafe && mTree) mTree->attachAccessor(*this);
         }
         return *this;
     }
@@ -137,7 +167,7 @@ protected:
     // Allow trees to deregister themselves.
     template<typename> friend class Tree;
 
-    virtual void release() { mTree = NULL; }
+    virtual void release() { mTree = nullptr; }
 
     TreeType* mTree;
 }; // class ValueAccessorBase
@@ -159,28 +189,44 @@ protected:
 /// This leads to significant acceleration of spatially-coherent accesses.
 ///
 /// @param _TreeType    the type of the tree to be accessed [required]
+/// @param IsSafe       if IsSafe = false then the ValueAccessor will
+///                     not register itself with the tree from which
+///                     it is consturcted (see warning).
 /// @param CacheLevels  the number of nodes to be cached, starting from the leaf level
 ///                     and not including the root (i.e., CacheLevels < DEPTH),
 ///                     and defaulting to all non-root nodes
 /// @param MutexType    the type of mutex to use (see note)
 ///
+/// @warning If IsSafe = false then the ValueAccessor will not register itself
+/// with the tree from which it is constructed. While in some rare cases this can
+/// lead to better performance (since it avoids the small overhead of insertion
+/// on creation and deletion on destruction) it is also unsafe if the tree is
+/// modified. So unless you're an expert it is highly recommended to set
+/// IsSafe = true, which is the default. However if you know that the tree is no
+/// being modifed for the lifespan of the ValueAccessor AND the work performed
+/// per ValueAccessor is small relative to overhead of registering it you should
+/// consider setting IsSafe = false. If this improves performance you should
+/// really rewrite your code so as to better amortize the construction of the
+/// ValueAccessor, i.e. reuse it as much as possible!
+///
 /// @note If @c MutexType is a TBB-compatible mutex, then multiple threads may
 /// safely access a single, shared accessor.  However, it is highly recommended
 /// that, instead, each thread be assigned its own, non-mutex-protected accessor.
 template<typename _TreeType,
+         bool IsSafe = true,
          Index CacheLevels = _TreeType::DEPTH-1,
          typename MutexType = tbb::null_mutex>
-class ValueAccessor: public ValueAccessorBase<_TreeType>
+class ValueAccessor: public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(CacheLevels < _TreeType::DEPTH);
 
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef typename RootNodeT::ValueType   ValueType;
-    typedef ValueAccessorBase<TreeType>     BaseT;
-    typedef typename MutexType::scoped_lock LockT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef typename RootNodeT::ValueType       ValueType;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename MutexType::scoped_lock     LockT;
     using BaseT::IsConstTree;
 
     ValueAccessor(TreeType& tree): BaseT(tree), mCache(*this)
@@ -303,7 +349,7 @@ public:
     NodeType* getNode()
     {
         LockT lock(mMutex);
-        NodeType* node = NULL;
+        NodeType* node = nullptr;
         mCache.getNode(node);
         return node;
     }
@@ -321,7 +367,7 @@ public:
     /// isCached(xyz) returns @c false for any voxel (x, y, z) contained in
     /// that node.  [Mainly for internal use]
     template<typename NodeType>
-    void eraseNode() { LockT lock(mMutex); NodeType* node = NULL; mCache.erase(node); }
+    void eraseNode() { LockT lock(mMutex); NodeType* node = nullptr; mCache.erase(node); }
 
     /// @brief Add the specified leaf to this tree, possibly creating a child branch
     /// in the process.  If the leaf node already exists, replace it.
@@ -352,7 +398,7 @@ public:
 
     //@{
     /// @brief Return a pointer to the node of the specified type that contains
-    /// voxel (x, y, z), or NULL if no such node exists.
+    /// voxel (x, y, z), or @c nullptr if no such node exists.
     template<typename NodeT>
     NodeT* probeNode(const Coord& xyz)
     {
@@ -374,7 +420,7 @@ public:
 
     //@{
     /// @brief Return a pointer to the leaf node that contains voxel (x, y, z),
-    /// or NULL if no such node exists.
+    /// or @c nullptr if no such node exists.
     LeafNodeT* probeLeaf(const Coord& xyz)
     {
         LockT lock(mMutex);
@@ -439,42 +485,50 @@ private:
 /// @brief Template specialization of the ValueAccessor with no mutex and no cache levels
 /// @details This specialization is provided mainly for benchmarking.
 /// Accessors with caching will almost always be faster.
-template<typename TreeType>
-struct ValueAccessor<TreeType, 0, tbb::null_mutex>: public ValueAccessor0<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 0, tbb::null_mutex>
+    : public ValueAccessor0<TreeType, IsSafe>
 {
-    ValueAccessor(TreeType& tree): ValueAccessor0<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor0<TreeType>(other) {}
+public:
+    ValueAccessor(TreeType& tree): ValueAccessor0<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor0<TreeType, IsSafe>(other) {}
     virtual ~ValueAccessor() {}
 };
 
 
 /// Template specialization of the ValueAccessor with no mutex and one cache level
-template<typename TreeType>
-struct ValueAccessor<TreeType, 1, tbb::null_mutex>: public ValueAccessor1<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 1, tbb::null_mutex>
+    : public ValueAccessor1<TreeType, IsSafe>
 {
-    ValueAccessor(TreeType& tree): ValueAccessor1<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor1<TreeType>(other) {}
+public:
+    ValueAccessor(TreeType& tree): ValueAccessor1<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor1<TreeType, IsSafe>(other) {}
     virtual ~ValueAccessor() {}
 };
 
 
 /// Template specialization of the ValueAccessor with no mutex and two cache levels
-template<typename TreeType>
-struct ValueAccessor<TreeType, 2, tbb::null_mutex>: public ValueAccessor2<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 2, tbb::null_mutex>
+    : public ValueAccessor2<TreeType, IsSafe>
 {
-    ValueAccessor(TreeType& tree): ValueAccessor2<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor2<TreeType>(other) {}
+public:
+    ValueAccessor(TreeType& tree): ValueAccessor2<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor& other): ValueAccessor2<TreeType, IsSafe>(other) {}
     virtual ~ValueAccessor() {}
 };
 
 
 /// Template specialization of the ValueAccessor with no mutex and three cache levels
-template<typename TreeType>
-struct ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeType>
+template<typename TreeType, bool IsSafe>
+class ValueAccessor<TreeType, IsSafe, 3, tbb::null_mutex>: public ValueAccessor3<TreeType, IsSafe>
 {
-    ValueAccessor(TreeType& tree): ValueAccessor3<TreeType>(tree) {}
-    ValueAccessor(const ValueAccessor& other): ValueAccessor3<TreeType>(other) {}
-    virtual ~ValueAccessor() {}
+public:
+    ValueAccessor(TreeType& tree): ValueAccessor3<TreeType, IsSafe>(tree) {}
+    ValueAccessor(const ValueAccessor&) = default;
+    ValueAccessor& operator=(const ValueAccessor&) = default;
+    virtual ~ValueAccessor() = default;
 };
 
 
@@ -489,11 +543,12 @@ struct ValueAccessor<TreeType, 3, tbb::null_mutex>: public ValueAccessor3<TreeTy
 /// can seriously impair performance of multithreaded applications, it
 /// is recommended that, instead, each thread be assigned its own
 /// (non-mutex protected) accessor.
-template<typename TreeType>
-struct ValueAccessorRW: public ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>
+template<typename TreeType, bool IsSafe = true>
+class ValueAccessorRW: public ValueAccessor<TreeType, IsSafe, TreeType::DEPTH-1, tbb::spin_mutex>
 {
+public:
     ValueAccessorRW(TreeType& tree)
-        : ValueAccessor<TreeType, TreeType::DEPTH-1, tbb::spin_mutex>(tree)
+        : ValueAccessor<TreeType, IsSafe, TreeType::DEPTH-1, tbb::spin_mutex>(tree)
     {
     }
 };
@@ -519,7 +574,7 @@ public:
     CacheItem(TreeCacheT& parent):
         mParent(&parent),
         mHash(CoordLimits::max()),
-        mNode(NULL),
+        mNode(nullptr),
         mNext(parent)
     {
     }
@@ -552,7 +607,7 @@ public:
     /// Cache the given node at this level.
     void insert(const Coord& xyz, const NodeType* node)
     {
-        mHash = (node != NULL) ? xyz & ~(NodeType::DIM-1) : Coord::max();
+        mHash = (node != nullptr) ? xyz & ~(NodeType::DIM-1) : Coord::max();
         mNode = node;
     }
     /// Forward the given node to another level of the cache.
@@ -560,13 +615,13 @@ public:
     void insert(const Coord& xyz, const OtherNodeType* node) { mNext.insert(xyz, node); }
 
     /// Erase the node at this level.
-    void erase(const NodeType*) { mHash = Coord::max(); mNode = NULL; }
+    void erase(const NodeType*) { mHash = Coord::max(); mNode = nullptr; }
     /// Erase the node at another level of the cache.
     template<typename OtherNodeType>
     void erase(const OtherNodeType* node) { mNext.erase(node); }
 
     /// Erase the nodes at this and lower levels of the cache.
-    void clear() { mHash = Coord::max(); mNode = NULL; mNext.clear(); }
+    void clear() { mHash = Coord::max(); mNode = nullptr; mNext.clear(); }
 
     /// Return the cached node (if any) at this level.
     void getNode(const NodeType*& node) const { node = mNode; }
@@ -820,7 +875,7 @@ public:
     typedef typename RootNodeType::ValueType           ValueType;
     typedef typename RootNodeType::LeafNodeType        LeafNodeType;
 
-    CacheItem(TreeCacheT& parent): mParent(&parent), mRoot(NULL) {}
+    CacheItem(TreeCacheT& parent): mParent(&parent), mRoot(nullptr) {}
     CacheItem(TreeCacheT& parent, const CacheItem& other): mParent(&parent), mRoot(other.mRoot) {}
 
     CacheItem& copy(TreeCacheT& parent, const CacheItem& other)
@@ -838,9 +893,9 @@ public:
     template <typename OtherNodeType>
     void insert(const Coord&, const OtherNodeType*) {}
 
-    void erase(const RootNodeType*) { mRoot = NULL; }
+    void erase(const RootNodeType*) { mRoot = nullptr; }
 
-    void clear() { mRoot = NULL; }
+    void clear() { mRoot = nullptr; }
 
     void getNode(RootNodeType*& node)
     {
@@ -987,15 +1042,15 @@ private:
 /// @brief ValueAccessor with no mutex and no node caching.
 /// @details This specialization is provided mainly for benchmarking.
 /// Accessors with caching will almost always be faster.
-template<typename _TreeType>
-class ValueAccessor0: public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe>
+class ValueAccessor0: public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::ValueType    ValueType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef ValueAccessorBase<TreeType>     BaseT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
 
     ValueAccessor0(TreeType& tree): BaseT(tree) {}
 
@@ -1114,7 +1169,7 @@ public:
     void setValueOff(const Coord& xyz) { this->setActiveState(xyz, false); }
 
     /// Return the cached node of type @a NodeType.  [Mainly for internal use]
-    template<typename NodeT> NodeT* getNode() { return NULL; }
+    template<typename NodeT> NodeT* getNode() { return nullptr; }
 
     /// Cache the given node, which should lie along the path from the root node to
     /// the node containing voxel (x, y, z).  [Mainly for internal use]
@@ -1200,22 +1255,22 @@ private:
 ///
 /// @note This class is for experts only and should rarely be used
 /// directly. Instead use ValueAccessor with its default template arguments.
-template<typename _TreeType, Index L0>
-class ValueAccessor1 : public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe, Index L0>
+class ValueAccessor1 : public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 2);
     BOOST_STATIC_ASSERT( L0 < _TreeType::RootNodeType::LEVEL );
-    typedef _TreeType                       TreeType;
-    typedef typename TreeType::ValueType    ValueType;
-    typedef typename TreeType::RootNodeType RootNodeT;
-    typedef typename TreeType::LeafNodeType LeafNodeT;
-    typedef ValueAccessorBase<TreeType>     BaseT;
-    typedef typename RootNodeT::NodeChainType InvTreeT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename RootNodeT::NodeChainType   InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
 
     /// Constructor from a tree
-    ValueAccessor1(TreeType& tree) : BaseT(tree), mKey0(Coord::max()), mNode0(NULL)
+    ValueAccessor1(TreeType& tree) : BaseT(tree), mKey0(Coord::max()), mNode0(nullptr)
     {
     }
 
@@ -1399,7 +1454,7 @@ public:
     template<typename NodeT>
     NodeT* getNode()
     {
-        const NodeT* node = NULL;
+        const NodeT* node = nullptr;
         this->getNode(node);
         return const_cast<NodeT*>(node);
     }
@@ -1415,7 +1470,7 @@ public:
     template<typename NodeT>
     void eraseNode()
     {
-        const NodeT* node = NULL;
+        const NodeT* node = nullptr;
         this->eraseNode(node);
     }
 
@@ -1455,7 +1510,7 @@ public:
     }
 
     /// @brief @return a pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template <typename NodeT>
     NodeT* probeNode(const Coord& xyz)
     {
@@ -1469,7 +1524,7 @@ public:
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return NULL;
+        return nullptr;
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     LeafNodeT* probeLeaf(const Coord& xyz)
@@ -1478,7 +1533,7 @@ public:
     }
 
     /// @brief @return a const pointer to the nodeof the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template <typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz) const
     {
@@ -1491,7 +1546,7 @@ public:
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return NULL;
+        return nullptr;
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
@@ -1504,7 +1559,7 @@ public:
     virtual void clear()
     {
         mKey0  = Coord::max();
-        mNode0 = NULL;
+        mNode0 = nullptr;
     }
 
 private:
@@ -1521,10 +1576,10 @@ private:
     void getNode(const NodeT0*& node) { node = mNode0; }
     void getNode(const RootNodeT*& node)
     {
-        node = (BaseT::mTree ? &BaseT::mTree->root() : NULL);
+        node = (BaseT::mTree ? &BaseT::mTree->root() : nullptr);
     }
-    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
-    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = NULL; }
+    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = nullptr; }
+    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = nullptr; }
     template <typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
 
     /// Private copy method
@@ -1574,25 +1629,25 @@ private:
 ///
 /// @note This class is for experts only and should rarely be used directly.
 /// Instead use ValueAccessor with its default template arguments.
-template<typename _TreeType, Index L0, Index L1>
-class ValueAccessor2 : public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe, Index L0, Index L1>
+class ValueAccessor2 : public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 3);
     BOOST_STATIC_ASSERT( L0 < L1 && L1 < _TreeType::RootNodeType::LEVEL );
-    typedef _TreeType                         TreeType;
-    typedef typename TreeType::ValueType      ValueType;
-    typedef typename TreeType::RootNodeType   RootNodeT;
-    typedef typename TreeType::LeafNodeType   LeafNodeT;
-    typedef ValueAccessorBase<TreeType>       BaseT;
-    typedef typename RootNodeT::NodeChainType InvTreeT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename RootNodeT::NodeChainType   InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
 
     /// Constructor from a tree
     ValueAccessor2(TreeType& tree) : BaseT(tree),
-                                     mKey0(Coord::max()), mNode0(NULL),
-                                     mKey1(Coord::max()), mNode1(NULL) {}
+                                     mKey0(Coord::max()), mNode0(nullptr),
+                                     mKey1(Coord::max()), mNode1(nullptr) {}
 
     /// Copy constructor
     ValueAccessor2(const ValueAccessor2& other) : BaseT(other) { this->copy(other); }
@@ -1807,7 +1862,7 @@ public:
     template<typename NodeT>
     NodeT* getNode()
     {
-        const NodeT* node = NULL;
+        const NodeT* node = nullptr;
         this->getNode(node);
         return const_cast<NodeT*>(node);
     }
@@ -1823,7 +1878,7 @@ public:
     template<typename NodeT>
     void eraseNode()
     {
-        const NodeT* node = NULL;
+        const NodeT* node = nullptr;
         this->eraseNode(node);
     }
 
@@ -1873,7 +1928,7 @@ public:
         return BaseT::mTree->root().touchLeafAndCache(xyz, *this);
     }
     /// @brief @return a pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template <typename NodeT>
     NodeT* probeNode(const Coord& xyz)
     {
@@ -1896,15 +1951,15 @@ public:
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return NULL;
+        return nullptr;
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     /// @brief @return a pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     LeafNodeT* probeLeaf(const Coord& xyz) { return this->template probeNode<LeafNodeT>(xyz); }
 
     /// @brief @return a const pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template <typename NodeT>
     const NodeT* probeConstLeaf(const Coord& xyz) const
     {
@@ -1925,11 +1980,11 @@ public:
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return NULL;
+        return nullptr;
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     /// @brief @return a const pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
         return this->template probeConstNode<LeafNodeT>(xyz);
@@ -1937,7 +1992,7 @@ public:
     const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
     /// @brief @return a const pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template <typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz) const
     {
@@ -1959,7 +2014,7 @@ public:
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return NULL;
+        return nullptr;
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
@@ -1967,9 +2022,9 @@ public:
     virtual void clear()
     {
         mKey0  = Coord::max();
-        mNode0 = NULL;
+        mNode0 = nullptr;
         mKey1  = Coord::max();
-        mNode1 = NULL;
+        mNode1 = nullptr;
     }
 
 private:
@@ -1987,12 +2042,12 @@ private:
     void getNode(const NodeT1*& node) { node = mNode1; }
     void getNode(const RootNodeT*& node)
     {
-        node = (BaseT::mTree ? &BaseT::mTree->root() : NULL);
+        node = (BaseT::mTree ? &BaseT::mTree->root() : nullptr);
     }
-    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
+    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = nullptr; }
 
-    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = NULL; }
-    void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = NULL; }
+    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = nullptr; }
+    void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = nullptr; }
     template <typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
 
     /// Private copy method
@@ -2061,27 +2116,27 @@ private:
 ///
 /// @note This class is for experts only and should rarely be used
 /// directly. Instead use ValueAccessor with its default template arguments
-template<typename _TreeType, Index L0, Index L1, Index L2>
-class ValueAccessor3 : public ValueAccessorBase<_TreeType>
+template<typename _TreeType, bool IsSafe, Index L0, Index L1, Index L2>
+class ValueAccessor3 : public ValueAccessorBase<_TreeType, IsSafe>
 {
 public:
     BOOST_STATIC_ASSERT(_TreeType::DEPTH >= 4);
     BOOST_STATIC_ASSERT(L0 < L1 && L1 < L2 && L2 < _TreeType::RootNodeType::LEVEL);
-    typedef _TreeType                         TreeType;
-    typedef typename TreeType::ValueType      ValueType;
-    typedef typename TreeType::RootNodeType   RootNodeT;
-    typedef typename TreeType::LeafNodeType   LeafNodeT;
-    typedef ValueAccessorBase<TreeType>       BaseT;
-    typedef typename RootNodeT::NodeChainType InvTreeT;
+    typedef _TreeType                           TreeType;
+    typedef typename TreeType::ValueType        ValueType;
+    typedef typename TreeType::RootNodeType     RootNodeT;
+    typedef typename TreeType::LeafNodeType     LeafNodeT;
+    typedef ValueAccessorBase<TreeType, IsSafe> BaseT;
+    typedef typename RootNodeT::NodeChainType   InvTreeT;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L0> >::type NodeT0;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L1> >::type NodeT1;
     typedef typename boost::mpl::at<InvTreeT, boost::mpl::int_<L2> >::type NodeT2;
 
     /// Constructor from a tree
     ValueAccessor3(TreeType& tree) : BaseT(tree),
-                                     mKey0(Coord::max()), mNode0(NULL),
-                                     mKey1(Coord::max()), mNode1(NULL),
-                                     mKey2(Coord::max()), mNode2(NULL) {}
+                                     mKey0(Coord::max()), mNode0(nullptr),
+                                     mKey1(Coord::max()), mNode1(nullptr),
+                                     mKey2(Coord::max()), mNode2(nullptr) {}
 
     /// Copy constructor
     ValueAccessor3(const ValueAccessor3& other) : BaseT(other) { this->copy(other); }
@@ -2329,7 +2384,7 @@ public:
     template<typename NodeT>
     NodeT* getNode()
     {
-        const NodeT* node = NULL;
+        const NodeT* node = nullptr;
         this->getNode(node);
         return const_cast<NodeT*>(node);
     }
@@ -2345,7 +2400,7 @@ public:
     template<typename NodeT>
     void eraseNode()
     {
-        const NodeT* node = NULL;
+        const NodeT* node = nullptr;
         this->eraseNode(node);
     }
 
@@ -2404,7 +2459,7 @@ public:
         return BaseT::mTree->root().touchLeafAndCache(xyz, *this);
     }
     /// @brief @return a pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template <typename NodeT>
     NodeT* probeNode(const Coord& xyz)
     {
@@ -2439,15 +2494,15 @@ public:
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return NULL;
+        return nullptr;
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     /// @brief @return a pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     LeafNodeT* probeLeaf(const Coord& xyz) { return this->template probeNode<LeafNodeT>(xyz); }
 
     /// @brief @return a const pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template <typename NodeT>
     const NodeT* probeConstNode(const Coord& xyz) const
     {
@@ -2481,11 +2536,11 @@ public:
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return NULL;
+        return nullptr;
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
     /// @brief @return a const pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return NULL.
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
         return this->template probeConstNode<LeafNodeT>(xyz);
@@ -2496,11 +2551,11 @@ public:
     virtual void clear()
     {
         mKey0  = Coord::max();
-        mNode0 = NULL;
+        mNode0 = nullptr;
         mKey1  = Coord::max();
-        mNode1 = NULL;
+        mNode1 = nullptr;
         mKey2  = Coord::max();
-        mNode2 = NULL;
+        mNode2 = nullptr;
     }
 
 private:
@@ -2537,13 +2592,13 @@ private:
     void getNode(const NodeT2*& node) { node = mNode2; }
     void getNode(const RootNodeT*& node)
     {
-        node = (BaseT::mTree ? &BaseT::mTree->root() : NULL);
+        node = (BaseT::mTree ? &BaseT::mTree->root() : nullptr);
     }
-    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = NULL; }
+    template <typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = nullptr; }
 
-    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = NULL; }
-    void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = NULL; }
-    void eraseNode(const NodeT2*) { mKey2 = Coord::max(); mNode2 = NULL; }
+    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = nullptr; }
+    void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = nullptr; }
+    void eraseNode(const NodeT2*) { mKey2 = Coord::max(); mNode2 = nullptr; }
     template <typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
 
     /// Cache the given node, which should lie along the path from the root node to
@@ -2606,6 +2661,6 @@ private:
 
 #endif // OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

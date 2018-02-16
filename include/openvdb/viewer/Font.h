@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -28,48 +28,43 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 
-#ifndef OPENVDB_METADATA_STRINGMETADATA_HAS_BEEN_INCLUDED
-#define OPENVDB_METADATA_STRINGMETADATA_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_VIEWER_FONT_HAS_BEEN_INCLUDED
+#define OPENVDB_VIEWER_FONT_HAS_BEEN_INCLUDED
 
 #include <string>
-#include <openvdb/metadata/Metadata.h>
+
+#if defined(__APPLE__) || defined(MACOSX)
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+#else
+#include <GL/gl.h>
+#include <GL/glu.h>
+#endif
 
 
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
+namespace openvdb_viewer {
 
-typedef TypedMetadata<std::string> StringMetadata;
-
-
-template <>
-inline Index32
-StringMetadata::size() const
+class BitmapFont13
 {
-    return mValue.size();
-}
+public:
+    BitmapFont13() {}
 
+    static void initialize();
 
-template<>
-inline void
-StringMetadata::readValue(std::istream& is, Index32 size)
-{
-    mValue.resize(size, '\0');
-    is.read(&mValue[0], size);
-}
+    static void enableFontRendering();
+    static void disableFontRendering();
 
-template<>
-inline void
-StringMetadata::writeValue(std::ostream &os) const
-{
-    os.write(reinterpret_cast<const char*>(&mValue[0]), this->size());
-}
+    static void print(GLint px, GLint py, const std::string&);
 
-} // namespace OPENVDB_VERSION_NAME
-} // namespace openvdb
+private:
+    static GLuint sOffset;
+    static GLubyte sCharacters[95][13];
+};
 
-#endif // OPENVDB_METADATA_STRINGMETADATA_HAS_BEEN_INCLUDED
+} // namespace openvdb_viewer
 
-// Copyright (c) 2012-2013 DreamWorks Animation LLC
+#endif // OPENVDB_VIEWER_FONT_HAS_BEEN_INCLUDED
+
+// Copyright (c) 2012-2017 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
