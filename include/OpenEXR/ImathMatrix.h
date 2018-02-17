@@ -262,17 +262,13 @@ template <class T> class Matrix33
     // 
     //------------------------------------------------------------
 
-    const Matrix33 &    invert (bool singExc = false)
-                        throw (IEX_NAMESPACE::MathExc);
+    const Matrix33 &    invert (bool singExc = false);
 
-    Matrix33<T>         inverse (bool singExc = false) const
-                        throw (IEX_NAMESPACE::MathExc);
+    Matrix33<T>         inverse (bool singExc = false) const;
 
-    const Matrix33 &    gjInvert (bool singExc = false)
-                        throw (IEX_NAMESPACE::MathExc);
+    const Matrix33 &    gjInvert (bool singExc = false);
 
-    Matrix33<T>         gjInverse (bool singExc = false) const
-                        throw (IEX_NAMESPACE::MathExc);
+    Matrix33<T>         gjInverse (bool singExc = false) const;
 
 
     //------------------------------------------------
@@ -636,17 +632,13 @@ template <class T> class Matrix44
     // 
     //------------------------------------------------------------
 
-    const Matrix44 &    invert (bool singExc = false)
-                        throw (IEX_NAMESPACE::MathExc);
+    const Matrix44 &    invert (bool singExc = false);
 
-    Matrix44<T>         inverse (bool singExc = false) const
-                        throw (IEX_NAMESPACE::MathExc);
+    Matrix44<T>         inverse (bool singExc = false) const;
 
-    const Matrix44 &    gjInvert (bool singExc = false)
-                        throw (IEX_NAMESPACE::MathExc);
+    const Matrix44 &    gjInvert (bool singExc = false);
 
-    Matrix44<T>         gjInverse (bool singExc = false) const
-                        throw (IEX_NAMESPACE::MathExc);
+    Matrix44<T>         gjInverse (bool singExc = false) const;
 
 
     //------------------------------------------------
