@@ -42,6 +42,7 @@ Notes:
 * RMSD has minor modifications for C++ support.
 * Embree is built with support for up to SSE4.2. No AVX support is included.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
+* OpenEXR includes a [ThreadPool bug fix](https://github.com/openexr/openexr/pull/170/commits/51046a110296a5c95b5c52ce6d9798f6fc9884d3) that has not been merged into the OpenEXR mainline yet.
 * All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
 * All binary Windows libraries are built using /MT with Visual Studio 2017.
 * All binary Linux libraries are built using GCC 7.3 or later on Fedora.
