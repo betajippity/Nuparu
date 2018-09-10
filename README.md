@@ -1,13 +1,11 @@
 Nuparu
 ======
 
-v0.2.18.28a
+v0.2.18.37a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
-
-Updated:
 
 * [GLM](http://glm.g-truc.net) 0.9.8.5 (Src)
 * [Eigen](http://eigen.tuxfamily.org/) 3.3.4 (Src)
@@ -30,6 +28,7 @@ Updated:
 * [Boost](http://www.boost.org) 1.66.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.1 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 5.0.0 (Mac/Win/Linux)
+* [Protobuf](https://developers.google.com/protocol-buffers/) 3.6.1 (Mac/Win/Linux)
 
 Notes:
 
