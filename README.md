@@ -29,6 +29,7 @@ Nuparu currently consists of:
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.1 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 5.0.0 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.6.1 (Mac/Win/Linux)
+* [ispc](https://ispc.github.io) 1.10.0 (Mac/Win/Linux)
 
 Notes:
 
@@ -39,7 +40,7 @@ Notes:
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
 * Partio is built without support for .prt files.
 * RMSD has minor modifications for C++ support.
-* Embree is built with support for up to SSE4.2. No AVX support is included.
+* Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
 * OpenEXR includes a [ThreadPool bug fix](https://github.com/openexr/openexr/pull/170/commits/51046a110296a5c95b5c52ce6d9798f6fc9884d3) that has not been merged into the OpenEXR mainline yet.
 * All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
