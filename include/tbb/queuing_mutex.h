@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2017 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -46,6 +46,7 @@ public:
         //! Initialize fields to mean "no lock held".
         void initialize() {
             mutex = NULL;
+            going = 0;
 #if TBB_USE_ASSERT
             internal::poison_pointer(next);
 #endif /* TBB_USE_ASSERT */

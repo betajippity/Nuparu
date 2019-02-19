@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2017 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ namespace interface5 {
 
         //! Initialize buckets
         static void init_buckets( segment_ptr_t ptr, size_type sz, bool is_initial ) {
-            if( is_initial ) std::memset(ptr, 0, sz*sizeof(bucket) );
+            if( is_initial ) std::memset( static_cast<void*>(ptr), 0, sz*sizeof(bucket) );
             else for(size_type i = 0; i < sz; i++, ptr++) {
                 *reinterpret_cast<intptr_t*>(&ptr->mutex) = 0;
                 ptr->node_list = rehash_req;
@@ -604,8 +604,8 @@ protected:
     static node* allocate_node_emplace_construct(node_allocator_type& allocator, Args&&... args){
         return  new( allocator ) node(std::forward<Args>(args)...);
     }
-#endif //#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT
-#endif
+#endif //__TBB_CPP11_VARIADIC_TEMPLATES_PRESENT
+#endif //__TBB_CPP11_RVALUE_REF_PRESENT
 
     static node* allocate_node_default_construct(node_allocator_type& allocator, const Key &key, const T * ){
         return  new( allocator ) node(key);
@@ -759,9 +759,19 @@ public:
         : internal::hash_map_base(), my_allocator(a)
     {}
 
+    explicit concurrent_hash_map( const HashCompare& compare, const allocator_type& a = allocator_type() )
+        : internal::hash_map_base(), my_allocator(a), my_hash_compare(compare)
+    {}
+
     //! Construct empty table with n preallocated buckets. This number serves also as initial concurrency level.
     concurrent_hash_map( size_type n, const allocator_type &a = allocator_type() )
-        : my_allocator(a)
+        : internal::hash_map_base(), my_allocator(a)
+    {
+        reserve( n );
+    }
+
+    concurrent_hash_map( size_type n, const HashCompare& compare, const allocator_type& a = allocator_type() )
+        : internal::hash_map_base(), my_allocator(a), my_hash_compare(compare)
     {
         reserve( n );
     }
@@ -800,7 +810,16 @@ public:
     //! Construction with copying iteration range and given allocator instance
     template<typename I>
     concurrent_hash_map( I first, I last, const allocator_type &a = allocator_type() )
-        : my_allocator(a)
+        : internal::hash_map_base(), my_allocator(a)
+    {
+        call_clear_on_leave scope_guard(this);
+        internal_copy(first, last, std::distance(first, last));
+        scope_guard.dismiss();
+    }
+
+    template<typename I>
+    concurrent_hash_map( I first, I last, const HashCompare& compare, const allocator_type& a = allocator_type() )
+        : internal::hash_map_base(), my_allocator(a), my_hash_compare(compare)
     {
         call_clear_on_leave scope_guard(this);
         internal_copy(first, last, std::distance(first, last));
@@ -810,7 +829,15 @@ public:
 #if __TBB_INITIALIZER_LISTS_PRESENT
     //! Construct empty table with n preallocated buckets. This number serves also as initial concurrency level.
     concurrent_hash_map( std::initializer_list<value_type> il, const allocator_type &a = allocator_type() )
-        : my_allocator(a)
+        : internal::hash_map_base(), my_allocator(a)
+    {
+        call_clear_on_leave scope_guard(this);
+        internal_copy(il.begin(), il.end(), il.size());
+        scope_guard.dismiss();
+    }
+
+    concurrent_hash_map( std::initializer_list<value_type> il, const HashCompare& compare, const allocator_type& a = allocator_type() )
+        : internal::hash_map_base(), my_allocator(a), my_hash_compare(compare)
     {
         call_clear_on_leave scope_guard(this);
         internal_copy(il.begin(), il.end(), il.size());
@@ -1407,7 +1434,7 @@ void concurrent_hash_map<Key,T,HashCompare,A>::clear() {
         reported = true;
     }
 #endif
-#endif//TBB_USE_ASSERT || TBB_USE_PERFORMANCE_WARNINGS || __TBB_STATISTICS
+#endif // TBB_USE_ASSERT || TBB_USE_PERFORMANCE_WARNINGS || __TBB_STATISTICS
     my_size = 0;
     segment_index_t s = segment_index_of( m );
     __TBB_ASSERT( s+1 == pointers_per_table || !my_table[s+1], "wrong mask or concurrent grow" );

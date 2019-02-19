@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2017 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -727,8 +727,10 @@ protected:
 
 #if __TBB_CPP11_RVALUE_REF_PRESENT
     concurrent_unordered_base(concurrent_unordered_base&& right)
-        : Traits(right.my_hash_compare), my_solist(right.get_allocator()), my_allocator(right.get_allocator())
+        : Traits(right.my_hash_compare), my_solist(right.get_allocator()), my_allocator(right.get_allocator()),
+          my_maximum_bucket_size(float(initial_bucket_load))
     {
+        my_number_of_buckets = initial_bucket_number;
         internal_init();
         swap(right);
     }
@@ -740,6 +742,8 @@ protected:
 
         internal_init();
         if (a == right.get_allocator()){
+            my_number_of_buckets = initial_bucket_number;
+            my_maximum_bucket_size = float(initial_bucket_load);
             this->swap(right);
         }else{
             my_maximum_bucket_size = right.my_maximum_bucket_size;
@@ -1468,7 +1472,7 @@ private:
         if (my_buckets[segment] == NULL) {
             size_type sz = segment_size(segment);
             raw_iterator * new_segment = my_allocator.allocate(sz);
-            std::memset(new_segment, 0, sz*sizeof(raw_iterator));
+            std::memset(static_cast<void*>(new_segment), 0, sz*sizeof(raw_iterator));
 
             if (my_buckets[segment].compare_and_swap( new_segment, NULL) != NULL)
                 my_allocator.deallocate(new_segment, sz);

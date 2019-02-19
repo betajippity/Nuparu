@@ -24,7 +24,7 @@ Nuparu currently consists of:
 * [NanoGUI](https://github.com/wjakob/nanogui) (cf576ee) (Mac/Win/Linux)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Win/Linux)
-* [TBB](https://www.threadingbuildingblocks.org/) 2018 Update 2 (Mac/Win/Linux)
+* [TBB](https://www.threadingbuildingblocks.org/) 2019 Update 3 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.66.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.1 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 5.0.0 (Mac/Win/Linux)
@@ -37,6 +37,7 @@ Notes:
 * On macOS, all binary libraries except for TBB are statically linked.
 * On Windows, all binary libraries except for TBB are statically linked.
 * On Linux, all binary libraries except for TBB are statically linked.
+* The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
 * Since macOS ships with Zlib and GLUT by default, Nuparu does not include Zlib or FreeGLUT for macOS.
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
 * Partio is built without support for .prt files.

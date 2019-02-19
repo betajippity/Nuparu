@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2017 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -33,11 +33,46 @@ typedef tbb::internal::uint64_t tag_value;
 
 using tbb::internal::strip;
 
+#if __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT
+
+template<typename ... Policies> struct Policy {};
+
+template<typename ... Policies> struct has_policy;
+
+template<typename ExpectedPolicy, typename FirstPolicy, typename ...Policies>
+struct has_policy<ExpectedPolicy, FirstPolicy, Policies...> :
+    tbb::internal::bool_constant<has_policy<ExpectedPolicy, FirstPolicy>::value ||
+                                 has_policy<ExpectedPolicy, Policies...>::value> {};
+
+template<typename ExpectedPolicy, typename SinglePolicy>
+struct has_policy<ExpectedPolicy, SinglePolicy> :
+    tbb::internal::bool_constant<tbb::internal::is_same_type<ExpectedPolicy, SinglePolicy>::value> {};
+
+template<typename ExpectedPolicy, typename ...Policies>
+struct has_policy<ExpectedPolicy, Policy<Policies...> > : has_policy<ExpectedPolicy, Policies...> {};
+
+#else
+
+template<typename P1, typename P2 = void> struct Policy {};
+
+template<typename ExpectedPolicy, typename SinglePolicy>
+struct has_policy : tbb::internal::bool_constant<tbb::internal::is_same_type<ExpectedPolicy, SinglePolicy>::value> {};
+
+template<typename ExpectedPolicy, typename P>
+struct has_policy<ExpectedPolicy, Policy<P> > : has_policy<ExpectedPolicy, P> {};
+
+template<typename ExpectedPolicy, typename P1, typename P2>
+struct has_policy<ExpectedPolicy, Policy<P1, P2> > :
+    tbb::internal::bool_constant<has_policy<ExpectedPolicy, P1>::value || has_policy<ExpectedPolicy, P2>::value> {};
+
+#endif
+
 namespace graph_policy_namespace {
 
     struct rejecting { };
     struct reserving { };
     struct queueing  { };
+    struct lightweight  { };
 
     // K == type of field used for key-matching.  Each tag-matching port will be provided
     // functor that, given an object accepted by the port, will return the
@@ -51,6 +86,10 @@ namespace graph_policy_namespace {
 
     // old tag_matching join's new specifier
     typedef key_matching<tag_value> tag_matching;
+
+    // Aliases for Policy combinations
+    typedef interface10::internal::Policy<queueing, lightweight> queueing_lightweight;
+    typedef interface10::internal::Policy<rejecting, lightweight>  rejecting_lightweight;
 
 } // namespace graph_policy_namespace
 
@@ -232,13 +271,20 @@ private:
 
 //! A task that calls a node's forward_task function
 template< typename NodeType >
-class forward_task_bypass : public task {
+class forward_task_bypass : public graph_task {
 
     NodeType &my_node;
 
 public:
 
-    forward_task_bypass( NodeType &n ) : my_node(n) {}
+    forward_task_bypass( NodeType &n
+#if __TBB_PREVIEW_FLOW_GRAPH_PRIORITIES
+                         , node_priority_t node_priority = no_priority
+    ) : graph_task(node_priority),
+#else
+    ) :
+#endif
+    my_node(n) {}
 
     task *execute() __TBB_override {
         task * new_task = my_node.forward_task();
@@ -250,14 +296,21 @@ public:
 //! A task that calls a node's apply_body_bypass function, passing in an input of type Input
 //  return the task* unless it is SUCCESSFULLY_ENQUEUED, in which case return NULL
 template< typename NodeType, typename Input >
-class apply_body_task_bypass : public task {
+class apply_body_task_bypass : public graph_task {
 
     NodeType &my_node;
     Input my_input;
 
 public:
 
-    apply_body_task_bypass( NodeType &n, const Input &i ) : my_node(n), my_input(i) {}
+    apply_body_task_bypass( NodeType &n, const Input &i
+#if __TBB_PREVIEW_FLOW_GRAPH_PRIORITIES
+                            , node_priority_t node_priority = no_priority
+    ) : graph_task(node_priority),
+#else
+    ) :
+#endif
+        my_node(n), my_input(i) {}
 
     task *execute() __TBB_override {
         task * next_task = my_node.apply_body_bypass( my_input );
@@ -268,7 +321,7 @@ public:
 
 //! A task that calls a node's apply_body_bypass function with no input
 template< typename NodeType >
-class source_task_bypass : public task {
+class source_task_bypass : public graph_task {
 
     NodeType &my_node;
 
@@ -310,7 +363,12 @@ public:
 
     typedef continue_msg input_type;
     typedef continue_msg output_type;
-    decrementer( int number_of_predecessors = 0 ) : continue_receiver( number_of_predecessors ) { }
+    decrementer( int number_of_predecessors = 0 )
+        : continue_receiver(
+            __TBB_FLOW_GRAPH_PRIORITY_ARG1(number_of_predecessors, tbb::flow::internal::no_priority)
+        )
+        , my_node(NULL)
+    {}
     void set_owner( T *node ) { my_node = node; }
 };
 

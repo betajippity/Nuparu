@@ -1,5 +1,5 @@
 /*
-    Copyright (c) 2005-2017 Intel Corporation
+    Copyright (c) 2005-2018 Intel Corporation
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -96,7 +96,7 @@ class delegated_function<F,void> : public delegate_base {
 public:
     delegated_function(F& f) : my_func(f) {}
     void consume_result() const {}
-    
+
     friend class task_arena_base;
 };
 
@@ -313,12 +313,22 @@ public:
     template<typename F>
 #if __TBB_CPP11_RVALUE_REF_PRESENT
     void enqueue( F&& f, priority_t p ) {
+#if __TBB_PREVIEW_CRITICAL_TASKS
+        __TBB_ASSERT(p == priority_low || p == priority_normal || p == priority_high
+                     || p == internal::priority_critical, "Invalid priority level value");
+#else
         __TBB_ASSERT(p == priority_low || p == priority_normal || p == priority_high, "Invalid priority level value");
+#endif
         enqueue_impl(std::forward<F>(f), p);
     }
 #else
     void enqueue( const F& f, priority_t p ) {
+#if __TBB_PREVIEW_CRITICAL_TASKS
+        __TBB_ASSERT(p == priority_low || p == priority_normal || p == priority_high
+                     || p == internal::priority_critical, "Invalid priority level value");
+#else
         __TBB_ASSERT(p == priority_low || p == priority_normal || p == priority_high, "Invalid priority level value");
+#endif
         enqueue_impl(f,p);
     }
 #endif
