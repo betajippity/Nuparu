@@ -28,7 +28,7 @@ Nuparu currently consists of:
 * [Boost](http://www.boost.org) 1.66.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.1 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 5.0.0 (Mac/Win/Linux)
-* [blosc](https://github.com/Blosc) 1.14.4 (Mac/Win/Linux)
+* [blosc](https://github.com/Blosc) 1.16.2 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.6.1 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.10.0 (Mac/Win/Linux)
 
@@ -45,6 +45,7 @@ Notes:
 * Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
 * OpenEXR includes a [ThreadPool bug fix](https://github.com/openexr/openexr/pull/170/commits/51046a110296a5c95b5c52ce6d9798f6fc9884d3) that has not been merged into the OpenEXR mainline yet.
+* blosc is built without AVX2 support.
 * All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
 * All binary Windows libraries are built using /MT with Visual Studio 2017.
 * All binary Linux libraries are built using GCC 7.3 or later on Fedora.
