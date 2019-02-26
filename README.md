@@ -14,7 +14,7 @@ Nuparu currently consists of:
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
 * [Embree](https://embree.github.io) 3.5.0 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.8.4 (Mac/Win/Linux)
-* [OpenEXR](http://www.openexr.com) 2.2.1 (Mac/Win/Linux)
+* [OpenEXR](http://www.openexr.com) 2.3.0 (Mac/Win/Linux)
 * [stb_image](https://github.com/nothings/stb) 2.19 (Src)
 * [Ptex](http://ptex.us) 2.1.33 (Mac/Win/Linux)
 * [Partio](https://www.disneyanimation.com/technology/partio.html) 1.1.0 (8b6ea0d) (Mac/Win/Linux)
@@ -37,6 +37,7 @@ Notes:
 * On macOS, all binary libraries except for TBB are statically linked.
 * On Windows, all binary libraries except for TBB are statically linked.
 * On Linux, all binary libraries except for TBB are statically linked.
+* Everything is built using C++14.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
 * Since macOS ships with Zlib and GLUT by default, Nuparu does not include Zlib or FreeGLUT for macOS.
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
@@ -44,7 +45,6 @@ Notes:
 * RMSD has minor modifications for C++ support.
 * Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
-* OpenEXR includes a [ThreadPool bug fix](https://github.com/openexr/openexr/pull/170/commits/51046a110296a5c95b5c52ce6d9798f6fc9884d3) that has not been merged into the OpenEXR mainline yet.
 * blosc is built without AVX2 support.
 * All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
 * All binary Windows libraries are built using /MT with Visual Studio 2017.
