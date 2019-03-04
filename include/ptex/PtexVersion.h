@@ -40,7 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #define PtexFileMajorVersion 1
 #define PtexFileMinorVersion 4
 #define PtexLibraryMajorVersion 2
-#define PtexLibraryMinorVersion 2
+#define PtexLibraryMinorVersion 3
 
 #define PTEX_NAMESPACE Ptex
 #ifdef PTEX_VENDOR
