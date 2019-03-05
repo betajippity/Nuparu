@@ -48,6 +48,8 @@ Notes:
 * blosc is built without AVX2 support.
 * All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
 * All binary Windows libraries are built using /MT with Visual Studio 2017.
-* All binary Linux libraries are built using GCC 7.3 or later on Fedora.
+* All binary Linux libraries are built using GCC 8.2 or later on Fedora 29 and Red Hat Enterprise Linux (RHEL) 7.6.
+    * On RHEL, GCC 8.2 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
+    * Fedora libraries are in lib/linux, RHEL libraries are in lib/rhel
 * All binary libraries on all platforms are built for x86-64.
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
