@@ -45,6 +45,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 #include <vector>
 #include <map>
 #include <stdint.h>
+#include <string.h>
 #include "PartioAttribute.h"
 #include "PartioIterator.h"
 
@@ -217,6 +218,18 @@ public:
         return static_cast<T*>(fixedDataInternal(attribute));
     }
 
+    /// Set particle value for attribute
+    template<class T> inline void set(const ParticleAttribute& attribute,
+                                      const ParticleIndex particleIndex, const T* data) {
+        T* ptr = static_cast<T*>(dataInternal(attribute, particleIndex));
+        memcpy(ptr, data, attribute.count * TypeSize(attribute.type));
+    }
+
+    template<class T> inline void setFixed(const FixedAttribute& attribute, const T* data) {
+        T* ptr = static_cast<T*>(fixedDataInternal(attribute));
+        memcpy(ptr, data, attribute.count * TypeSize(attribute.type));
+    }
+
     /// Returns a token for the given string. This allows efficient storage of string data
     virtual int registerIndexedStr(const ParticleAttribute& attribute,const char* str)=0;
     /// Returns a token for the given string. This allows efficient storage of string data
@@ -318,5 +331,18 @@ void endCachedAccess(ParticlesData* particles);
 void print(const ParticlesData* particles);
 
 ParticlesDataMutable* computeClustering(ParticlesDataMutable* particles, const int numNeighbors,const double radiusSearch,const double radiusInside,const int connections,const double density);
+
+//! Merges one particle set into another
+/*!
+  Given a ParticleSetMutable, merges it with a second ParticleSet,
+  copying particles and attributes that align with the base particle
+  set. If an identifier is provided, that will be used as a key
+  to replace the particle in the base set with the particle in the second
+  set with the same identifier attribute value. If the identifier is not
+  provided or the particle's attribute value is not found in the base set,
+  a new particle is added. If used, the identifier must be a single INT.
+*/
+void merge(ParticlesDataMutable& base, const ParticlesData& delta, const std::string& identifier=std::string());
+
 }
 #endif
