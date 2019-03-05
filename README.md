@@ -21,7 +21,7 @@ Nuparu currently consists of:
 * [RMSD](http://boscoh.com/code/) (Src)
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
-* [NanoGUI](https://github.com/wjakob/nanogui) (cf576ee) (Mac/Win/Linux)
+* [NanoGUI](https://github.com/wjakob/nanogui) (f8a4fe) (Mac/Win/Linux)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2019 Update 3 (Mac/Win/Linux)
