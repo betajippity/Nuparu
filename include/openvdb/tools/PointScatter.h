@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -139,20 +139,20 @@ public:
     {
     }
 
-    /// @brief This is the main functor method implementing the actual
-    /// scattering of points.
+    /// This is the main functor method implementing the actual scattering of points.
     template<typename GridT>
     bool operator()(const GridT& grid)
     {
         mVoxelCount = grid.activeVoxelCount();
         if (mVoxelCount == 0) return false;
-        const Vec3d dim = grid.voxelSize();
-        if (mPointsPerVolume>0) {
+
+        const auto voxelVolume = grid.transform().voxelVolume();
+        if (mPointsPerVolume > 0) {
             BaseT::start("Uniform scattering with fixed point density");
-            mTargetPointCount = Index64(mPointsPerVolume*dim[0]*dim[1]*dim[2])*mVoxelCount;
-        } else if (mTargetPointCount>0) {
+            mTargetPointCount = Index64(mPointsPerVolume * voxelVolume * double(mVoxelCount));
+        } else if (mTargetPointCount > 0) {
             BaseT::start("Uniform scattering with fixed point count");
-            mPointsPerVolume = mTargetPointCount/float(dim[0]*dim[1]*dim[2] * mVoxelCount);
+            mPointsPerVolume = mTargetPointCount / float(voxelVolume * mVoxelCount);
         } else {
             return false;
         }
@@ -447,6 +447,6 @@ protected:
 
 #endif // OPENVDB_TOOLS_POINT_SCATTER_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

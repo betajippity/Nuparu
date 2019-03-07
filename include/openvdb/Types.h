@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -47,6 +47,7 @@
 #include <type_traits>
 #if OPENVDB_ABI_VERSION_NUMBER <= 3
 #include <boost/shared_ptr.hpp>
+#include <boost/weak_ptr.hpp>
 #endif
 
 
@@ -100,14 +101,18 @@ using math::Vec4d;
 
 // Three-dimensional matrix types
 using Mat3R = math::Mat3<Real>;
+using math::Mat3s;
+using math::Mat3d;
 
 // Four-dimensional matrix types
 using Mat4R = math::Mat4<Real>;
-using Mat4d = math::Mat4<double>;
-using Mat4s = math::Mat4<float>;
+using math::Mat4s;
+using math::Mat4d;
 
 // Quaternions
 using QuatR = math::Quat<Real>;
+using math::Quats;
+using math::Quatd;
 
 // Dummy type for a voxel with a binary mask value, e.g. the active state
 class ValueMask {};
@@ -182,6 +187,9 @@ struct PointIndex
     using IntType = IntType_;
 
     PointIndex(IntType i = IntType(0)): mIndex(i) {}
+
+    /// Explicit type conversion constructor
+    template<typename T> explicit PointIndex(T i): mIndex(static_cast<IntType>(i)) {}
 
     operator IntType() const { return mIndex; }
 
@@ -348,6 +356,8 @@ template<> inline const char* typeNameAsString<Vec3i>()             { return "ve
 template<> inline const char* typeNameAsString<Vec3f>()             { return "vec3s"; }
 template<> inline const char* typeNameAsString<Vec3d>()             { return "vec3d"; }
 template<> inline const char* typeNameAsString<std::string>()       { return "string"; }
+template<> inline const char* typeNameAsString<Mat3s>()             { return "mat3s"; }
+template<> inline const char* typeNameAsString<Mat3d>()             { return "mat3d"; }
 template<> inline const char* typeNameAsString<Mat4s>()             { return "mat4s"; }
 template<> inline const char* typeNameAsString<Mat4d>()             { return "mat4d"; }
 template<> inline const char* typeNameAsString<math::Quats>()       { return "quats"; }
@@ -565,6 +575,6 @@ class PartialCreate {};
 
 #endif // OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

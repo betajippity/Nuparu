@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -62,8 +62,9 @@
 #include <tbb/task_group.h>
 #include <tbb/task_scheduler_init.h>
 
-#include <boost/integer_traits.hpp> // for const_max
-#include <boost/shared_array.hpp>
+#include <boost/mpl/at.hpp>
+#include <boost/mpl/int.hpp>
+#include <boost/mpl/size.hpp>
 
 #include <algorithm> // for std::sort()
 #include <cmath> // for std::isfinite(), std::isnan()
@@ -759,7 +760,7 @@ public:
             ijk += step;
         }
 
-        return boost::integer_traits<size_t>::const_max;
+        return std::numeric_limits<size_t>::max();
     }
 
 
@@ -776,7 +777,7 @@ private:
 template<typename TreeType>
 struct LeafNodeConnectivityTable
 {
-    enum { INVALID_OFFSET = boost::integer_traits<size_t>::const_max };
+    enum { INVALID_OFFSET = std::numeric_limits<size_t>::max() };
 
     using LeafNodeType = typename TreeType::LeafNodeType;
 
@@ -1370,8 +1371,8 @@ struct ComputeIntersectingVoxelSign
     using Int32TreeType = typename TreeType::template ValueConverter<Int32>::Type;
     using Int32LeafNodeType = typename Int32TreeType::LeafNodeType;
 
-    using PointArray = boost::shared_array<Vec3d>;
-    using MaskArray = boost::shared_array<bool>;
+    using PointArray = std::unique_ptr<Vec3d[]>;
+    using MaskArray = std::unique_ptr<bool[]>;
     using LocalData = std::pair<PointArray, MaskArray>;
     using LocalDataTable = tbb::enumerable_thread_specific<LocalData>;
 
@@ -2035,11 +2036,13 @@ private:
         enum { POLYGON_LIMIT = 1000 };
 
         SubTask(const Triangle& prim, DataTable& dataTable,
-            int subdivisionCount, size_t polygonCount)
+            int subdivisionCount, size_t polygonCount,
+            Interrupter* interrupter = nullptr)
             : mLocalDataTable(&dataTable)
             , mPrim(prim)
             , mSubdivisionCount(subdivisionCount)
             , mPolygonCount(polygonCount)
+            , mInterrupter(interrupter)
         {
         }
 
@@ -2052,15 +2055,16 @@ private:
 
                 voxelizeTriangle(mPrim, *dataPtr);
 
-            } else {
-                spawnTasks(mPrim, *mLocalDataTable, mSubdivisionCount, mPolygonCount);
+            } else if (!(mInterrupter && mInterrupter->wasInterrupted())) {
+                spawnTasks(mPrim, *mLocalDataTable, mSubdivisionCount, mPolygonCount, mInterrupter);
             }
         }
 
-        DataTable * const mLocalDataTable;
-        Triangle    const mPrim;
-        int         const mSubdivisionCount;
-        size_t      const mPolygonCount;
+        DataTable   * const mLocalDataTable;
+        Triangle      const mPrim;
+        int           const mSubdivisionCount;
+        size_t        const mPolygonCount;
+        Interrupter * const mInterrupter;
     }; // struct SubTask
 
     inline static int evalSubdivisionCount(const Triangle& prim)
@@ -2086,12 +2090,16 @@ private:
         if (subdivisionCount <= 0) {
             voxelizeTriangle(prim, data);
         } else {
-            spawnTasks(prim, *mDataTable, subdivisionCount, polygonCount);
+            spawnTasks(prim, *mDataTable, subdivisionCount, polygonCount, mInterrupter);
         }
     }
 
     static void spawnTasks(
-        const Triangle& mainPrim, DataTable& dataTable, int subdivisionCount, size_t polygonCount)
+        const Triangle& mainPrim,
+        DataTable& dataTable,
+        int subdivisionCount,
+        size_t polygonCount,
+        Interrupter* const interrupter)
     {
         subdivisionCount -= 1;
         polygonCount *= 4;
@@ -2108,22 +2116,22 @@ private:
         prim.a = mainPrim.a;
         prim.b = ab;
         prim.c = ac;
-        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount, interrupter));
 
         prim.a = ab;
         prim.b = bc;
         prim.c = ac;
-        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount, interrupter));
 
         prim.a = ab;
         prim.b = mainPrim.b;
         prim.c = bc;
-        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount, interrupter));
 
         prim.a = ac;
         prim.b = bc;
         prim.c = mainPrim.c;
-        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount));
+        tasks.run(SubTask(prim, dataTable, subdivisionCount, polygonCount, interrupter));
 
         tasks.wait();
     }
@@ -3437,14 +3445,16 @@ doMeshConversion(
         QuadAndTriangleDataAdapter<Vec3s, Vec3I>
             mesh(indexSpacePoints.get(), numPoints, &triangles[0], triangles.size());
 
-        return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+        return meshToVolume<GridType>(
+            interrupter, mesh, xform, exBandWidth, inBandWidth, conversionFlags);
 
     } else if (triangles.empty()) {
 
         QuadAndTriangleDataAdapter<Vec3s, Vec4I>
             mesh(indexSpacePoints.get(), numPoints, &quads[0], quads.size());
 
-        return meshToVolume<GridType>(mesh, xform, exBandWidth, inBandWidth, conversionFlags);
+        return meshToVolume<GridType>(
+            interrupter, mesh, xform, exBandWidth, inBandWidth, conversionFlags);
     }
 
     // pack primitives
@@ -4202,6 +4212,6 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
 #endif // OPENVDB_TOOLS_MESH_TO_VOLUME_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

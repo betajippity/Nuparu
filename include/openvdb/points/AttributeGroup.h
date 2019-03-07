@@ -1,6 +1,6 @@
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 //
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
@@ -167,6 +167,10 @@ public:
 
     inline bool initialized() const { return bool(mHandle); }
 
+    static index::State state() { return index::PARTIAL; }
+    template <typename LeafT>
+    static index::State state(const LeafT&) { return index::PARTIAL; }
+
     template <typename LeafT>
     void reset(const LeafT& leaf) {
         mHandle.reset(new GroupHandle(leaf.groupHandle(mIndex)));
@@ -195,6 +199,6 @@ private:
 
 #endif // OPENVDB_POINTS_ATTRIBUTE_GROUP_HAS_BEEN_INCLUDED
 
-// Copyright (c) 2012-2017 DreamWorks Animation LLC
+// Copyright (c) 2012-2018 DreamWorks Animation LLC
 // All rights reserved. This software is distributed under the
 // Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

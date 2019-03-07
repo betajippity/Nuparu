@@ -27,7 +27,7 @@ Nuparu currently consists of:
 * [TBB](https://www.threadingbuildingblocks.org/) 2019 Update 3 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.69.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.3 (Mac/Win/Linux)
-* [OpenVDB](http://www.openvdb.org/) 5.0.0 (Mac/Win/Linux)
+* [OpenVDB](http://www.openvdb.org/) 6.0.0 (Mac/Win/Linux)
 * [blosc](https://github.com/Blosc) 1.16.2 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.6.1 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.10.0 (Mac/Win/Linux)
@@ -46,9 +46,10 @@ Notes:
 * Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
 * blosc is built without AVX2 support.
-* All binary macOS libraries are built with macOS's Clang variant (Apple LLVM 5.1 or greater) using libc++.
-* All binary Windows libraries are built using /MT with Visual Studio 2017.
-* All binary Linux libraries are built using GCC 8.2 or later on Fedora 29 and Red Hat Enterprise Linux (RHEL) 7.6.
+* OpenVDB is built without ABI compatibility for OpenVDB 3.x.
+* All binary macOS libraries are built on at least macOS Mojave with macOS's Clang variant (Apple LLVM 10.0 or greater) using libc++.
+* All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2017.
+* All binary Linux libraries are built using GCC 8.2 or later on at least Fedora 29 and at least Red Hat Enterprise Linux (RHEL) 7.6.
     * On RHEL, GCC 8.2 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
     * Fedora libraries are in lib/linux, RHEL libraries are in lib/rhel
 * All binary libraries on all platforms are built for x86-64.
