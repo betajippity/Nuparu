@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.19.10a
+v0.3.19.16a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -10,7 +10,7 @@ Nuparu currently consists of:
 * [GLM](http://glm.g-truc.net) 0.9.9.3 (Src)
 * [Eigen](http://eigen.tuxfamily.org/) 3.3.7 (Src)
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.0.0 (Win)
-* [GLFW](http://www.glfw.org) 3.2.1 (Mac/Win/Linux)
+* [GLFW](http://www.glfw.org) 3.3 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
 * [Embree](https://embree.github.io) 3.5.0 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.8.4 (Mac/Win/Linux)
