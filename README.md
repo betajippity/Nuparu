@@ -31,6 +31,7 @@ Nuparu currently consists of:
 * [blosc](https://github.com/Blosc) 1.16.2 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.6.1 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.10.0 (Mac/Win/Linux)
+* [dear imgui](https://github.com/ocornut/imgui/releases) 1.71 (Src)
 
 Notes:
 
@@ -47,6 +48,7 @@ Notes:
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
+* dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
 * All binary macOS libraries are built on at least macOS Mojave with macOS's Clang variant (Apple LLVM 10.0 or greater) using libc++.
 * All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2017.
 * All binary Linux libraries are built using GCC 8.2 or later on at least Fedora 29 and at least Red Hat Enterprise Linux (RHEL) 7.6.
