@@ -12,14 +12,13 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
-
-
-
 */
 
 #ifndef __TBB_concurrent_priority_queue_H
 #define __TBB_concurrent_priority_queue_H
+
+#define __TBB_concurrent_priority_queue_H_include_area
+#include "internal/_warning_suppress_enable_notice.h"
 
 #include "atomic.h"
 #include "cache_aligned_allocator.h"
@@ -28,6 +27,7 @@
 #include "tbb_profiling.h"
 #include "internal/_aggregator_impl.h"
 #include "internal/_template_helpers.h"
+#include "internal/_allocator_traits.h"
 #include <vector>
 #include <iterator>
 #include <functional>
@@ -545,5 +545,8 @@ concurrent_priority_queue(std::initializer_list<T> init_list, CompareOrAllocalor
 using interface5::concurrent_priority_queue;
 
 } // namespace tbb
+
+#include "internal/_warning_suppress_disable_notice.h"
+#undef __TBB_concurrent_priority_queue_H_include_area
 
 #endif /* __TBB_concurrent_priority_queue_H */

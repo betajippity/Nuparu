@@ -12,10 +12,6 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
-
-
-
 */
 
 #ifndef __TBB_scalable_allocator_H
@@ -95,9 +91,12 @@ typedef enum {
     TBBMALLOC_USE_HUGE_PAGES,  /* value turns using huge pages on and off */
     /* deprecated, kept for backward compatibility only */
     USE_HUGE_PAGES = TBBMALLOC_USE_HUGE_PAGES,
-    /* try to limit memory consumption value Bytes, clean internal buffers
+    /* try to limit memory consumption value (Bytes), clean internal buffers
        if limit is exceeded, but not prevents from requesting memory from OS */
-    TBBMALLOC_SET_SOFT_HEAP_LIMIT
+    TBBMALLOC_SET_SOFT_HEAP_LIMIT,
+    /* Lower bound for the size (Bytes), that is interpreted as huge
+     * and not released during regular cleanup operations. */
+    TBBMALLOC_SET_HUGE_SIZE_THRESHOLD
 } AllocationModeParam;
 
 /** Set TBB allocator-specific allocation modes.

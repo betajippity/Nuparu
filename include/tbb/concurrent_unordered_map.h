@@ -12,10 +12,6 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
-
-
-
 */
 
 /* Container implementations in this header are based on PPL implementations
@@ -23,6 +19,9 @@
 
 #ifndef __TBB_concurrent_unordered_map_H
 #define __TBB_concurrent_unordered_map_H
+
+#define __TBB_concurrent_unordered_map_H_include_area
+#include "internal/_warning_suppress_enable_notice.h"
 
 #include "internal/_concurrent_unordered_impl.h"
 
@@ -41,7 +40,9 @@ protected:
     typedef Hash_compare hash_compare;
     typedef typename tbb::internal::allocator_rebind<Allocator, value_type>::type allocator_type;
 #if __TBB_UNORDERED_NODE_HANDLE_PRESENT
-    typedef internal::node_handle<Key, value_type, Allocator> node_type;
+    typedef tbb::internal::node_handle<key_type, value_type,
+                                  typename internal::split_ordered_list<value_type, allocator_type>::node,
+                                  allocator_type> node_type;
 #endif // __TBB_UNORDERED_NODE_HANDLE_PRESENT
 
     enum { allow_multimapping = Allow_multimapping };
@@ -484,5 +485,8 @@ using interface5::concurrent_unordered_map;
 using interface5::concurrent_unordered_multimap;
 
 } // namespace tbb
+
+#include "internal/_warning_suppress_disable_notice.h"
+#undef __TBB_concurrent_unordered_map_H_include_area
 
 #endif// __TBB_concurrent_unordered_map_H

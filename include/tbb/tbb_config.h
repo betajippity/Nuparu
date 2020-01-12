@@ -12,10 +12,6 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
-
-
-
 */
 
 #ifndef __TBB_tbb_config_H
@@ -164,13 +160,6 @@
     #define __INTEL_CXX11_MODE__ (__GXX_EXPERIMENTAL_CXX0X__ || (_MSC_VER && __STDC_HOSTED__))
 #endif
 
-// Intel(R) C++ Compiler offloading API to the Intel(R) Graphics Technology presence macro
-// TODO: add support for ICC 15.00 _GFX_enqueue API and then decrease Intel C++ Compiler supported version
-// TODO: add linux support and restict it with (__linux__ && __TBB_x86_64 && !__ANDROID__) macro
-#if __INTEL_COMPILER >= 1600 && _WIN32
-#define __TBB_GFX_PRESENT 1
-#endif
-
 #if __INTEL_COMPILER && (!_MSC_VER || __INTEL_CXX11_MODE__)
     //  On Windows, C++11 features supported by Visual Studio 2010 and higher are enabled by default,
     //  so in absence of /Qstd= use MSVC branch for feature detection.
@@ -215,7 +204,7 @@
     #define __TBB_CPP11_TEMPLATE_ALIASES_PRESENT            (__INTEL_CXX11_MODE__ && __INTEL_COMPILER >= 1210)
     #define __TBB_CPP14_INTEGER_SEQUENCE_PRESENT            (__cplusplus >= 201402L)
     #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT          (__cplusplus >= 201402L)
-    #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT            (__INTEL_COMPILER > 1901) // a future version
+    #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT            (__INTEL_COMPILER > 1910) // a future version
     #define __TBB_CPP17_INVOKE_RESULT_PRESENT               (__cplusplus >= 201703L)
 #elif __clang__
 /** TODO: these options need to be rechecked **/
@@ -225,9 +214,7 @@
 /** TODO: extend exception_ptr related conditions to cover libstdc++ **/
     #define __TBB_EXCEPTION_PTR_PRESENT                     (__cplusplus >= 201103L && (_LIBCPP_VERSION || __TBB_GLIBCXX_VERSION >= 40600))
     #define __TBB_STATIC_ASSERT_PRESENT                     __has_feature(__cxx_static_assert__)
-    /**Clang (preprocessor) has problems with dealing with expression having __has_include in #ifs
-     * used inside C++ code. (At least version that comes with OS X 10.8 : Apple LLVM version 4.2 (clang-425.0.28) (based on LLVM 3.2svn)) **/
-    #if (__GXX_EXPERIMENTAL_CXX0X__ && __has_include(<tuple>))
+    #if (__cplusplus >= 201103L && __has_include(<tuple>))
         #define __TBB_CPP11_TUPLE_PRESENT                   1
     #endif
     #if (__has_feature(__cxx_generalized_initializers__) && __has_include(<initializer_list>))
@@ -306,28 +293,28 @@
     #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT            (_MSVC_LANG >= 201703L && _MSC_VER >= 1914)
     #define __TBB_CPP17_INVOKE_RESULT_PRESENT               (_MSVC_LANG >= 201703L && _MSC_VER >= 1911)
 #else
-    #define __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT          0
-    #define __TBB_CPP11_RVALUE_REF_PRESENT                  0
-    #define __TBB_IMPLICIT_MOVE_PRESENT                     0
-    #define __TBB_EXCEPTION_PTR_PRESENT                     0
-    #define __TBB_STATIC_ASSERT_PRESENT                     0
-    #define __TBB_CPP11_TUPLE_PRESENT                       0
-    #define __TBB_INITIALIZER_LISTS_PRESENT                 0
-    #define __TBB_CONSTEXPR_PRESENT                         0
-    #define __TBB_DEFAULTED_AND_DELETED_FUNC_PRESENT        0
-    #define __TBB_NOEXCEPT_PRESENT                          0
-    #define __TBB_CPP11_STD_BEGIN_END_PRESENT               0
-    #define __TBB_CPP11_AUTO_PRESENT                        0
-    #define __TBB_CPP11_DECLTYPE_PRESENT                    0
-    #define __TBB_CPP11_LAMBDAS_PRESENT                     0
-    #define __TBB_CPP11_DEFAULT_FUNC_TEMPLATE_ARGS_PRESENT  0
-    #define __TBB_OVERRIDE_PRESENT                          0
-    #define __TBB_ALIGNAS_PRESENT                           0
-    #define __TBB_CPP11_TEMPLATE_ALIASES_PRESENT            0
+    #define __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT          __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_RVALUE_REF_PRESENT                  __TBB_CPP11_PRESENT
+    #define __TBB_IMPLICIT_MOVE_PRESENT                     __TBB_CPP11_PRESENT
+    #define __TBB_EXCEPTION_PTR_PRESENT                     __TBB_CPP11_PRESENT
+    #define __TBB_STATIC_ASSERT_PRESENT                     __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_TUPLE_PRESENT                       __TBB_CPP11_PRESENT
+    #define __TBB_INITIALIZER_LISTS_PRESENT                 __TBB_CPP11_PRESENT
+    #define __TBB_CONSTEXPR_PRESENT                         __TBB_CPP11_PRESENT
+    #define __TBB_DEFAULTED_AND_DELETED_FUNC_PRESENT        __TBB_CPP11_PRESENT
+    #define __TBB_NOEXCEPT_PRESENT                          __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_STD_BEGIN_END_PRESENT               __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_AUTO_PRESENT                        __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_DECLTYPE_PRESENT                    __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_LAMBDAS_PRESENT                     __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_DEFAULT_FUNC_TEMPLATE_ARGS_PRESENT  __TBB_CPP11_PRESENT
+    #define __TBB_OVERRIDE_PRESENT                          __TBB_CPP11_PRESENT
+    #define __TBB_ALIGNAS_PRESENT                           __TBB_CPP11_PRESENT
+    #define __TBB_CPP11_TEMPLATE_ALIASES_PRESENT            __TBB_CPP11_PRESENT
     #define __TBB_CPP14_INTEGER_SEQUENCE_PRESENT            (__cplusplus >= 201402L)
-    #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT          0
-    #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT            0
-    #define __TBB_CPP17_INVOKE_RESULT_PRESENT               0
+    #define __TBB_CPP14_VARIABLE_TEMPLATES_PRESENT          (__cplusplus >= 201402L)
+    #define __TBB_CPP17_DEDUCTION_GUIDES_PRESENT            (__cplusplus >= 201703L)
+    #define __TBB_CPP17_INVOKE_RESULT_PRESENT               (__cplusplus >= 201703L)
 #endif
 
 // C++11 standard library features
@@ -340,7 +327,6 @@
 #define __TBB_CPP11_VARIADIC_TUPLE_PRESENT                  (!_MSC_VER || _MSC_VER >= 1800)
 
 #define __TBB_CPP11_TYPE_PROPERTIES_PRESENT                 (_LIBCPP_VERSION || _MSC_VER >= 1700 || (__TBB_GLIBCXX_VERSION >= 50000 && __GXX_EXPERIMENTAL_CXX0X__))
-#define __TBB_TR1_TYPE_PROPERTIES_IN_STD_PRESENT            (__GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION >= 40300 || _MSC_VER >= 1600)
 // GCC supported some of type properties since 4.7
 #define __TBB_CPP11_IS_COPY_CONSTRUCTIBLE_PRESENT           (__GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION >= 40700 || __TBB_CPP11_TYPE_PROPERTIES_PRESENT)
 
@@ -348,7 +334,7 @@
 #define __TBB_MOVE_IF_NOEXCEPT_PRESENT                      (__TBB_NOEXCEPT_PRESENT && (__TBB_GLIBCXX_VERSION >= 40700 || _MSC_VER >= 1900 || _LIBCPP_VERSION))
 #define __TBB_ALLOCATOR_TRAITS_PRESENT                      (__cplusplus >= 201103L && _LIBCPP_VERSION  || _MSC_VER >= 1800 ||  \
                                                             __GXX_EXPERIMENTAL_CXX0X__ && __TBB_GLIBCXX_VERSION >= 40700 && !(__TBB_GLIBCXX_VERSION == 40700 && __TBB_DEFINE_MIC))
-#define __TBB_MAKE_EXCEPTION_PTR_PRESENT                    (__TBB_EXCEPTION_PTR_PRESENT && (_MSC_VER >= 1700 || __TBB_GLIBCXX_VERSION >= 40600 || _LIBCPP_VERSION))
+#define __TBB_MAKE_EXCEPTION_PTR_PRESENT                    (__TBB_EXCEPTION_PTR_PRESENT && (_MSC_VER >= 1700 || __TBB_GLIBCXX_VERSION >= 40600 || _LIBCPP_VERSION || __SUNPRO_CC))
 
 // Due to libc++ limitations in C++03 mode, do not pass rvalues to std::make_shared()
 #define __TBB_CPP11_SMART_POINTERS_PRESENT                  ( _MSC_VER >= 1600 || _LIBCPP_VERSION   \
@@ -520,6 +506,15 @@ There are four cases that are supported:
 
 /** Internal TBB features & modes **/
 
+/** __TBB_CONCURRENT_ORDERED_CONTAINERS indicates that all conditions of use
+ * concurrent_map and concurrent_set are met. **/
+// TODO: Add cpp11 random generation macro
+#ifndef __TBB_CONCURRENT_ORDERED_CONTAINERS_PRESENT
+    #define __TBB_CONCURRENT_ORDERED_CONTAINERS_PRESENT ( __TBB_CPP11_RVALUE_REF_PRESENT && __TBB_CPP11_VARIADIC_TEMPLATES_PRESENT \
+     && __TBB_IMPLICIT_MOVE_PRESENT  && __TBB_CPP11_AUTO_PRESENT && __TBB_CPP11_LAMBDAS_PRESENT && __TBB_CPP11_ARRAY_PRESENT \
+     && __TBB_INITIALIZER_LISTS_PRESENT )
+#endif
+
 /** __TBB_WEAK_SYMBOLS_PRESENT denotes that the system supports the weak symbol mechanism **/
 #ifndef __TBB_WEAK_SYMBOLS_PRESENT
 #define __TBB_WEAK_SYMBOLS_PRESENT ( !_WIN32 && !__APPLE__ && !__sun && (__TBB_GCC_VERSION >= 40000 || __INTEL_COMPILER ) )
@@ -580,6 +575,10 @@ There are four cases that are supported:
     #error __TBB_TASK_PRIORITY requires __TBB_TASK_GROUP_CONTEXT to be enabled
 #endif
 
+#if TBB_PREVIEW_NUMA_SUPPORT || __TBB_BUILD
+    #define __TBB_NUMA_SUPPORT 1
+#endif
+
 #if TBB_PREVIEW_WAITING_FOR_WORKERS || __TBB_BUILD
     #define __TBB_SUPPORTS_WORKERS_WAITING_IN_TERMINATE 1
 #endif
@@ -615,6 +614,42 @@ There are four cases that are supported:
     #else
         #define __TBB_VARIADIC_MAX 15
     #endif
+#endif
+
+// Intel C++ Compiler starts analyzing usages of the deprecated content at the template
+// instantiation site, which is too late for suppression of the corresponding messages for internal
+// stuff.
+#if !defined(__INTEL_COMPILER) && (!defined(TBB_SUPPRESS_DEPRECATED_MESSAGES) || (TBB_SUPPRESS_DEPRECATED_MESSAGES == 0))
+    #if (__cplusplus >= 201402L)
+        #define __TBB_DEPRECATED [[deprecated]]
+        #define __TBB_DEPRECATED_MSG(msg) [[deprecated(msg)]]
+    #elif _MSC_VER
+        #define __TBB_DEPRECATED __declspec(deprecated)
+        #define __TBB_DEPRECATED_MSG(msg) __declspec(deprecated(msg))
+    #elif (__GNUC__ && __TBB_GCC_VERSION >= 40805) || __clang__
+        #define __TBB_DEPRECATED __attribute__((deprecated))
+        #define __TBB_DEPRECATED_MSG(msg) __attribute__((deprecated(msg)))
+    #endif
+#endif  // !defined(TBB_SUPPRESS_DEPRECATED_MESSAGES) || (TBB_SUPPRESS_DEPRECATED_MESSAGES == 0)
+
+#if !defined(__TBB_DEPRECATED)
+    #define __TBB_DEPRECATED
+    #define __TBB_DEPRECATED_MSG(msg)
+#elif !defined(__TBB_SUPPRESS_INTERNAL_DEPRECATED_MESSAGES)
+    // Suppress deprecated messages from self
+    #define __TBB_SUPPRESS_INTERNAL_DEPRECATED_MESSAGES 1
+#endif
+
+#if defined(TBB_SUPPRESS_DEPRECATED_MESSAGES) && (TBB_SUPPRESS_DEPRECATED_MESSAGES == 0)
+    #define __TBB_DEPRECATED_VERBOSE __TBB_DEPRECATED
+    #define __TBB_DEPRECATED_VERBOSE_MSG(msg) __TBB_DEPRECATED_MSG(msg)
+#else
+    #define __TBB_DEPRECATED_VERBOSE
+    #define __TBB_DEPRECATED_VERBOSE_MSG(msg)
+#endif // (TBB_SUPPRESS_DEPRECATED_MESSAGES == 0)
+
+#if (!defined(TBB_SUPPRESS_DEPRECATED_MESSAGES) || (TBB_SUPPRESS_DEPRECATED_MESSAGES == 0)) && !__TBB_CPP11_PRESENT
+    #pragma message("TBB Warning: Support for C++98/03 is deprecated. Please use the compiler that supports C++11 features at least.")
 #endif
 
 /** __TBB_WIN8UI_SUPPORT enables support of Windows* Store Apps and limit a possibility to load
@@ -817,17 +852,22 @@ There are four cases that are supported:
 #define __TBB_PREVIEW_MESSAGE_BASED_KEY_MATCHING (TBB_PREVIEW_FLOW_GRAPH_FEATURES || __TBB_PREVIEW_OPENCL_NODE)
 #define __TBB_PREVIEW_ASYNC_MSG                 (TBB_PREVIEW_FLOW_GRAPH_FEATURES && __TBB_FLOW_GRAPH_CPP11_FEATURES)
 
-#define __TBB_PREVIEW_GFX_FACTORY               (__TBB_GFX_PRESENT && TBB_PREVIEW_FLOW_GRAPH_FEATURES && !__TBB_MIC_OFFLOAD \
-                                                && __TBB_FLOW_GRAPH_CPP11_FEATURES && __TBB_CPP11_TEMPLATE_ALIASES_PRESENT \
-                                                && __TBB_CPP11_FUTURE_PRESENT)
-
 
 #ifndef __TBB_PREVIEW_FLOW_GRAPH_PRIORITIES
 #define __TBB_PREVIEW_FLOW_GRAPH_PRIORITIES     TBB_PREVIEW_FLOW_GRAPH_FEATURES
 #endif
 
+// This feature works only in combination with critical tasks (__TBB_PREVIEW_CRITICAL_TASKS)
+#ifndef __TBB_PREVIEW_RESUMABLE_TASKS
+#define __TBB_PREVIEW_RESUMABLE_TASKS           ((__TBB_CPF_BUILD || TBB_PREVIEW_RESUMABLE_TASKS) && !__TBB_WIN8UI_SUPPORT && !__ANDROID__ && !__TBB_ipf)
+#endif
+
 #ifndef __TBB_PREVIEW_CRITICAL_TASKS
-#define __TBB_PREVIEW_CRITICAL_TASKS            (__TBB_CPF_BUILD || __TBB_PREVIEW_FLOW_GRAPH_PRIORITIES)
+#define __TBB_PREVIEW_CRITICAL_TASKS            (__TBB_CPF_BUILD || __TBB_PREVIEW_FLOW_GRAPH_PRIORITIES || __TBB_PREVIEW_RESUMABLE_TASKS)
+#endif
+
+#ifndef __TBB_PREVIEW_FLOW_GRAPH_NODE_SET
+#define __TBB_PREVIEW_FLOW_GRAPH_NODE_SET       (TBB_PREVIEW_FLOW_GRAPH_FEATURES && __TBB_CPP11_PRESENT && __TBB_FLOW_GRAPH_CPP11_FEATURES)
 #endif
 
 #endif /* __TBB_tbb_config_H */

@@ -12,14 +12,13 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-
-
-
-
 */
 
 #ifndef __TBB_task_scheduler_observer_H
 #define __TBB_task_scheduler_observer_H
+
+#define __TBB_task_scheduler_observer_H_include_area
+#include "internal/_warning_suppress_enable_notice.h"
 
 #include "atomic.h"
 #if __TBB_ARENA_OBSERVER
@@ -160,5 +159,8 @@ typedef tbb::internal::task_scheduler_observer_v3 task_scheduler_observer;
 } // namespace tbb
 
 #endif /* __TBB_SCHEDULER_OBSERVER */
+
+#include "internal/_warning_suppress_disable_notice.h"
+#undef __TBB_task_scheduler_observer_H_include_area
 
 #endif /* __TBB_task_scheduler_observer_H */
