@@ -2,9 +2,9 @@
 //
 // Copyright (c) 2002, Industrial Light & Magic, a division of Lucas
 // Digital Ltd. LLC
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
@@ -16,8 +16,8 @@
 // distribution.
 // *       Neither the name of Industrial Light & Magic nor the names of
 // its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission. 
-// 
+// from this software without specific prior written permission.
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -48,13 +48,14 @@
 #include "ImfPixelType.h"
 #include "ImfExport.h"
 #include "ImfNamespace.h"
+#include "ImathBox.h"
 
 #include <map>
 #include <string>
+#include <cstdint>
 
 
 OPENEXR_IMF_INTERNAL_NAMESPACE_HEADER_ENTER
-
 
 //-------------------------------------------------------
 // Description of a single slice of the frame buffer:
@@ -100,7 +101,7 @@ struct Slice
 
     //--------------------------------------------
     // Subsampling: pixel (x, y) is present in the
-    // slice only if 
+    // slice only if
     //
     //  x % xSampling == 0 && y % ySampling == 0
     //
@@ -116,7 +117,7 @@ struct Slice
     //----------------------------------------------------------
 
     double              fillValue;
-    
+
 
     //-------------------------------------------------------
     // For tiled files, the xTileCoords and yTileCoords flags
@@ -148,6 +149,38 @@ struct Slice
            double fillValue = 0.0,
            bool xTileCoords = false,
            bool yTileCoords = false);
+
+    // Does the heavy lifting of computing the base pointer for a slice,
+    // avoiding overflow issues with large origin offsets
+    //
+    // if xStride == 0, assumes sizeof(pixeltype)
+    // if yStride == 0, assumes xStride * ( w / xSampling )
+    IMF_EXPORT
+    static Slice Make(PixelType type,
+                      const void *ptr,
+                      const IMATH_NAMESPACE::V2i &origin,
+                      int64_t w,
+                      int64_t h,
+                      size_t xStride = 0,
+                      size_t yStride = 0,
+                      int xSampling = 1,
+                      int ySampling = 1,
+                      double fillValue = 0.0,
+                      bool xTileCoords = false,
+                      bool yTileCoords = false);
+    // same as above, just computes w and h for you
+    // from a data window
+    IMF_EXPORT
+    static Slice Make(PixelType type,
+                      const void *ptr,
+                      const IMATH_NAMESPACE::Box2i &dataWindow,
+                      size_t xStride = 0,
+                      size_t yStride = 0,
+                      int xSampling = 1,
+                      int ySampling = 1,
+                      double fillValue = 0.0,
+                      bool xTileCoords = false,
+                      bool yTileCoords = false);
 };
 
 

@@ -52,8 +52,10 @@
 #   endif
 #   define NOMINMAX
 #   include <windows.h>
-#elif HAVE_POSIX_SEMAPHORES
+#elif defined(HAVE_POSIX_SEMAPHORES)
 #   include <semaphore.h>
+#elif defined(__APPLE__)
+#   include <dispatch/dispatch.h>
 #else
 #   ifdef ILMBASE_FORCE_CXX03
 #      if HAVE_PTHREAD
@@ -89,6 +91,9 @@ class ILMTHREAD_EXPORT Semaphore
 #elif defined(HAVE_POSIX_SEMAPHORES)
 
 	mutable sem_t _semaphore;
+
+#elif defined(__APPLE__)
+	mutable dispatch_semaphore_t _semaphore;
 
 #else
 	//

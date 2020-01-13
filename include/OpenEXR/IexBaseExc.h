@@ -132,12 +132,18 @@ class BaseExc: public std::exception
     class name: public base                                         \
     {                                                               \
       public:                                                       \
-        exp name()                         throw(): base (0)    {}  \
-        exp name (const char* text)        throw(): base (text) {}  \
-        exp name (const std::string &text) throw(): base (text) {}  \
-        exp name (std::stringstream &text) throw(): base (text) {}  \
-        exp ~name() throw() { }                                     \
+        exp name() throw();                                         \
+        exp name (const char* text) throw();                        \
+        exp name (const std::string &text) throw();                 \
+        exp name (std::stringstream &text) throw();                 \
+        exp ~name() throw();                                        \
     };
+#define DEFINE_EXC_EXP_IMPL(exp, name, base)                       \
+exp name::name () throw () : base () {}                            \
+exp name::name (const char* text) throw () : base (text) {}        \
+exp name::name (const std::string& text) throw () : base (text) {} \
+exp name::name (std::stringstream& text) throw () : base (text) {} \
+exp name::~name () throw () {}
 
 // For backward compatibility.
 #define DEFINE_EXC(name, base) DEFINE_EXC_EXP(, name, base)
