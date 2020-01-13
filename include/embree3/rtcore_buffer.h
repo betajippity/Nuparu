@@ -1,5 +1,5 @@
 // ======================================================================== //
-// Copyright 2009-2018 Intel Corporation                                    //
+// Copyright 2009-2020 Intel Corporation                                    //
 //                                                                          //
 // Licensed under the Apache License, Version 2.0 (the "License");          //
 // you may not use this file except in compliance with the License.         //
@@ -18,9 +18,7 @@
 
 #include "rtcore_device.h"
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
+RTC_NAMESPACE_BEGIN
 
 /* Types of buffers */
 enum RTCBufferType
@@ -63,6 +61,4 @@ RTC_API void rtcRetainBuffer(RTCBuffer buffer);
 /* Releases the buffer (decrements the reference count). */
 RTC_API void rtcReleaseBuffer(RTCBuffer buffer);
 
-#if defined(__cplusplus)
-}
-#endif
+RTC_NAMESPACE_END

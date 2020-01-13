@@ -12,7 +12,7 @@ Nuparu currently consists of:
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.0.0 (Win)
 * [GLFW](http://www.glfw.org) 3.3 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
-* [Embree](https://embree.github.io) 3.5.0 (Mac/Win/Linux)
+* [Embree](https://embree.github.io) 3.7.0 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.8.4 (Mac/Win/Linux)
 * [OpenEXR](http://www.openexr.com) 2.3.0 (Mac/Win/Linux)
 * [stb_image](https://github.com/nothings/stb) 2.20 (Src)
@@ -45,6 +45,7 @@ Notes:
 * Partio is built without support for .prt files.
 * RMSD has minor modifications for C++ support.
 * Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
+* Embree is built with a max nested instancing depth of 8.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
