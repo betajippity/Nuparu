@@ -28,7 +28,7 @@ Nuparu currently consists of:
 * [Boost](http://www.boost.org) 1.72.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.3 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 6.0.0 (Mac/Win/Linux)
-* [blosc](https://github.com/Blosc) 1.16.2 (Mac/Win/Linux)
+* [blosc](https://github.com/Blosc) 1.17.1 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.6.1 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.12.0 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui/releases) 1.71 (Src)
