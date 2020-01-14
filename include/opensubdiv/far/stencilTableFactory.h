@@ -38,14 +38,17 @@ namespace Far {
 
 class TopologyRefiner;
 
-class Stencil;
-class StencilTable;
-class LimitStencil;
-class LimitStencilTable;
+template <typename REAL> class StencilReal;
+template <typename REAL> class StencilTableReal;
+
+template <typename REAL> class LimitStencilReal;
+template <typename REAL> class LimitStencilTableReal;
+
 
 /// \brief A specialized factory for StencilTable
 ///
-class StencilTableFactory {
+template <typename REAL>
+class StencilTableFactoryReal {
 
 public:
 
@@ -88,8 +91,8 @@ public:
     ///
     /// @param options  Options controlling the creation of the table
     ///
-    static StencilTable const * Create(TopologyRefiner const & refiner,
-        Options options = Options());
+    static StencilTableReal<REAL> const * Create(
+                TopologyRefiner const & refiner, Options options = Options());
 
 
     /// \brief Instantiates StencilTable by concatenating an array of existing
@@ -104,7 +107,8 @@ public:
     ///
     /// @param tables    Array of input StencilTables
     ///
-    static StencilTable const * Create(int numTables, StencilTable const ** tables);
+    static StencilTableReal<REAL> const * Create(
+                int numTables, StencilTableReal<REAL> const ** tables);
 
 
     /// \brief Utility function for stencil splicing for local point stencils.
@@ -116,16 +120,39 @@ public:
     /// @param localPointStencilTable
     ///                             StencilTable for the change of basis patch points.
     ///
-    /// @param factorize            If factorize set to true, endcap stencils will be
+    /// @param factorize            If factorize is set to true, endcap stencils will be
     ///                             factorized with supporting vertices from baseStencil
     ///                             table so that the endcap points can be computed
     ///                             directly from control vertices.
     ///
-    static StencilTable const * AppendLocalPointStencilTable(
-        TopologyRefiner const &refiner,
-        StencilTable const *baseStencilTable,
-        StencilTable const *localPointStencilTable,
-        bool factorize = true);
+    static StencilTableReal<REAL> const * AppendLocalPointStencilTable(
+                TopologyRefiner const &refiner,
+                StencilTableReal<REAL> const *baseStencilTable,
+                StencilTableReal<REAL> const *localPointStencilTable,
+                bool factorize = true);
+
+    /// \brief Utility function for stencil splicing for local point varying stencils.
+    ///
+    /// @param refiner              The TopologyRefiner containing the topology
+    ///
+    /// @param baseStencilTable     Input StencilTable for refined vertices
+    ///
+    /// @param localPointStencilTable
+    ///                             StencilTable for the change of basis patch points.
+    ///
+    /// @param factorize            If factorize is set to true, endcap stencils will be
+    ///                             factorized with supporting vertices from baseStencil
+    ///                             table so that the endcap points can be computed
+    ///                             directly from control vertices.
+    ///
+    static StencilTableReal<REAL> const * AppendLocalPointStencilTableVarying(
+                TopologyRefiner const &refiner,
+                StencilTableReal<REAL> const *baseStencilTable,
+                StencilTableReal<REAL> const *localPointStencilTable,
+                bool factorize = true) {
+        return AppendLocalPointStencilTable(
+                refiner, baseStencilTable, localPointStencilTable, factorize);
+    }
 
     /// \brief Utility function for stencil splicing for local point
     /// face-varying stencils.
@@ -139,30 +166,32 @@ public:
     ///
     /// @param channel              face-varying channel
     ///
-    /// @param factorize            If factorize sets to true, endcap stencils will be
+    /// @param factorize            If factorize is set to true, endcap stencils will be
     ///                             factorized with supporting vertices from baseStencil
     ///                             table so that the endcap points can be computed
     ///                             directly from control vertices.
     ///
-    static StencilTable const * AppendLocalPointStencilTableFaceVarying(
-        TopologyRefiner const &refiner,
-        StencilTable const *baseStencilTable,
-        StencilTable const *localPointStencilTable,
-        int channel = 0,
-        bool factorize = true);
+    static StencilTableReal<REAL> const * AppendLocalPointStencilTableFaceVarying(
+                TopologyRefiner const &refiner,
+                StencilTableReal<REAL> const *baseStencilTable,
+                StencilTableReal<REAL> const *localPointStencilTable,
+                int channel = 0,
+                bool factorize = true);
 
 private:
 
     // Generate stencils for the coarse control-vertices (single weight = 1.0f)
-    static void generateControlVertStencils(int numControlVerts, Stencil & dst);
+    static void generateControlVertStencils(
+                int numControlVerts,
+                StencilReal<REAL> & dst);
 
     // Internal method to splice local point stencils
-    static StencilTable const * appendLocalPointStencilTable(
-        TopologyRefiner const &refiner,
-        StencilTable const * baseStencilTable,
-        StencilTable const * localPointStencilTable,
-        int channel,
-        bool factorize);
+    static StencilTableReal<REAL> const * appendLocalPointStencilTable(
+                TopologyRefiner const &refiner,
+                StencilTableReal<REAL> const * baseStencilTable,
+                StencilTableReal<REAL> const * localPointStencilTable,
+                int channel,
+                bool factorize);
 };
 
 /// \brief A specialized factory for LimitStencilTable
@@ -176,9 +205,29 @@ private:
 /// normalized (s,t) patch coordinates. The factory exposes the LocationArray
 /// struct as a container for these location descriptors.
 ///
-class LimitStencilTableFactory {
+template <typename REAL>
+class LimitStencilTableFactoryReal {
 
 public:
+
+    enum Mode {
+        INTERPOLATE_VERTEX=0,           ///< vertex primvar stencils
+        INTERPOLATE_VARYING,            ///< varying primvar stencils
+        INTERPOLATE_FACE_VARYING        ///< face-varying primvar stencils
+    };
+
+    struct Options {
+
+        Options() : interpolationMode(INTERPOLATE_VERTEX),
+                    generate1stDerivatives(true),
+                    generate2ndDerivatives(false),
+                    fvarChannel(0) { }
+
+        unsigned int interpolationMode           : 2, ///< interpolation mode
+                     generate1stDerivatives      : 1, ///< Generate weights for 1st derivatives
+                     generate2ndDerivatives      : 1; ///< Generate weights for 2nd derivatives
+        unsigned int fvarChannel;                     ///< face-varying channel to use
+    };
 
     /// \brief Descriptor for limit surface locations
     struct LocationArray {
@@ -188,20 +237,11 @@ public:
         int ptexIdx,        ///< ptex face index
             numLocations;   ///< number of (u,v) coordinates in the array
 
-        float const * s,    ///< array of u coordinates
+        REAL  const * s,    ///< array of u coordinates
                     * t;    ///< array of v coordinates
     };
 
     typedef std::vector<LocationArray> LocationArrayVec;
-
-    struct Options {
-
-        Options() : generate1stDerivatives(true),
-                    generate2ndDerivatives(false) { }
-
-        unsigned int generate1stDerivatives      : 1, ///< Generate weights for 1st derivatives
-                     generate2ndDerivatives      : 1; ///< Generate weights for 2nd derivatives
-    };
 
     /// \brief Instantiates LimitStencilTable from a TopologyRefiner that has
     ///        been refined either uniformly or adaptively.
@@ -211,24 +251,128 @@ public:
     /// @param locationArrays   An array of surface location descriptors
     ///                         (see LocationArray)
     ///
-    /// @param cvStencils       A set of StencilTable generated from the
-    ///                         TopologyRefiner (optional: prevents redundant
-    ///                         instantiation of the table if available)
+    /// @param cvStencils       A StencilTable generated from the TopologyRefiner
+    ///                         (Optional: prevents redundant instantiation of the
+    ///                         table if available. The given table must at least
+    ///                         contain stencils for all control points and all
+    ///                         refined points -- any stencils for local points of
+    ///                         a PatchTable must match the PatchTable provided or
+    ///                         internally generated)
     ///
-    /// @param patchTable       A set of PatchTable generated from the
-    ///                         TopologyRefiner (optional: prevents redundant
-    ///                         instantiation of the table if available)
+    /// @param patchTable       A PatchTable generated from the TopologyRefiner
+    ///                         (Optional: prevents redundant instantiation of the
+    ///                         table if available. The given table must match
+    ///                         the optional StencilTable if also provided)
     ///
     /// @param options          Options controlling the creation of the table
     ///
-    static LimitStencilTable const * Create(TopologyRefiner const & refiner,
-        LocationArrayVec const & locationArrays,
-            StencilTable const * cvStencils=0,
-              PatchTable const * patchTable=0,
-                         Options options=Options());
+    static LimitStencilTableReal<REAL> const * Create(
+                TopologyRefiner const & refiner,
+                LocationArrayVec const & locationArrays,
+                StencilTableReal<REAL> const * cvStencils = 0,
+                PatchTable const * patchTable = 0,
+                Options options = Options());
 
 };
 
+
+//
+//  Public wrapper classes for the templates
+//
+class Stencil;
+class StencilTable;
+
+/// \brief Stencil table factory class wrapping the template for compatibility.
+///
+class StencilTableFactory : public StencilTableFactoryReal<float> {
+private:
+    typedef StencilTableFactoryReal<float> BaseFactory;
+    typedef StencilTableReal<float>        BaseTable;
+
+public:
+    static StencilTable const * Create(
+                TopologyRefiner const & refiner, Options options = Options()) {
+
+        return static_cast<StencilTable const *>(
+                BaseFactory::Create(refiner, options));
+    }
+
+    static StencilTable const * Create(
+                int numTables, StencilTable const ** tables) {
+
+        return static_cast<StencilTable const *>(
+                BaseFactory::Create(numTables,
+                        reinterpret_cast<BaseTable const **>(tables)));
+    }
+
+    static StencilTable const * AppendLocalPointStencilTable(
+                TopologyRefiner const &refiner,
+                StencilTable const *baseStencilTable,
+                StencilTable const *localPointStencilTable,
+                bool factorize = true) {
+
+        return static_cast<StencilTable const *>(
+                BaseFactory::AppendLocalPointStencilTable(refiner,
+                        static_cast<BaseTable const *>(baseStencilTable),
+                        static_cast<BaseTable const *>(localPointStencilTable),
+                        factorize));
+    }
+
+    static StencilTable const * AppendLocalPointStencilTableVarying(
+                TopologyRefiner const &refiner,
+                StencilTable const *baseStencilTable,
+                StencilTable const *localPointStencilTable,
+                bool factorize = true) {
+
+        return static_cast<StencilTable const *>(
+                BaseFactory::AppendLocalPointStencilTableVarying(refiner,
+                        static_cast<BaseTable const *>(baseStencilTable),
+                        static_cast<BaseTable const *>(localPointStencilTable),
+                        factorize));
+    }
+
+    static StencilTable const * AppendLocalPointStencilTableFaceVarying(
+                TopologyRefiner const &refiner,
+                StencilTable const *baseStencilTable,
+                StencilTable const *localPointStencilTable,
+                int channel = 0,
+                bool factorize = true) {
+
+        return static_cast<StencilTable const *>(
+                BaseFactory::AppendLocalPointStencilTableFaceVarying(refiner,
+                        static_cast<BaseTable const *>(baseStencilTable),
+                        static_cast<BaseTable const *>(localPointStencilTable),
+                        channel, factorize));
+    }
+};
+
+class LimitStencil;
+class LimitStencilTable;
+
+/// \brief Stencil table factory class wrapping the template for compatibility.
+///
+class LimitStencilTableFactory : public LimitStencilTableFactoryReal<float> {
+private:
+    typedef LimitStencilTableFactoryReal<float> BaseFactory;
+    typedef StencilTableReal<float>             BaseTable;
+
+public:
+    static LimitStencilTable const * Create(
+                TopologyRefiner const & refiner,
+                LocationArrayVec const & locationArrays,
+                StencilTable const * cvStencils = 0,
+                PatchTable const * patchTable = 0,
+                Options options = Options()) {
+
+        return static_cast<LimitStencilTable const *>(
+                BaseFactory::Create(
+                        refiner,
+                        locationArrays,
+                        static_cast<BaseTable const *>(cvStencils),
+                        patchTable,
+                        options));
+    }
+};
 
 } // end namespace Far
 

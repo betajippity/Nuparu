@@ -160,6 +160,17 @@ public:
     /// \brief Returns the number of local vertex points.
     int GetNumLocalPoints() const;
 
+    /// \brief Returns the stencil table to compute local point vertex values
+    StencilTable const *GetLocalPointStencilTable() const;
+
+    /// \brief Returns the stencil table to compute local point vertex values
+    template <typename REAL>
+    StencilTableReal<REAL> const *GetLocalPointStencilTable() const;
+
+    /// \brief Tests if the precision of the stencil table to compute local point
+    /// vertex values matches the given floating point type \<REAL\>.
+    template <typename REAL> bool LocalPointStencilPrecisionMatchesType() const;
+
     /// \brief Updates local point vertex values.
     ///
     /// @param src       Buffer with primvar data for the base and refined
@@ -168,17 +179,27 @@ public:
     /// @param dst       Destination buffer for the computed local point
     ///                  vertex values
     ///
+    /// For more flexibility computing local vertex points, retrieval of
+    /// the local point stencil table and use of its public methods is
+    /// recommended or often required.
     ///
     template <class T> void
     ComputeLocalPointValues(T const *src, T *dst) const;
 
-    /// \brief Returns the stencil table to compute local point vertex values
-    StencilTable const *GetLocalPointStencilTable() const {
-        return _localPointStencils;
-    }
 
     /// \brief Returns the number of local varying points.
     int GetNumLocalPointsVarying() const;
+
+    /// \brief Returns the stencil table to compute local point varying values
+    StencilTable const *GetLocalPointVaryingStencilTable() const;
+
+    /// \brief Returns the stencil table to compute local point varying values
+    template <typename REAL>
+    StencilTableReal<REAL> const *GetLocalPointVaryingStencilTable() const;
+
+    /// \brief Tests if the precision of the stencil table to compute local point
+    /// varying values matches the given floating point type \<REAL\>.
+    template <typename REAL> bool LocalPointVaryingStencilPrecisionMatchesType() const;
 
     /// \brief Updates local point varying values.
     ///
@@ -188,17 +209,27 @@ public:
     /// @param dst       Destination buffer for the computed local point
     ///                  varying values
     ///
+    /// For more flexibility computing local varying points, retrieval of
+    /// the local point varying stencil table and use of its public methods
+    /// is recommended or often required.
     ///
     template <class T> void
     ComputeLocalPointValuesVarying(T const *src, T *dst) const;
 
-    /// \brief Returns the stencil table to compute local point varying values
-    StencilTable const *GetLocalPointVaryingStencilTable() const {
-        return _localPointVaryingStencils;
-    }
 
     /// \brief Returns the number of local face-varying points for \p channel
     int GetNumLocalPointsFaceVarying(int channel = 0) const;
+
+    /// \brief Returns the stencil table to compute local point face-varying values
+    StencilTable const *GetLocalPointFaceVaryingStencilTable(int channel = 0) const;
+
+    /// \brief Returns the stencil table to compute local point face-varying values
+    template <typename REAL>
+    StencilTableReal<REAL> const * GetLocalPointFaceVaryingStencilTable(int channel = 0) const;
+
+    /// \brief Tests if the precision of the stencil table to compute local point
+    /// face-varying values matches the given floating point type \<REAL\>.
+    template <typename REAL> bool LocalPointFaceVaryingStencilPrecisionMatchesType() const;
 
     /// \brief Updates local point face-varying values.
     ///
@@ -210,17 +241,12 @@ public:
     ///
     /// @param channel   face-varying channel
     ///
+    /// For more flexibility computing local face-varying points, retrieval
+    /// of the local point face-varying stencil table and use of its public
+    /// methods is recommended or often required.
     ///
     template <class T> void
     ComputeLocalPointValuesFaceVarying(T const *src, T *dst, int channel = 0) const;
-
-    /// \brief Returns the stencil table to compute local point face-varying values
-    StencilTable const *GetLocalPointFaceVaryingStencilTable(int channel = 0) const {
-        if (channel >= 0 && channel < (int)_localPointFaceVaryingStencils.size()) {
-            return _localPointFaceVaryingStencils[channel];
-        }
-        return NULL;
-    }
     //@}
 
 
@@ -298,7 +324,13 @@ public:
     /// \brief Returns the number of face-varying channels
     int GetNumFVarChannels() const;
 
-    /// \brief Returns the patch descriptor for \p channel
+    /// \brief Returns the regular patch descriptor for \p channel
+    PatchDescriptor GetFVarPatchDescriptorRegular(int channel = 0) const;
+
+    /// \brief Returns the irregular patch descriptor for \p channel
+    PatchDescriptor GetFVarPatchDescriptorIrregular(int channel = 0) const;
+
+    /// \brief Returns the default/irregular patch descriptor for \p channel
     PatchDescriptor GetFVarPatchDescriptor(int channel = 0) const;
 
     /// \brief Returns the value indices for a given patch in \p channel
@@ -312,6 +344,9 @@ public:
 
     /// \brief Returns an array of value indices for the patches in \p channel
     ConstIndexArray GetFVarValues(int channel = 0) const;
+
+    /// \brief Returns the stride between patches in the value index array of \p channel
+    int GetFVarValueStride(int channel = 0) const;
 
     /// \brief Returns the value indices for a given patch in \p channel
     PatchParam GetPatchFVarPatchParam(PatchHandle const & handle, int channel = 0) const;
@@ -390,9 +425,22 @@ public:
     ///
     /// @param wDvv    Weights (evaluated basis functions) for 2nd derivative wrt v
     ///
+    template <typename REAL>
+    void EvaluateBasis(PatchHandle const & handle, REAL u, REAL v,
+        REAL wP[], REAL wDu[] = 0, REAL wDv[] = 0,
+        REAL wDuu[] = 0, REAL wDuv[] = 0, REAL wDvv[] = 0) const;
+
+    /// \brief  An overloaded version to assist template parameter resolution
+    /// when explicitly declaring unused array arguments as 0.
     void EvaluateBasis(PatchHandle const & handle, float u, float v,
         float wP[], float wDu[] = 0, float wDv[] = 0,
         float wDuu[] = 0, float wDuv[] = 0, float wDvv[] = 0) const;
+
+    /// \brief  An overloaded version to assist template parameter resolution
+    /// when explicitly declaring unused array arguments as 0.
+    void EvaluateBasis(PatchHandle const & handle, double u, double v,
+        double wP[], double wDu[] = 0, double wDv[] = 0,
+        double wDuu[] = 0, double wDuv[] = 0, double wDvv[] = 0) const;
 
     /// \brief Evaluate basis functions for a varying value and
     /// derivatives at a given (u,v) parametric location of a patch.
@@ -416,9 +464,22 @@ public:
     ///
     /// @param wDvv    Weights (evaluated basis functions) for 2nd derivative wrt v
     ///
+    template <typename REAL>
+    void EvaluateBasisVarying(PatchHandle const & handle, REAL u, REAL v,
+        REAL wP[], REAL wDu[] = 0, REAL wDv[] = 0,
+        REAL wDuu[] = 0, REAL wDuv[] = 0, REAL wDvv[] = 0) const;
+
+    /// \brief  An overloaded version to assist template parameter resolution
+    /// when explicitly declaring unused array arguments as 0.
     void EvaluateBasisVarying(PatchHandle const & handle, float u, float v,
         float wP[], float wDu[] = 0, float wDv[] = 0,
         float wDuu[] = 0, float wDuv[] = 0, float wDvv[] = 0) const;
+
+    /// \brief  An overloaded version to assist template parameter resolution
+    /// when explicitly declaring unused array arguments as 0.
+    void EvaluateBasisVarying(PatchHandle const & handle, double u, double v,
+        double wP[], double wDu[] = 0, double wDv[] = 0,
+        double wDuu[] = 0, double wDuv[] = 0, double wDvv[] = 0) const;
 
     /// \brief Evaluate basis functions for a face-varying value and
     /// derivatives at a given (u,v) parametric location of a patch.
@@ -444,9 +505,24 @@ public:
     ///
     /// @param channel face-varying channel
     ///
+    template <typename REAL>
+    void EvaluateBasisFaceVarying(PatchHandle const & handle, REAL u, REAL v,
+        REAL wP[], REAL wDu[] = 0, REAL wDv[] = 0,
+        REAL wDuu[] = 0, REAL wDuv[] = 0, REAL wDvv[] = 0,
+        int channel = 0) const;
+
+    /// \brief  An overloaded version to assist template parameter resolution
+    /// when explicitly declaring unused array arguments as 0.
     void EvaluateBasisFaceVarying(PatchHandle const & handle, float u, float v,
         float wP[], float wDu[] = 0, float wDv[] = 0,
         float wDuu[] = 0, float wDuv[] = 0, float wDvv[] = 0,
+        int channel = 0) const;
+
+    /// \brief  An overloaded version to assist template parameter resolution
+    /// when explicitly declaring unused array arguments as 0.
+    void EvaluateBasisFaceVarying(PatchHandle const & handle, double u, double v,
+        double wP[], double wDu[] = 0, double wDv[] = 0,
+        double wDuu[] = 0, double wDuv[] = 0, double wDvv[] = 0,
         int channel = 0) const;
     //@}
 
@@ -506,7 +582,8 @@ private:
 
     void allocateFVarPatchChannels(int numChannels);
     void allocateFVarPatchChannelValues(
-        PatchDescriptor desc, int numPatches, int channel);
+        PatchDescriptor regDesc, PatchDescriptor irregDesc,
+        int numPatches, int channel);
 
     // deprecated
     void setFVarPatchChannelLinearInterpolation(
@@ -517,6 +594,38 @@ private:
 
     PatchParamArray getFVarPatchParams(int channel);
     PatchParam getPatchFVarPatchParam(int patch, int channel) const;
+
+private:
+    //
+    //  Simple private class to hold stencil table pointers of varying precision,
+    //  where the discriminant of the precision is external.
+    //
+    //  NOTE that this is a simple pointer container and NOT a smart pointer that
+    //  manages the ownership of the object referred to by it.
+    //
+    class StencilTablePtr {
+    private:
+        typedef StencilTableReal<float>  float_type;
+        typedef StencilTableReal<double> double_type;
+
+        union {
+            float_type  * _fPtr;
+            double_type * _dPtr;
+        };
+
+    public:
+        StencilTablePtr()                  { _fPtr = 0; }
+        StencilTablePtr(float_type  * ptr) { _fPtr = ptr; }
+        StencilTablePtr(double_type * ptr) { _dPtr = ptr; }
+
+        operator bool() const { return _fPtr != 0; }
+
+        void Set()                  { _fPtr = 0; }
+        void Set(float_type  * ptr) { _fPtr = ptr; }
+        void Set(double_type * ptr) { _dPtr = ptr; }
+
+        template <typename REAL> StencilTableReal<REAL> * Get() const;
+    };
 
 private:
 
@@ -541,13 +650,13 @@ private:
     //
     QuadOffsetsTable     _quadOffsetsTable;   // Quad offsets (for Gregory patches)
     VertexValenceTable   _vertexValenceTable; // Vertex valence table (for Gregory patches)
-    StencilTable const * _localPointStencils;  // endcap basis conversion stencils
-    StencilTable const * _localPointVaryingStencils; // endcap varying stencils (for convenience)
+
+    StencilTablePtr _localPointStencils;        // local point conversion stencils
+    StencilTablePtr _localPointVaryingStencils; // local point varying stencils
 
     //
     // Varying data
     //
-
     PatchDescriptor _varyingDesc;
 
     std::vector<Index>   _varyingVerts;
@@ -555,45 +664,192 @@ private:
     //
     // Face-varying data
     //
-
     FVarPatchChannelVector _fvarChannels;
 
-    std::vector<StencilTable const *> _localPointFaceVaryingStencils;
+    std::vector<StencilTablePtr> _localPointFaceVaryingStencils;
 
     //
     // 'single-crease' patch sharpness tables
     //
-
     std::vector<Index>   _sharpnessIndices; // Indices of single-crease sharpness (one per patch)
     std::vector<float>   _sharpnessValues;  // Sharpness values.
+
+    //
+    //  Construction history -- relevant to at least one public query:
+    //
+    unsigned int _isUniformLinear : 1;
+
+    //
+    //  Precision -- only applies to local-point stencil tables
+    //
+    unsigned int _vertexPrecisionIsDouble      : 1;
+    unsigned int _varyingPrecisionIsDouble     : 1;
+    unsigned int _faceVaryingPrecisionIsDouble : 1;
 };
 
+
+//
+//  Template specializations for float/double -- to be defined before used:
+//
+template <> inline StencilTableReal<float> *
+PatchTable::StencilTablePtr::Get<float>() const { return _fPtr; }
+
+template <> inline StencilTableReal<double> *
+PatchTable::StencilTablePtr::Get<double>() const { return _dPtr; }
+
+template <> inline bool
+PatchTable::LocalPointStencilPrecisionMatchesType<float>() const {
+    return !_vertexPrecisionIsDouble;
+}
+template <> inline bool
+PatchTable::LocalPointVaryingStencilPrecisionMatchesType<float>() const {
+    return !_varyingPrecisionIsDouble;
+}
+template <> inline bool
+PatchTable::LocalPointFaceVaryingStencilPrecisionMatchesType<float>() const {
+    return !_faceVaryingPrecisionIsDouble;
+}
+
+template <> inline bool
+PatchTable::LocalPointStencilPrecisionMatchesType<double>() const {
+    return _vertexPrecisionIsDouble;
+}
+template <> inline bool
+PatchTable::LocalPointVaryingStencilPrecisionMatchesType<double>() const {
+    return _varyingPrecisionIsDouble;
+}
+template <> inline bool
+PatchTable::LocalPointFaceVaryingStencilPrecisionMatchesType<double>() const {
+    return _faceVaryingPrecisionIsDouble;
+}
+
+//
+//  StencilTable access -- backward compatible and generic:
+//
+inline StencilTable const *
+PatchTable::GetLocalPointStencilTable() const {
+    assert(LocalPointStencilPrecisionMatchesType<float>());
+    return static_cast<StencilTable const *>(_localPointStencils.Get<float>());
+}
+inline StencilTable const *
+PatchTable::GetLocalPointVaryingStencilTable() const {
+    assert(LocalPointVaryingStencilPrecisionMatchesType<float>());
+    return static_cast<StencilTable const *>(
+            _localPointVaryingStencils.Get<float>());
+}
+inline StencilTable const *
+PatchTable::GetLocalPointFaceVaryingStencilTable(int channel) const {
+    assert(LocalPointFaceVaryingStencilPrecisionMatchesType<float>());
+    if (channel >= 0 && channel < (int)_localPointFaceVaryingStencils.size()) {
+        return static_cast<StencilTable const *>(
+                _localPointFaceVaryingStencils[channel].Get<float>());
+    }
+    return NULL;
+}
+
+template <typename REAL>
+inline StencilTableReal<REAL> const *
+PatchTable::GetLocalPointStencilTable() const {
+    assert(LocalPointStencilPrecisionMatchesType<REAL>());
+    return _localPointStencils.Get<REAL>();
+}
+template <typename REAL>
+inline StencilTableReal<REAL> const *
+PatchTable::GetLocalPointVaryingStencilTable() const {
+    assert(LocalPointVaryingStencilPrecisionMatchesType<REAL>());
+    return _localPointVaryingStencils.Get<REAL>();
+}
+template <typename REAL>
+inline StencilTableReal<REAL> const *
+PatchTable::GetLocalPointFaceVaryingStencilTable(int channel) const {
+    assert(LocalPointFaceVaryingStencilPrecisionMatchesType<REAL>());
+    if (channel >= 0 && channel < (int)_localPointFaceVaryingStencils.size()) {
+        return _localPointFaceVaryingStencils[channel].Get<REAL>();
+    }
+    return NULL;
+}
+
+
+//
+//  Computation of local point values:
+//
 template <class T>
 inline void
 PatchTable::ComputeLocalPointValues(T const *src, T *dst) const {
+    assert(LocalPointStencilPrecisionMatchesType<float>());
     if (_localPointStencils) {
-        _localPointStencils->UpdateValues(src, dst);
+        _localPointStencils.Get<float>()->UpdateValues(src, dst);
     }
 }
 
 template <class T>
 inline void
 PatchTable::ComputeLocalPointValuesVarying(T const *src, T *dst) const {
+    assert(LocalPointVaryingStencilPrecisionMatchesType<float>());
     if (_localPointVaryingStencils) {
-        _localPointVaryingStencils->UpdateValues(src, dst);
+        _localPointVaryingStencils.Get<float>()->UpdateValues(src, dst);
     }
 }
 
 template <class T>
 inline void
 PatchTable::ComputeLocalPointValuesFaceVarying(T const *src, T *dst, int channel) const {
+    assert(LocalPointFaceVaryingStencilPrecisionMatchesType<float>());
     if (channel >= 0 && channel < (int)_localPointFaceVaryingStencils.size()) {
         if (_localPointFaceVaryingStencils[channel]) {
-            _localPointFaceVaryingStencils[channel]->UpdateValues(src, dst);
+            _localPointFaceVaryingStencils[channel].Get<float>()->UpdateValues(src, dst);
         }
     }
 }
 
+
+//
+//  Basis evaluation overloads
+//
+inline void
+PatchTable::EvaluateBasis(PatchHandle const & handle, float u, float v,
+    float wP[], float wDu[], float wDv[],
+    float wDuu[], float wDuv[], float wDvv[]) const {
+
+    EvaluateBasis<float>(handle, u, v, wP, wDu, wDv, wDuu, wDuv, wDvv);
+}
+inline void
+PatchTable::EvaluateBasis(PatchHandle const & handle, double u, double v,
+    double wP[], double wDu[], double wDv[],
+    double wDuu[], double wDuv[], double wDvv[]) const {
+
+    EvaluateBasis<double>(handle, u, v, wP, wDu, wDv, wDuu, wDuv, wDvv);
+}
+
+inline void
+PatchTable::EvaluateBasisVarying(PatchHandle const & handle, float u, float v,
+    float wP[], float wDu[], float wDv[],
+    float wDuu[], float wDuv[], float wDvv[]) const {
+
+    EvaluateBasisVarying<float>(handle, u, v, wP, wDu, wDv, wDuu, wDuv, wDvv);
+}
+inline void
+PatchTable::EvaluateBasisVarying(PatchHandle const & handle, double u, double v,
+    double wP[], double wDu[], double wDv[],
+    double wDuu[], double wDuv[], double wDvv[]) const {
+
+    EvaluateBasisVarying<double>(handle, u, v, wP, wDu, wDv, wDuu, wDuv, wDvv);
+}
+
+inline void
+PatchTable::EvaluateBasisFaceVarying(PatchHandle const & handle, float u, float v,
+    float wP[], float wDu[], float wDv[],
+    float wDuu[], float wDuv[], float wDvv[], int channel) const {
+
+    EvaluateBasisFaceVarying<float>(handle, u, v, wP, wDu, wDv, wDuu, wDuv, wDvv, channel);
+}
+inline void
+PatchTable::EvaluateBasisFaceVarying(PatchHandle const & handle, double u, double v,
+    double wP[], double wDu[], double wDv[],
+    double wDuu[], double wDuv[], double wDvv[], int channel) const {
+
+    EvaluateBasisFaceVarying<double>(handle, u, v, wP, wDu, wDv, wDuu, wDuv, wDvv, channel);
+}
 
 } // end namespace Far
 

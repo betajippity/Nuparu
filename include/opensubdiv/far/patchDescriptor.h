@@ -41,12 +41,6 @@ namespace Far {
 ///
 /// Uniquely identifies all the different types of patches
 ///
-/// * Uniformly subdivided meshes contain bilinear patches of either QUADS
-///   or TRIANGLES
-///
-/// * Adaptively subdivided meshes contain bicubic patches of types REGULAR,
-///   GREGORY, GREGORY_BOUNDARY, GREGORY_BASIS.
-///
 class PatchDescriptor {
 
 public:
@@ -57,15 +51,16 @@ public:
         POINTS,            ///< points (useful for cage drawing)
         LINES,             ///< lines  (useful for cage drawing)
 
-        QUADS,             ///< bilinear quads-only patches
-        TRIANGLES,         ///< bilinear triangles-only mesh
+        QUADS,             ///< 4-sided quadrilateral (bilinear)
+        TRIANGLES,         ///< 3-sided triangle
 
-        LOOP,              ///< Loop patch
+        LOOP,              ///< regular triangular patch for the Loop scheme
 
-        REGULAR,           ///< feature-adaptive bicubic patches
+        REGULAR,           ///< regular B-Spline patch for the Catmark scheme
         GREGORY,
         GREGORY_BOUNDARY,
-        GREGORY_BASIS
+        GREGORY_BASIS,
+        GREGORY_TRIANGLE
     };
 
 public:
@@ -87,9 +82,9 @@ public:
         return (Type)_type;
     }
 
-    /// \brief Returns true if the type is an adaptive patch
+    /// \brief Returns true if the type is an adaptive (non-linear) patch
     static inline bool IsAdaptive(Type type) {
-        return (type>=LOOP && type<=GREGORY_BASIS);
+        return type > TRIANGLES;
     }
 
     /// \brief Returns true if the type is an adaptive patch
@@ -149,10 +144,12 @@ inline short
 PatchDescriptor::GetNumControlVertices( Type type ) {
     switch (type) {
         case REGULAR           : return GetRegularPatchSize();
+        case LOOP              : return 12;
         case QUADS             : return 4;
         case GREGORY           :
         case GREGORY_BOUNDARY  : return GetGregoryPatchSize();
         case GREGORY_BASIS     : return GetGregoryBasisPatchSize();
+        case GREGORY_TRIANGLE  : return 18;
         case TRIANGLES         : return 3;
         case LINES             : return 2;
         case POINTS            : return 1;

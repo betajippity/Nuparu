@@ -112,12 +112,22 @@ public:
         VTagSize _semiSharp       : 1;  // variable
         VTagSize _semiSharpEdges  : 1;  // variable
         VTagSize _rule            : 4;  // variable when _semiSharp
-        VTagSize _incomplete      : 1;  // variable for sparse refinement
+
+        //  These next to tags are complementary -- the "incomplete" tag is only
+        //  relevant for refined levels while the "incident an irregular face" tag
+        //  is only relevant for the base level.  They could be combined as both
+        //  indicate "no full regular ring" around a vertex
+        VTagSize _incomplete      : 1;  // variable only set in refined levels
+        VTagSize _incidIrregFace  : 1;  // variable only set in base level
 
         //  Tags indicating incident infinitely-sharp (permanent) features
         VTagSize _infSharpEdges   : 1;  // fixed
         VTagSize _infSharpCrease  : 1;  // fixed
         VTagSize _infIrregular    : 1;  // fixed
+
+        //  Alternate constructor and accessor for dealing with integer bits directly:
+        explicit VTag(VTagSize bits) { *this = *reinterpret_cast<VTag const *>(&bits); }
+        VTagSize getBits() const { return *reinterpret_cast<VTagSize const *>(this); }
 
         static VTag BitwiseOr(VTag const vTags[], int size = 4);
     };
@@ -133,6 +143,10 @@ public:
         ETagSize _boundary     : 1;  // fixed
         ETagSize _infSharp     : 1;  // fixed
         ETagSize _semiSharp    : 1;  // variable
+
+        //  Alternate constructor and accessor for dealing with integer bits directly:
+        explicit ETag(ETagSize bits) { *this = *reinterpret_cast<ETag const *>(&bits); }
+        ETagSize getBits() const { return *reinterpret_cast<ETagSize const *>(this); }
 
         static ETag BitwiseOr(ETag const eTags[], int size = 4);
     };
@@ -172,6 +186,7 @@ public:
 
         LocalIndex _numFaces;
         LocalIndex _startFace;
+        LocalIndex _cornerInSpan;
 
         unsigned short _periodic : 1;
         unsigned short _sharp    : 1;
