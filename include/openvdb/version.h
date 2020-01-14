@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @file version.h
 /// @brief Library and file format version numbers
@@ -70,29 +43,11 @@
 #define OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
 #include "Platform.h"
-
-/// @name Utilities
-/// @{
-/// @cond OPENVDB_VERSION_INTERNAL
-#define OPENVDB_PREPROC_STRINGIFY_(x) #x
-/// @endcond
-/// @brief Return @a x as a string literal.  If @a x is a macro,
-/// return its value as a string literal.
-/// @hideinitializer
-#define OPENVDB_PREPROC_STRINGIFY(x) OPENVDB_PREPROC_STRINGIFY_(x)
-
-/// @cond OPENVDB_VERSION_INTERNAL
-#define OPENVDB_PREPROC_CONCAT_(x, y) x ## y
-/// @endcond
-/// @brief Form a new token by concatenating two existing tokens.
-/// If either token is a macro, concatenate its value.
-/// @hideinitializer
-#define OPENVDB_PREPROC_CONCAT(x, y) OPENVDB_PREPROC_CONCAT_(x, y)
-/// @}
+#include <cstdint> // uint32_t
 
 
 // Library major, minor and patch version numbers
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 6
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 7
 #define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 
@@ -111,6 +66,17 @@
         #define OPENVDB_ABI_VERSION_NUMBER 3
     #else
         #define OPENVDB_ABI_VERSION_NUMBER OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
+    #endif
+#endif
+
+// If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue a message
+// directive. Note that an error is also set in openvdb.cc which enforces stricter
+// behavior during compilation of the library. Both can be optionally suppressed
+// by defining OPENVDB_USE_DEPRECATED_ABI.
+#ifndef OPENVDB_USE_DEPRECATED_ABI
+    #if OPENVDB_ABI_VERSION_NUMBER == 4
+        PRAGMA(message("NOTE: ABI = 4 is deprecated, define OPENVDB_USE_DEPRECATED_ABI "
+            "to suppress this message"))
     #endif
 #endif
 
@@ -174,7 +140,7 @@
 
 /// By default, the @b OPENVDB_REQUIRE_VERSION_NAME macro is undefined, and
 /// symbols from the version namespace are promoted to the top-level namespace
-/// so that, for example, @b openvdb::v6_0::io::File can be referred to
+/// so that, for example, @b openvdb::v5_0::io::File can be referred to
 /// simply as @b openvdb::io::File.
 ///
 /// When @b OPENVDB_REQUIRE_VERSION_NAME is defined, symbols must be
@@ -251,7 +217,3 @@ struct VersionId {
 } // namespace openvdb
 
 #endif // OPENVDB_VERSION_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

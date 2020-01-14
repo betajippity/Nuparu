@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 /// @author Dan Bailey
 ///
@@ -45,6 +18,8 @@
 #include "PointDataGrid.h"
 #include "PointAttribute.h"
 #include "PointCount.h"
+
+#include <tbb/parallel_reduce.h>
 
 #include <algorithm>
 #include <random>
@@ -450,13 +425,9 @@ inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void appendGroup(PointDataTree& tree, const Name& group)
+template <typename PointDataTreeT>
+inline void appendGroup(PointDataTreeT& tree, const Name& group)
 {
-    using Descriptor = AttributeSet::Descriptor;
-    using LeafManagerT = typename tree::template LeafManager<PointDataTree>;
-
-    using point_attribute_internal::AppendAttributeOp;
     using point_group_internal::GroupInfo;
 
     if (group.empty()) {
@@ -468,7 +439,7 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
-    Descriptor::Ptr descriptor = attributeSet.descriptorPtr();
+    auto descriptor = attributeSet.descriptorPtr();
     GroupInfo groupInfo(attributeSet);
 
     // don't add if group already exists
@@ -486,14 +457,17 @@ inline void appendGroup(PointDataTree& tree, const Name& group)
         const Name groupName = descriptor->uniqueName("__group");
 
         descriptor = descriptor->duplicateAppend(groupName, GroupAttributeArray::attributeType());
-
         const size_t pos = descriptor->find(groupName);
 
         // insert new group attribute
 
-        AppendAttributeOp<PointDataTree> append(descriptor, pos);
-        LeafManagerT leafManager(tree);
-        tbb::parallel_for(leafManager.leafRange(), append);
+        tree::LeafManager<PointDataTreeT> leafManager(tree);
+        leafManager.foreach(
+            [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
+                auto expected = leaf.attributeSet().descriptorPtr();
+                leaf.appendAttribute(*expected, descriptor, pos);
+            }, /*threaded=*/true
+        );
     }
     else {
         // make the descriptor unique before we modify the group map
@@ -696,15 +670,9 @@ inline void setGroup(   PointDataTree& tree,
 {
     using Descriptor    = AttributeSet::Descriptor;
     using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
-
-    if (membership.size() != pointCount(tree)) {
-        OPENVDB_THROW(LookupError, "Membership vector size must match number of points.");
-    }
-
     using point_group_internal::SetGroupFromIndexOp;
 
     auto iter = tree.cbeginLeaf();
-
     if (!iter)  return;
 
     const AttributeSet& attributeSet = iter->attributeSet();
@@ -714,19 +682,47 @@ inline void setGroup(   PointDataTree& tree,
         OPENVDB_THROW(LookupError, "Group must exist on Tree before defining membership.");
     }
 
+    {
+        // Check that that the largest index in the PointIndexTree is smaller than the size
+        // of the membership vector. The index tree will be used to lookup membership
+        // values. If the index tree was constructed with nan positions, this index will
+        // differ from the PointDataTree count
+
+        using IndexTreeManager = tree::LeafManager<const PointIndexTree>;
+        IndexTreeManager leafManager(indexTree);
+
+        const int64_t max = tbb::parallel_reduce(leafManager.leafRange(), -1,
+            [](const typename IndexTreeManager::LeafRange& range, int64_t value) -> int64_t {
+                for (auto leaf = range.begin(); leaf; ++leaf) {
+                    auto it = std::max_element(leaf->indices().begin(), leaf->indices().end());
+                    value = std::max(value, static_cast<int64_t>(*it));
+                }
+                return value;
+            },
+            [](const int64_t a, const int64_t b) {
+                return std::max(a, b);
+            }
+        );
+
+        if (max != -1 && membership.size() <= static_cast<size_t>(max)) {
+            OPENVDB_THROW(IndexError, "Group membership vector size must be larger than "
+                " the maximum index within the provided index tree.");
+        }
+    }
+
     const Descriptor::GroupIndex index = attributeSet.groupIndex(group);
     LeafManagerT leafManager(tree);
 
     // set membership
 
     if (remove) {
-        SetGroupFromIndexOp<PointDataTree,
-                            PointIndexTree, false> set(indexTree, membership, index);
+        SetGroupFromIndexOp<PointDataTree, PointIndexTree, true>
+            set(indexTree, membership, index);
         tbb::parallel_for(leafManager.leafRange(), set);
     }
     else {
-        SetGroupFromIndexOp<PointDataTree,
-                            PointIndexTree, true> set(indexTree, membership, index);
+        SetGroupFromIndexOp<PointDataTree, PointIndexTree, false>
+            set(indexTree, membership, index);
         tbb::parallel_for(leafManager.leafRange(), set);
     }
 }
@@ -830,7 +826,7 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
     using RandomFilter =  RandomLeafFilter<PointDataTree, std::mt19937>;
 
     const int currentPoints = static_cast<int>(pointCount(tree));
-    const int targetPoints = int(math::Round((percentage * currentPoints)/100.0f));
+    const int targetPoints = int(math::Round((percentage * float(currentPoints))/100.0f));
 
     RandomFilter filter(tree, targetPoints, seed);
 
@@ -847,7 +843,3 @@ inline void setGroupByRandomPercentage( PointDataTree& tree,
 
 
 #endif // OPENVDB_POINTS_POINT_GROUP_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -1,32 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-//
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
-//
-// Redistributions of source code must retain the above copyright
-// and license notice and the following restrictions and disclaimer.
-//
-// *     Neither the name of DreamWorks Animation nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// IN NO EVENT SHALL THE COPYRIGHT HOLDERS' AND CONTRIBUTORS' AGGREGATE
-// LIABILITY FOR ALL CLAIMS REGARDLESS OF THEIR BASIS EXCEED US$250.00.
-//
-///////////////////////////////////////////////////////////////////////////
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 //
 /// @file DDA.h
 ///
@@ -41,8 +14,8 @@
 #include "Math.h"
 #include "Vec3.h"
 #include <openvdb/Types.h>
-#include <iostream>// for std::ostream
-#include <limits>// for std::numeric_limits<Type>::max()
+#include <iostream> // for std::ostream
+#include <limits> // for std::numeric_limits<Type>::max()
 #include <boost/mpl/at.hpp>
 
 namespace openvdb {
@@ -62,10 +35,10 @@ template<typename RayT, Index Log2Dim = 0>
 class DDA
 {
 public:
-    typedef typename RayT::RealType RealType;
-    typedef RealType                RealT;
-    typedef typename RayT::Vec3Type Vec3Type;
-    typedef Vec3Type                Vec3T;
+    using RealType = typename RayT::RealType;
+    using RealT = RealType;
+    using Vec3Type = typename RayT::Vec3Type;
+    using Vec3T = Vec3Type;
 
     /// @brief uninitialized constructor
     DDA() {}
@@ -141,11 +114,11 @@ public:
     /// @brief Print information about this DDA for debugging.
     /// @param os    a stream to which to write textual information.
     void print(std::ostream& os = std::cout) const
-      {
-          os << "Dim=" << (1<<Log2Dim) << " time=" << mT0 << " next()="
-             << this->next() << " voxel=" << mVoxel << " next=" << mNext
-             << " delta=" << mDelta << " step=" << mStep << std::endl;
-      }
+    {
+        os << "Dim=" << (1<<Log2Dim) << " time=" << mT0 << " next()="
+            << this->next() << " voxel=" << mVoxel << " next=" << mNext
+            << " delta=" << mDelta << " step=" << mStep << std::endl;
+    }
 
 private:
     RealT mT0, mT1;
@@ -171,8 +144,8 @@ inline std::ostream& operator<<(std::ostream& os, const DDA<RayT, Log2Dim>& dda)
 template<typename TreeT, int NodeLevel>
 struct LevelSetHDDA
 {
-    typedef typename TreeT::RootNodeType::NodeChainType ChainT;
-    typedef typename boost::mpl::at<ChainT, boost::mpl::int_<NodeLevel> >::type NodeT;
+    using ChainT = typename TreeT::RootNodeType::NodeChainType;
+    using NodeT = typename boost::mpl::at<ChainT, boost::mpl::int_<NodeLevel> >::type;
 
     template <typename TesterT>
     static bool test(TesterT& tester)
@@ -216,9 +189,9 @@ class VolumeHDDA
 {
 public:
 
-    typedef typename TreeT::RootNodeType::NodeChainType ChainT;
-    typedef typename boost::mpl::at<ChainT, boost::mpl::int_<ChildNodeLevel> >::type NodeT;
-    typedef typename RayT::TimeSpan TimeSpanT;
+    using ChainT = typename TreeT::RootNodeType::NodeChainType;
+    using NodeT = typename boost::mpl::at<ChainT, boost::mpl::int_<ChildNodeLevel> >::type;
+    using TimeSpanT = typename RayT::TimeSpan;
 
     VolumeHDDA() {}
 
@@ -252,7 +225,7 @@ private:
     {
         mDDA.init(ray);
         do {
-            if (acc.template probeConstNode<NodeT>(mDDA.voxel()) != NULL) {//child node
+            if (acc.template probeConstNode<NodeT>(mDDA.voxel()) != nullptr) {//child node
                 ray.setTimes(mDDA.time(), mDDA.next());
                 if (mHDDA.march(ray, acc, t)) return true;//terminate
             } else if (acc.isValueOn(mDDA.voxel())) {//hit an active tile
@@ -276,7 +249,7 @@ private:
     {
         mDDA.init(ray);
         do {
-            if (acc.template probeConstNode<NodeT>(mDDA.voxel()) != NULL) {//child node
+            if (acc.template probeConstNode<NodeT>(mDDA.voxel()) != nullptr) {//child node
                 ray.setTimes(mDDA.time(), mDDA.next());
                 mHDDA.hits(ray, acc, times, t);
             } else if (acc.isValueOn(mDDA.voxel())) {//hit an active tile
@@ -301,8 +274,8 @@ class VolumeHDDA<TreeT, RayT, 0>
 {
 public:
 
-    typedef typename TreeT::LeafNodeType LeafT;
-    typedef typename RayT::TimeSpan TimeSpanT;
+    using LeafT = typename TreeT::LeafNodeType;
+    using TimeSpanT = typename RayT::TimeSpan;
 
     VolumeHDDA() {}
 
@@ -369,7 +342,3 @@ private:
 } // namespace openvdb
 
 #endif // OPENVDB_MATH_DDA_HAS_BEEN_INCLUDED
-
-// Copyright (c) 2012-2018 DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )
