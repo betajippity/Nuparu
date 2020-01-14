@@ -17,7 +17,7 @@ Nuparu currently consists of:
 * [OpenEXR](http://www.openexr.com) 2.4.0 (Mac/Win/Linux)
 * [stb_image](https://github.com/nothings/stb) 2.23 (Src)
 * [Ptex](http://ptex.us) 2.3.2 (Mac/Win/Linux)
-* [Partio](https://www.disneyanimation.com/technology/partio.html) 1.7.3 (Mac/Win/Linux)
+* [Partio](https://www.disneyanimation.com/technology/partio.html) 1.10.1 (Mac/Win/Linux)
 * [RMSD](http://boscoh.com/code/) (Src)
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
