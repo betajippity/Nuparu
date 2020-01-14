@@ -23,7 +23,7 @@ Nuparu currently consists of:
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 * [NanoGUI](https://github.com/wjakob/nanogui) (f8a4fe) (Mac/Win/Linux)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
-* [Zlib](https://www.zlib.net) 1.2.11 (Win/Linux)
+* [Zlib](https://www.zlib.net) 1.2.11 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2020.0 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.72.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.3 (Mac/Win/Linux)
@@ -40,7 +40,7 @@ Notes:
 * On Linux, all binary libraries except for TBB are statically linked.
 * Everything is built using C++14.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
-* Since macOS ships with Zlib and GLUT by default, Nuparu does not include Zlib or FreeGLUT for macOS.
+* Since macOS ships with GLUT by default, Nuparu does not include FreeGLUT for macOS.
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
 * Partio is built without support for .prt files.
 * RMSD has minor modifications for C++ support.
