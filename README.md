@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.19.16a
+v0.3.20.03a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -13,7 +13,7 @@ Nuparu currently consists of:
 * [GLFW](http://www.glfw.org) 3.3.1 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
 * [Embree](https://embree.github.io) 3.7.0 (Mac/Win/Linux)
-* [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.8.4 (Mac/Win/Linux)
+* [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.2 (Mac/Win/Linux)
 * [OpenEXR](http://www.openexr.com) 2.4.0 (Mac/Win/Linux)
 * [stb_image](https://github.com/nothings/stb) 2.23 (Src)
 * [Ptex](http://ptex.us) 2.3.2 (Mac/Win/Linux)
@@ -22,14 +22,14 @@ Nuparu currently consists of:
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 * [NanoGUI](https://github.com/wjakob/nanogui) (e9ec8a) (Mac/Win/Linux)
-* [tinyformat](https://github.com/c42f/tinyformat) 2.1.0 (Src)
+* [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2020.0 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.72.0 (Mac/Win/Linux)
-* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.3.3 (Mac/Win/Linux)
-* [OpenVDB](http://www.openvdb.org/) 6.0.0 (Mac/Win/Linux)
+* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.4.0 (Mac/Win/Linux)
+* [OpenVDB](http://www.openvdb.org/) 7.0.0 (Mac/Win/Linux)
 * [blosc](https://github.com/Blosc) 1.17.1 (Mac/Win/Linux)
-* [Protobuf](https://developers.google.com/protocol-buffers/) 3.6.1 (Mac/Win/Linux)
+* [Protobuf](https://developers.google.com/protocol-buffers/) 3.11.2 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.12.0 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui/releases) 1.74 (Src)
 
@@ -51,10 +51,10 @@ Notes:
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
-* All binary macOS libraries are built on at least macOS Mojave with macOS's Clang variant (Apple LLVM 10.0 or greater) using libc++.
-* All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2017.
-* All binary Linux libraries are built using GCC 8.2 or later on at least Fedora 29 and at least Red Hat Enterprise Linux (RHEL) 7.6.
-    * On RHEL, GCC 8.2 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
+* All binary macOS libraries are built on at least macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++.
+* All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2019.
+* All binary Linux libraries are built using GCC 9.2 or later on at least Fedora 31 and at least Red Hat Enterprise Linux (RHEL) 7.6.
+    * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
     * Fedora libraries are in lib/linux, RHEL libraries are in lib/rhel
 * All binary libraries on all platforms are built for x86-64.
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
