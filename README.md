@@ -1,14 +1,13 @@
 Nuparu
 ======
 
-v0.3.20.09a
+v0.3.20.10a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
 * [GLM](http://glm.g-truc.net) 0.9.9.7 (Src)
-* [Eigen](http://eigen.tuxfamily.org/) 3.3.7 (Src)
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.2.1 (Win)
 * [GLFW](http://www.glfw.org) 3.3.1 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
@@ -21,7 +20,6 @@ Nuparu currently consists of:
 * [RMSD](http://boscoh.com/code/) (Src)
 * [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
-* [NanoGUI](https://github.com/wjakob/nanogui) (e9ec8a) (Mac/Win/Linux)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2020.0 (Mac/Win/Linux)
