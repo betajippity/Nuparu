@@ -18,7 +18,6 @@ Nuparu currently consists of:
 * [Ptex](http://ptex.us) 2.3.2 (Mac/Win/Linux)
 * [Partio](https://www.disneyanimation.com/technology/partio.html) 1.10.1 (Mac/Win/Linux)
 * [RMSD](http://boscoh.com/code/) (Src)
-* [glslUtility](https://github.com/CIS565-Fall-2012/Project0-Cuda-Checker/blob/master/HW0_MAC/src/glslUtility.cpp) 1.2 (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Mac/Win/Linux)
