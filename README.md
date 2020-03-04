@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.20.10a
+v0.3.20.10b
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -29,6 +29,7 @@ Nuparu currently consists of:
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.11.2 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.12.0 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui/releases) 1.75 (Src)
+* [imnodes](https://github.com/Nelarius/imnodes) 0.2 (Src)
 
 Notes:
 
