@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.20.10b
+v0.3.20.11a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -53,6 +53,7 @@ Notes:
 * All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2019.
 * All binary Linux libraries are built using GCC 9.2 or later on at least Fedora 31 and at least Red Hat Enterprise Linux (RHEL) 7.6.
     * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
-    * Fedora libraries are in lib/linux, RHEL libraries are in lib/rhel
+    * Fedora libraries build using GCC 9.2 are in lib/linux-gcc9
+    * RHEL libraries build using GCC 8.3 are in lib/linux-gcc8
 * All binary libraries on all platforms are built for x86-64.
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
