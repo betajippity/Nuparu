@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.20.11a
+v0.3.20.15a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -21,7 +21,7 @@ Nuparu currently consists of:
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.11 (Mac/Win/Linux)
-* [TBB](https://www.threadingbuildingblocks.org/) 2020.0 (Mac/Win/Linux)
+* [TBB](https://www.threadingbuildingblocks.org/) 2020.2 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.72.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html)  3.4.0 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 7.0.0 (Mac/Win/Linux)
