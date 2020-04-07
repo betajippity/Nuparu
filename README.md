@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.20.15a
+v0.3.20.15b
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -11,7 +11,7 @@ Nuparu currently consists of:
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.2.1 (Win)
 * [GLFW](http://www.glfw.org) 3.3.1 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
-* [Embree](https://embree.github.io) 3.8.0 (Mac/Win/Linux)
+* [Embree](https://embree.github.io) 3.9.0 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.2 (Mac/Win/Linux)
 * [OpenEXR](http://www.openexr.com) 2.4.0 (Mac/Win/Linux)
 * [stb_image](https://github.com/nothings/stb) 2.23 (Src)
