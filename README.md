@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.20.15f
+v0.3.20.15f-ARM
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -36,13 +36,16 @@ Notes:
 * On macOS, all binary libraries except for TBB are statically linked.
 * On Windows, all binary libraries except for TBB are statically linked.
 * On Linux, all binary libraries except for TBB are statically linked.
+* x86-64 builds are included for macOS, Windows, and Linux-GCC8/Linux-GCC9
+* ARM aarch64 builds are included for Linux-GCC9
 * Everything is built using C++14.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
 * Since macOS ships with GLUT by default, Nuparu does not include FreeGLUT for macOS.
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
 * Partio is built without support for .prt files.
 * RMSD has minor modifications for C++ support.
-* Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
+* On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
+* On ARM aarch64, Embree 3.8 is currently included instead of Embree 3.9. The ARM aarch64 build of Embree is based on the [embree-aarch64](https://github.com/lighttransport/embree-aarch64) fork of Embree.
 * Embree is built with a max nested instancing depth of 8.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
@@ -53,7 +56,7 @@ Notes:
 * All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2019.
 * All binary Linux libraries are built using GCC 9.2 or later on at least Fedora 31 and at least Red Hat Enterprise Linux (RHEL) 7.6.
     * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
-    * Fedora libraries build using GCC 9.2 are in lib/linux-gcc9
+    * Fedora libraries build using GCC 9.2 on x86-64 are in lib/linux-gcc9
+    * Fedora libraries build using GCC 9.2 on ARM aarch64 are in lib/linux-arm
     * RHEL libraries build using GCC 8.3 are in lib/linux-gcc8
-* All binary libraries on all platforms are built for x86-64.
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
