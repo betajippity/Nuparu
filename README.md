@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.20.21a
+v0.3.20.21b
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -36,8 +36,8 @@ Notes:
 * On macOS, all binary libraries except for TBB are statically linked.
 * On Windows, all binary libraries except for TBB are statically linked.
 * On Linux, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and Linux-GCC8/Linux-GCC9
-* ARM aarch64 builds are included for Linux-GCC9
+* x86-64 builds are included for macOS, Windows, and Linux-GCC8/Linux-GCC10
+* ARM aarch64 builds are included for Linux-GCC10
 * Everything is built using C++14.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
 * Since macOS ships with GLUT by default, Nuparu does not include FreeGLUT for macOS.
@@ -52,11 +52,11 @@ Notes:
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
-* All binary macOS libraries are built on at least macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++.
+* All binary macOS libraries are built on macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++.
 * All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2019.
-* All binary Linux libraries are built using GCC 9.2 or later on at least Fedora 31 and at least Red Hat Enterprise Linux (RHEL) 7.6.
+* All binary Linux libraries are built using GCC 10.1 on Fedora 32 and on Red Hat Enterprise Linux (RHEL) 7.6.
     * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
-    * Fedora libraries build using GCC 9.2 on x86-64 are in lib/linux-gcc9
-    * Fedora libraries build using GCC 9.2 on ARM aarch64 are in lib/linux-arm
+    * Fedora libraries built using GCC 10.1 on x86-64 are in lib/linux-gcc10
+    * Fedora libraries built using GCC 10.1 on ARM aarch64 are in lib/linux-arm
     * RHEL libraries build using GCC 8.3 are in lib/linux-gcc8
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
