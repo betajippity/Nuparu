@@ -52,7 +52,7 @@ Notes:
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
-* All binary x86-64 macOS libraries are built on macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++. macOS libraries for x86-64 are in lib/osx.
+* All binary x86-64 macOS libraries are built on macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++. macOS libraries for x86-64 are in lib/mac.
 * All binary arm64 macOS libraries are built on macOS Big Sur with macOS's Clang variant (Apple LLVM 12.0 or greater) using libc++. macOS libraries for arm64 are in lib/mac-arm.
 * All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2019.
 * All binary Linux libraries are built using GCC 10.1 on Fedora 32 and on Red Hat Enterprise Linux (RHEL) 7.6.
