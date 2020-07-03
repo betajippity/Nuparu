@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.20.21b
+v0.3.20.27a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -37,7 +37,7 @@ Notes:
 * On Windows, all binary libraries except for TBB are statically linked.
 * On Linux, all binary libraries except for TBB are statically linked.
 * x86-64 builds are included for macOS, Windows, and Linux-GCC8/Linux-GCC10
-* ARM aarch64 builds are included for Linux-GCC10
+* ARM aarch64/arm64 builds are included for macOS and Linux-GCC10
 * Everything is built using C++14.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
 * Since macOS ships with GLUT by default, Nuparu does not include FreeGLUT for macOS.
@@ -45,14 +45,15 @@ Notes:
 * Partio is built without support for .prt files.
 * RMSD has minor modifications for C++ support.
 * On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included.
-* The ARM aarch64 build of Embree is based on the [embree-aarch64](https://github.com/lighttransport/embree-aarch64) fork of Embree.
+* The ARM aarch64/arm64 build of Embree is based on the [embree-aarch64](https://github.com/lighttransport/embree-aarch64) fork of Embree.
 * Embree is built with a max nested instancing depth of 8.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
-* All binary macOS libraries are built on macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++.
+* All binary x86-64 macOS libraries are built on macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++. macOS libraries for x86-64 are in lib/osx.
+* All binary arm64 macOS libraries are built on macOS Big Sur with macOS's Clang variant (Apple LLVM 12.0 or greater) using libc++. macOS libraries for arm64 are in lib/mac-arm.
 * All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2019.
 * All binary Linux libraries are built using GCC 10.1 on Fedora 32 and on Red Hat Enterprise Linux (RHEL) 7.6.
     * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
