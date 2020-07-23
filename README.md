@@ -7,7 +7,7 @@ Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
-* [GLM](http://glm.g-truc.net) 0.9.9.7 (Src)
+* [GLM](http://glm.g-truc.net) 0.9.9.8 (Src)
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.2.1 (Win)
 * [GLFW](http://www.glfw.org) 3.3.2 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
