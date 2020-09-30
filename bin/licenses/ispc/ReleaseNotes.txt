@@ -1,3 +1,104 @@
+=== v1.14.1 === (28 August 2020)
+
+A minor ISPC update with a bug fix for AVX512 detection problem on macOS
+(for more details see issue #1854) and update of GPU version to use Level0 v1.0.
+CPU binaries are based on patched LLVM 10.0.1.
+
+Runtime Dependencies for GPU-enabled build:
+- Intel(R) Graphics Compute Runtime
+  https://github.com/intel/compute-runtime/releases/tag/20.33.17675
+- Level Zero Loader
+  https://github.com/oneapi-src/level-zero/releases/tag/v1.0
+- OpenMP Runtime
+  Consult your Linux distribution documentation for installation of OpenMP runtime
+  instructions.
+
+Components revisions used in GPU-enabled build:
+KhronosGroup/SPIRV-LLVM-Translator@1a5c52f
+intel/vc-intrinsics@f39ff1e
+oneapi-src/level-zero@fcc7b7a (v1.0)
+llvm/llvm-project@ef32c61 (llvmorg-10.0.1) + patches from llvm_patches folder
+
+=== v1.14.0 === (30 July 2020)
+
+An ISPC release with several improvements for CPU and initial support of Intel
+graphics hardware architectures. The binaries in this release include CPU versions
+for Windows, Linux, and macOS, as previous releases, plus a GPU-enabled Linux binary,
+which supports both CPU and GPU. CPU binaries are based on patched LLVM 10.0.1.
+
+CPU changes include:
+- new avx2-i8x32, avx2-i16x16, avx512skx-i8x64, avx512skx-i16x32 targets.
+- "generic" targets were removed.
+- several stability fixes, including bugs discovered during fuzzing ISPC by YARPGen.
+- integer division performance improvements.
+- support for __vectorcall calling convention on Windows x64 (enabled by 
+  '--vectorcall')
+
+Using GPU-enabled Linux binary you can build ISPC programs and run them on Intel(R)
+Core(tm) Processors with Gen9 graphics (formerly Skylake, Kaby Lake, Coffee Lake)
+using new '--target' options: 'genx-x8' and 'genx-x16'. For code generation ISPC
+uses Vector Compute backend which is the part of 'Intel(R) Graphics Compute Runtime'
+through SPIR-V interface. This release also includes ISPC Runtime based on
+'oneAPI Level Zero' for GPU and 'OpenMP Runtime' for CPU, which creates unified
+abstraction for executing ISPC code on CPU and GPU.
+
+More details are available here: https://ispc.github.io/ispc_for_gen.html
+
+For build instructions check our docker recipe:
+https://github.com/ispc/ispc/blob/master/docker/ubuntu/gen/Dockerfile
+
+The stability and performance of GPU part of this release is not mature yet but we
+strongly encourage to try it out and give us feedback! You can reach us through
+Github issues, ISPC mailing list (ispc-users@googlegroups.com), or on Twitter
+(@ispc_updates).
+
+Runtime Dependencies 
+- Intel(R) Graphics Compute Runtime
+  https://github.com/intel/compute-runtime/releases/tag/20.29.17408
+- Level Zero Loader
+  https://github.com/oneapi-src/level-zero/releases/tag/v0.91.21
+- OpenMP Runtime
+  Consult your Linux distribution documentation for installation of OpenMP runtime
+  instructions.
+
+Components revisions used in this build:
+KhronosGroup/SPIRV-LLVM-Translator@1e661b2
+intel/vc-intrinsics.git@a0b66f2
+oneapi-src/level-zero@v0.91.21
+llvm/llvm-project@llvmorg-10.0.0
+
+=== v1.13.0 === (23 April 2020)
+
+An ISPC update, which graduates cross-compilation support to production and
+has multiple code generation improvements and bug fixes. AVX512 targets may
+get the biggest performance boost due to changed internal representation of
+masks (we observed up to 5% speedups), and new switch '--opt=disable-zmm',
+which disables using zmm registers in favour of ymm for avx512skx-i32x16 target.
+All targets will definitely benefit from LLVM 10.0 backend used in this release.
+
+Here is the list of other changes:
+
+- new switch '--support-matrix' was added to display information about supported
+  cross-compilation targets, which are managed by '--target-os=<os>',
+  '--target=<ispc-target>', and '--arch=<arch>' switches.
+- representation of 'bool' type in storage was changed to match C/C++ (i.e. one
+  'bool' occupies one byte) for better interoperability.
+- type aliases for unsigned types were added: 'uint8', 'uint16', 'uint32',
+  'uint64', and 'uint'. To detect if these types are supported you can check if
+  ISPC_UINT_IS_DEFINED macro is defined.
+- 'extract()'/'insert()' for boolean arguments, and 'abs()' for all integer and
+  FP types were added to standard library.
+- FreeBSD was added to the list of supported target OSes, but it's not well
+  tested.
+
+Supported platforms in this release are below. Rows are hosts, columns are
+targets. x86 and arm are both 32 and 64 bits, where appropriate.
+
+          Windows | Linux    | macOS | Android  | iOS | PS4 | FreeBSD
+Windows | x86     | x86, arm | x86   | x86, arm |     | x86 | x86, arm
+Linux   |         | x86, arm | x86   | x86, arm |     |     | x86, arm
+macOS   |         | x86, arm | x86   | x86, arm | arm |     | x86, arm
+
 === v1.12.0 === (15 August 2019)
 
 This ISPC update includes experimental cross OS compilation support, ARM and AARCH64
