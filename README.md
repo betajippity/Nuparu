@@ -13,7 +13,7 @@ Nuparu currently consists of:
 * [GLEW](https://github.com/nigels-com/glew) 2.1.0 (Mac/Win/Linux)
 * [Embree](https://embree.github.io) 3.12.0 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.2 (Mac/Win/Linux)
-* [OpenEXR](http://www.openexr.com) 2.4.1 (Mac/Win/Linux)
+* [OpenEXR](http://www.openexr.com) 2.5.3 (Mac/Win/Linux)
 * [stb_image](https://github.com/nothings/stb) 2.26 (Src)
 * [Ptex](http://ptex.us) 2.3.2 (Mac/Win/Linux)
 * [Partio](https://www.disneyanimation.com/technology/partio.html) 1.10.1 (Mac/Win/Linux)
