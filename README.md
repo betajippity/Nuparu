@@ -14,7 +14,7 @@ Nuparu currently consists of:
 * [Embree](https://embree.github.io) 3.12.0 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.2 (Mac/Win/Linux)
 * [OpenEXR](http://www.openexr.com) 2.4.1 (Mac/Win/Linux)
-* [stb_image](https://github.com/nothings/stb) 2.23 (Src)
+* [stb_image](https://github.com/nothings/stb) 2.26 (Src)
 * [Ptex](http://ptex.us) 2.3.2 (Mac/Win/Linux)
 * [Partio](https://www.disneyanimation.com/technology/partio.html) 1.10.1 (Mac/Win/Linux)
 * [RMSD](http://boscoh.com/code/) (Src)
