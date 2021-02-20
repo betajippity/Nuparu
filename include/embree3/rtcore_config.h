@@ -1,13 +1,13 @@
-// Copyright 2009-2020 Intel Corporation
+// Copyright 2009-2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 
 #define RTC_VERSION_MAJOR 3
 #define RTC_VERSION_MINOR 12
-#define RTC_VERSION_PATCH 1
-#define RTC_VERSION 31201
-#define RTC_VERSION_STRING "3.12.1"
+#define RTC_VERSION_PATCH 2
+#define RTC_VERSION 31202
+#define RTC_VERSION_STRING "3.12.2"
 
 #define RTC_MAX_INSTANCE_LEVEL_COUNT 8
 
