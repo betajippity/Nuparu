@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.3.21.07a
+v0.4.21.07b
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -33,12 +33,11 @@ Nuparu currently consists of:
 
 Notes:
 
-* On macOS, all binary libraries except for TBB are statically linked.
-* On Windows, all binary libraries except for TBB are statically linked.
-* On Linux, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and Linux-GCC8/Linux-GCC10
-* ARM aarch64/arm64 builds are included for macOS and Linux-GCC10
-* Everything is built using C++14.
+* On all platforms, all binary libraries except for TBB are statically linked.
+* x86-64 builds are included for macOS, Windows, and Linux-GCC8/Linux-GCC10.
+* ARM aarch64/arm64 builds are included for macOS and Linux-GCC10.
+* macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
+* Everything is built using C++14 or newer.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
 * Since macOS ships with GLUT by default, Nuparu does not include FreeGLUT for macOS.
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
@@ -52,12 +51,11 @@ Notes:
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
-* All binary x86-64 macOS libraries are built on macOS Catalina with macOS's Clang variant (Apple LLVM 11.0 or greater) using libc++. macOS libraries for x86-64 are in lib/mac.
-* All binary arm64 macOS libraries are built on macOS Big Sur with macOS's Clang variant (Apple LLVM 12.0 or greater) using libc++. macOS libraries for arm64 are in lib/mac-arm.
-* All binary Windows libraries are built on Windows 10 using /MT with Visual Studio 2019.
-* All binary Linux libraries are built using GCC 10.1 on Fedora 32 and on Red Hat Enterprise Linux (RHEL) 7.6.
+* macOS libraries require at minimum macOS Big Sur and macOS's Clang variant (Apple LLVM 11.0 or greater) with libc++.
+* Windows libraries require at minimum Windows 10 and Visual Studio 2019 with \mt. 
+* Linux libraries require at minimum either Fedora 33 or Red Hat Enterprise Linux (RHEL) 7.6.
     * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
-    * Fedora libraries built using GCC 10.1 on x86-64 are in lib/linux-gcc10
-    * Fedora libraries built using GCC 10.1 on ARM aarch64 are in lib/linux-arm
-    * RHEL libraries build using GCC 8.3 are in lib/linux-gcc8
+    * Fedora 33 libraries require GCC 10.1 on x86-64 and are in lib/linux-gcc10
+    * Fedora 33 libraries require GCC 10.1 on ARM aarch64 and are in lib/linux-arm
+    * RHEL libraries require GCC 8.3 and are in lib/linux-gcc8
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
