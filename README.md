@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.4.21.07b
+v0.4.21.08a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -28,7 +28,7 @@ Nuparu currently consists of:
 * [blosc](https://github.com/Blosc) 1.21.0 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.15.3 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.15 (Mac/Win/Linux)
-* [dear imgui](https://github.com/ocornut/imgui/releases) 1.78 (Src)
+* [dear imgui](https://github.com/ocornut/imgui/releases) 1.81 (Src)
 * [imnodes](https://github.com/Nelarius/imnodes) 0.3 (Src)
 
 Notes:
