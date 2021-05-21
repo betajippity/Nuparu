@@ -1,37 +1,7 @@
-///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2004, Industrial Light & Magic, a division of Lucas
-// Digital Ltd. LLC
-// 
-// All rights reserved.
-// 
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-// *       Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-// *       Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-// *       Neither the name of Industrial Light & Magic nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission. 
-// 
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) Contributors to the OpenEXR Project.
 //
-///////////////////////////////////////////////////////////////////////////
-
 
 
 #ifndef INCLUDED_IMF_HEADER_H
@@ -43,22 +13,22 @@
 //
 //-----------------------------------------------------------------------------
 
+#include "ImfForward.h"
+
 #include "ImfLineOrder.h"
 #include "ImfCompression.h"
 #include "ImfName.h"
 #include "ImfTileDescription.h"
-#include "ImfInt64.h"
 #include "ImathVec.h"
 #include "ImathBox.h"
 #include "IexBaseExc.h"
 
-#include "ImfForward.h"
-#include "ImfNamespace.h"
-#include "ImfExport.h"
+#include "ImfAttribute.h"
 
 #include <map>
 #include <iosfwd>
 #include <string>
+#include <cstdint>
 
 
 OPENEXR_IMF_INTERNAL_NAMESPACE_HEADER_ENTER
@@ -66,7 +36,7 @@ OPENEXR_IMF_INTERNAL_NAMESPACE_HEADER_ENTER
 using std::string;
 
 
-class Header
+class IMF_EXPORT_TYPE Header
 {
   public:
     
@@ -488,7 +458,7 @@ class Header
 
 
     IMF_EXPORT
-    Int64			writeTo (OPENEXR_IMF_INTERNAL_NAMESPACE::OStream &os,
+    uint64_t			writeTo (OPENEXR_IMF_INTERNAL_NAMESPACE::OStream &os,
 					 bool isTiled = false) const;
 
     IMF_EXPORT
@@ -508,7 +478,7 @@ class Header
 // Iterators
 //----------
 
-class Header::Iterator
+class IMF_EXPORT_TYPE Header::Iterator
 {
   public:
 
@@ -535,7 +505,7 @@ class Header::Iterator
 };
 
 
-class Header::ConstIterator
+class IMF_EXPORT_TYPE Header::ConstIterator
 {
   public:
 
@@ -570,7 +540,7 @@ class Header::ConstIterator
 //
 // In a multithreaded program, staticInitialize() must be called once
 // during startup, before the program accesses any other functions or
-// classes in the IlmImf library.  Calling staticInitialize() in this
+// classes in the OpenEXR library.  Calling staticInitialize() in this
 // way avoids races during initialization of the library's global
 // variables.
 //
@@ -579,7 +549,7 @@ class Header::ConstIterator
 //
 //------------------------------------------------------------------------
 
-void IMF_EXPORT staticInitialize ();
+IMF_EXPORT void staticInitialize ();
 
 
 //-----------------
@@ -707,7 +677,7 @@ T &
 Header::typedAttribute (const char name[])
 {
     Attribute *attr = &(*this)[name];
-    T *tattr = dynamic_cast <T*> (attr);
+    T *tattr = dynamic_cast <T *> (attr);
 
     if (tattr == 0)
 	throw IEX_NAMESPACE::TypeExc ("Unexpected attribute type.");
@@ -721,7 +691,7 @@ const T &
 Header::typedAttribute (const char name[]) const
 {
     const Attribute *attr = &(*this)[name];
-    const T *tattr = dynamic_cast <const T*> (attr);
+    const T *tattr = dynamic_cast <const T *> (attr);
 
     if (tattr == 0)
 	throw IEX_NAMESPACE::TypeExc ("Unexpected attribute type.");
@@ -751,7 +721,7 @@ T *
 Header::findTypedAttribute (const char name[])
 {
     AttributeMap::iterator i = _map.find (name);
-    return (i == _map.end())? 0: dynamic_cast <T*> (i->second);
+    return (i == _map.end())? 0: dynamic_cast <T *> (i->second);
 }
 
 
@@ -760,7 +730,7 @@ const T *
 Header::findTypedAttribute (const char name[]) const
 {
     AttributeMap::const_iterator i = _map.find (name);
-    return (i == _map.end())? 0: dynamic_cast <const T*> (i->second);
+    return (i == _map.end())? 0: dynamic_cast <const T *> (i->second);
 }
 
 

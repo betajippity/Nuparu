@@ -1,62 +1,15 @@
-///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2002, Industrial Light & Magic, a division of Lucas
-// Digital Ltd. LLC
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) Contributors to the OpenEXR Project.
 //
-// All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-// *       Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-// *       Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-// *       Neither the name of Industrial Light & Magic nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-///////////////////////////////////////////////////////////////////////////
-
 
 
 #ifndef INCLUDED_IEXMATHFLOATEXC_H
 #define INCLUDED_IEXMATHFLOATEXC_H
 
-#ifndef IEXMATH_EXPORT_H
-#define IEXMATH_EXPORT_H
-
-#if defined(OPENEXR_DLL)
-    #if defined(IEXMATH_EXPORTS)
-    #define IEXMATH_EXPORT __declspec(dllexport)
-    #else
-    #define IEXMATH_EXPORT __declspec(dllimport)
-    #endif
-    #define IEXMATH_EXPORT_CONST
-#else
-    #define IEXMATH_EXPORT
-    #define IEXMATH_EXPORT_CONST const
-#endif
-
-#endif
-
+#include "IexExport.h"
 #include "IexNamespace.h"
-#include "IexMathExc.h"
-//#include <IexBaseExc.h>
+
 #include "IexMathIeeeExc.h"
 
 IEX_INTERNAL_NAMESPACE_HEADER_ENTER
@@ -67,7 +20,7 @@ IEX_INTERNAL_NAMESPACE_HEADER_ENTER
 // will be trapped and converted to C++ exceptions.
 //-------------------------------------------------------------
 
-IEXMATH_EXPORT
+IEX_EXPORT
 void mathExcOn (int when = (IEEE_OVERFLOW | IEEE_DIVZERO | IEEE_INVALID));
 
 
@@ -76,7 +29,7 @@ void mathExcOn (int when = (IEEE_OVERFLOW | IEEE_DIVZERO | IEEE_INVALID));
 // trapping and conversion to C++ exceptions is currently enabled.
 //----------------------------------------------------------------------
 
-IEXMATH_EXPORT
+IEX_EXPORT
 int getMathExcOn();
 
 
@@ -100,12 +53,12 @@ int getMathExcOn();
 //					// point exception settings
 //------------------------------------------------------------------------
 
-class MathExcOn
+class IEX_EXPORT_TYPE MathExcOn
 {
   public:
 
-    IEXMATH_EXPORT MathExcOn (int when);
-    IEXMATH_EXPORT ~MathExcOn ();
+    IEX_EXPORT MathExcOn (int when);
+    IEX_EXPORT ~MathExcOn ();
     MathExcOn (const MathExcOn&) = delete;
     MathExcOn& operator= (const MathExcOn&) = delete;
     MathExcOn (MathExcOn&&) = delete;
@@ -120,7 +73,7 @@ class MathExcOn
     // It should be called wherever this class is commonly used where it has
     // been found that certain floating point exceptions are not being thrown.
 
-    IEXMATH_EXPORT void handleOutstandingExceptions();
+    IEX_EXPORT void handleOutstandingExceptions();
 
   private:
 

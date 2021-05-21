@@ -1,36 +1,7 @@
-///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (c) 2005-2012, Industrial Light & Magic, a division of Lucas
-// Digital Ltd. LLC
-// 
-// All rights reserved.
-// 
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are
-// met:
-// *       Redistributions of source code must retain the above copyright
-// notice, this list of conditions and the following disclaimer.
-// *       Redistributions in binary form must reproduce the above
-// copyright notice, this list of conditions and the following disclaimer
-// in the documentation and/or other materials provided with the
-// distribution.
-// *       Neither the name of Industrial Light & Magic nor the names of
-// its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission. 
-// 
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) Contributors to the OpenEXR Project.
 //
-///////////////////////////////////////////////////////////////////////////
 
 #ifndef INCLUDED_ILM_THREAD_POOL_H
 #define INCLUDED_ILM_THREAD_POOL_H
@@ -63,6 +34,7 @@
 
 #include "IlmThreadNamespace.h"
 #include "IlmThreadExport.h"
+#include "IlmThreadConfig.h"
 
 ILMTHREAD_INTERNAL_NAMESPACE_HEADER_ENTER
 
@@ -75,11 +47,11 @@ class Task;
 // the implementation of the processing of tasks
 // is implemented
 //-------------------------------------------------------
-class ILMTHREAD_EXPORT ThreadPoolProvider
+class ILMTHREAD_EXPORT_TYPE ThreadPoolProvider
 {
   public:
-    ThreadPoolProvider();
-    virtual ~ThreadPoolProvider();
+    ILMTHREAD_EXPORT ThreadPoolProvider();
+    ILMTHREAD_EXPORT virtual ~ThreadPoolProvider();
 
     // as in ThreadPool below
     virtual int numThreads () const = 0;
@@ -93,19 +65,13 @@ class ILMTHREAD_EXPORT ThreadPoolProvider
     virtual void finish () = 0;
 
     // Make the provider non-copyable
-#if __cplusplus >= 201103L
     ThreadPoolProvider (const ThreadPoolProvider &) = delete;
     ThreadPoolProvider &operator= (const ThreadPoolProvider &) = delete;
     ThreadPoolProvider (ThreadPoolProvider &&) = delete;
     ThreadPoolProvider &operator= (ThreadPoolProvider &&) = delete;
-#else
-  private:
-    ThreadPoolProvider (const ThreadPoolProvider &);
-    ThreadPoolProvider &operator= (const ThreadPoolProvider &);
-#endif
 };  
 
-class ILMTHREAD_EXPORT ThreadPool  
+class ILMTHREAD_EXPORT_TYPE ThreadPool  
 {
   public:
     //-------------------------------------------------------
@@ -119,6 +85,7 @@ class ILMTHREAD_EXPORT ThreadPool
     // that we can query, this routine gives a place where we
     // can centralize that logic
     //-------------------------------------------------------
+    ILMTHREAD_EXPORT
     static unsigned estimateThreadCountForFileIO ();
 
     //-------------------------------------------------------
@@ -127,7 +94,7 @@ class ILMTHREAD_EXPORT ThreadPool
     // using a default ThreadPoolProvider
     //-------------------------------------------------------
 
-    ThreadPool (unsigned numThreads = 0);
+    ILMTHREAD_EXPORT ThreadPool (unsigned numThreads = 0);
 
 
     //-----------------------------------------------------------
@@ -135,7 +102,7 @@ class ILMTHREAD_EXPORT ThreadPool
     // the threads to the calling thread, and then destroys them.
     //-----------------------------------------------------------
 
-    virtual ~ThreadPool ();
+    ILMTHREAD_EXPORT virtual ~ThreadPool ();
     ThreadPool (const ThreadPool&) = delete;
     ThreadPool& operator= (const ThreadPool&) = delete;
     ThreadPool (ThreadPool&&) = delete;
@@ -149,8 +116,8 @@ class ILMTHREAD_EXPORT ThreadPool
     // or crash.
     //--------------------------------------------------------
     
-    int		numThreads () const;
-    void	setNumThreads (int count);
+    ILMTHREAD_EXPORT int  numThreads () const;
+    ILMTHREAD_EXPORT void setNumThreads (int count);
 
     //--------------------------------------------------------
     // Set the thread provider for the pool.
@@ -163,7 +130,7 @@ class ILMTHREAD_EXPORT ThreadPool
     // thread as this will almost certainly cause a deadlock
     // or crash.
     //--------------------------------------------------------
-    void    setThreadProvider (ThreadPoolProvider *provider);
+    ILMTHREAD_EXPORT void setThreadProvider (ThreadPoolProvider *provider);
 
     //------------------------------------------------------------
     // Add a task for processing.  The ThreadPool can handle any
@@ -172,17 +139,17 @@ class ILMTHREAD_EXPORT ThreadPool
     // by threads as they become available, in FIFO order.
     //------------------------------------------------------------
 
-    void addTask (Task* task);
+    ILMTHREAD_EXPORT void addTask (Task* task);
     
 
     //-------------------------------------------
     // Access functions for the global threadpool
     //-------------------------------------------
     
-    static ThreadPool&	globalThreadPool ();
-    static void		addGlobalTask (Task* task);
+    ILMTHREAD_EXPORT static ThreadPool&	globalThreadPool ();
+    ILMTHREAD_EXPORT static void		addGlobalTask (Task* task);
 
-    struct Data;
+    struct ILMTHREAD_HIDDEN Data;
 
   protected:
 
@@ -190,18 +157,19 @@ class ILMTHREAD_EXPORT ThreadPool
 };
 
 
-class ILMTHREAD_EXPORT Task
+class ILMTHREAD_EXPORT_TYPE Task
 {
   public:
 
-    Task (TaskGroup* g);
-    virtual ~Task ();
+    ILMTHREAD_EXPORT Task (TaskGroup* g);
+    ILMTHREAD_EXPORT virtual ~Task ();
     Task (const Task&) = delete;
     Task &operator= (const Task&) = delete;
     Task (Task&&) = delete;
     Task& operator= (Task&&) = delete;
 
     virtual void	execute () = 0;
+    ILMTHREAD_EXPORT
     TaskGroup *		group();
 
   protected:
@@ -210,12 +178,12 @@ class ILMTHREAD_EXPORT Task
 };
 
 
-class ILMTHREAD_EXPORT TaskGroup
+class ILMTHREAD_EXPORT_TYPE TaskGroup
 {
   public:
 
-    TaskGroup();
-    ~TaskGroup();
+    ILMTHREAD_EXPORT TaskGroup();
+    ILMTHREAD_EXPORT ~TaskGroup();
 
     TaskGroup (const TaskGroup& other) = delete;
     TaskGroup& operator = (const TaskGroup& other) = delete;
@@ -225,9 +193,9 @@ class ILMTHREAD_EXPORT TaskGroup
     // marks one task as finished
     // should be used by the thread pool provider to notify
     // as it finishes tasks
-    void finishOneTask ();
+    ILMTHREAD_EXPORT void finishOneTask ();
 
-    struct Data;
+    struct ILMTHREAD_HIDDEN Data;
     Data* const		_data;
 };
 
