@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.4.21.18a
+v0.4.21.20a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -27,7 +27,7 @@ Nuparu currently consists of:
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.4.4 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 8.0.1 (Mac/Win/Linux)
 * [blosc](https://github.com/Blosc) 1.21.0 (Mac/Win/Linux)
-* [Protobuf](https://developers.google.com/protocol-buffers/) 3.15.3 (Mac/Win/Linux)
+* [Protobuf](https://developers.google.com/protocol-buffers/) 3.17.0 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.15 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui/releases) 1.82 (Src)
 * [imnodes](https://github.com/Nelarius/imnodes) 0.4 (Src)
