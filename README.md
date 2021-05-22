@@ -30,7 +30,7 @@ Nuparu currently consists of:
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.15.3 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.15 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui/releases) 1.82 (Src)
-* [imnodes](https://github.com/Nelarius/imnodes) 0.3 (Src)
+* [imnodes](https://github.com/Nelarius/imnodes) 0.4 (Src)
 
 Notes:
 
