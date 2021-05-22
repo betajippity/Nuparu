@@ -1,9 +1,8 @@
-#ifndef PtexVersion_h
-#define PtexVersion_h
-
+#ifndef PtexExports_h
+#define PtexExports_h
 /*
 PTEX SOFTWARE
-Copyright 2014 Disney Enterprises, Inc.  All rights reserved
+Copyright 2021 Disney Enterprises, Inc.  All rights reserved
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -36,28 +35,30 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 */
 
-#define PtexAPIVersion 4
-#define PtexFileMajorVersion 1
-#define PtexFileMinorVersion 4
-#define PtexLibraryMajorVersion 2
-#define PtexLibraryMinorVersion 4
+/** @file PtexExports.h
+    @brief Definitions related to exported Ptex API symbol visibility.
+*/
+#include "PtexPlatform.h"
 
-#define PTEX_NAMESPACE Ptex
-#ifdef PTEX_VENDOR
-#  define make_version_ns_(major,minor,vendor) v##major##_##minor##_##vendor
-#  define make_version_ns(major,minor,vendor) make_version_ns_(major,minor,vendor)
-#  define PTEX_VERSION_NAMESPACE make_version_ns(PtexLibraryMajorVersion,PtexLibraryMinorVersion,PTEX_VENDOR)
+#ifdef PTEX_STATIC
+#   define PTEXAPI
 #else
-#  define make_version_ns_(major,minor) v##major##_##minor
-#  define make_version_ns(major,minor) make_version_ns_(major,minor)
-#  define PTEX_VERSION_NAMESPACE make_version_ns(PtexLibraryMajorVersion,PtexLibraryMinorVersion)
+#   if defined(PTEX_PLATFORM_WINDOWS)
+#       if defined(PTEX_EXPORTS)
+#           define PTEXAPI __declspec(dllexport)
+#       else
+#           define PTEXAPI __declspec(dllimport)
+#       endif
+#   elif defined(PTEX_COMPILER_CLANG) || defined(PTEX_COMPILER_GCC) \
+        || defined(PTEX_COMPILER_ICC)
+#       if defined(PTEX_EXPORTS)
+#           define PTEXAPI __attribute__((visibility("default")))
+#       else
+#           define PTEXAPI
+#       endif
+#   else
+#       define PTEXAPI
+#   endif
 #endif
 
-#define PTEX_NAMESPACE_BEGIN \
-namespace PTEX_NAMESPACE { \
-namespace PTEX_VERSION_NAMESPACE {} \
-using namespace PTEX_VERSION_NAMESPACE; \
-namespace PTEX_VERSION_NAMESPACE {
-
-#define PTEX_NAMESPACE_END }}
-#endif
+#endif  // PtexExports_h
