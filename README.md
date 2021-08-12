@@ -51,6 +51,12 @@ Notes:
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
+* Only a subset of boost necessary to support OpenVDB and USD is included.
+* For boost, the following versions of Python are supported:
+    * On macOS, Python 3.9 from MacPorts
+    * On Fedora 33, the default system Python 3.9
+    * On RHEL, the default system Python 3.6
+    * Python support is not provided on Windows
 * macOS libraries require at minimum macOS Big Sur and macOS's Clang variant (Apple LLVM 11.0 or greater) with libc++.
 * Windows libraries require at minimum Windows 10 and Visual Studio 2019 with \mt. 
 * Linux libraries require at minimum either Fedora 33 or Red Hat Enterprise Linux (RHEL) 7.6.
