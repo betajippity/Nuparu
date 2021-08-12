@@ -70,25 +70,25 @@ IMATH_INTERNAL_NAMESPACE_HEADER_ENTER
 /// python example of how to do that:
 ///
 /// 
-///   >>> import imath
-///   >>> M = imath.M44f()
-///   >>> s = imath.V3f()
-///   >>> h = imath.V3f()
-///   >>> r = imath.V3f()
-///   >>> t = imath.V3f()
-///   # Use Shear.YX (index 3), which is an "extra" shear value
-///   >>> M.setShear((0,0,0,1,0,0))
-///   M44f((1, 1, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))
-///   >>> M.extractSHRT(s, h, r, t)
-///   1
-///   >>> s
-///   V3f(1.41421354, 0.707106769, 1)
-///   >>> h
-///   V3f(1, 0, 0)
-///   >>> r
-///   V3f(0, -0, 0.785398185)
-///   >>> t
-///   V3f(0, 0, 0)
+///     >>> import imath
+///     >>> M = imath.M44f()
+///     >>> s = imath.V3f()
+///     >>> h = imath.V3f()
+///     >>> r = imath.V3f()
+///     >>> t = imath.V3f()
+///     # Use Shear.YX (index 3), which is an "extra" shear value
+///     >>> M.setShear((0,0,0,1,0,0))
+///     M44f((1, 1, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1))
+///     >>> M.extractSHRT(s, h, r, t)
+///     1
+///     >>> s
+///     V3f(1.41421354, 0.707106769, 1)
+///     >>> h
+///     V3f(1, 0, 0)
+///     >>> r
+///     V3f(0, -0, 0.785398185)
+///     >>> t
+///     V3f(0, 0, 0)
 ///   
 /// That shows how to decompose a transform matrix with one of those
 /// "extra" shear coefficients into those standard 12 degrees of
@@ -263,16 +263,16 @@ template <class T> class IMATH_EXPORT_TEMPLATE_TYPE Shear6
     /// @name Numerical Limits
     
     /// Largest possible negative value
-    IMATH_HOSTDEVICE constexpr static T baseTypeLowest() noexcept { return std::numeric_limits<T>::lowest(); }
+    IMATH_HOSTDEVICE constexpr static T baseTypeLowest() IMATH_NOEXCEPT { return std::numeric_limits<T>::lowest(); }
 
     /// Largest possible positive value
-    IMATH_HOSTDEVICE constexpr static T baseTypeMax() noexcept { return std::numeric_limits<T>::max(); }
+    IMATH_HOSTDEVICE constexpr static T baseTypeMax() IMATH_NOEXCEPT { return std::numeric_limits<T>::max(); }
 
     /// Smallest possible positive value
-    IMATH_HOSTDEVICE constexpr static T baseTypeSmallest() noexcept { return std::numeric_limits<T>::min(); }
+    IMATH_HOSTDEVICE constexpr static T baseTypeSmallest() IMATH_NOEXCEPT { return std::numeric_limits<T>::min(); }
 
     /// Smallest possible e for which 1+e != 1
-    IMATH_HOSTDEVICE constexpr static T baseTypeEpsilon() noexcept { return std::numeric_limits<T>::epsilon(); }
+    IMATH_HOSTDEVICE constexpr static T baseTypeEpsilon() IMATH_NOEXCEPT { return std::numeric_limits<T>::epsilon(); }
 
     /// @}
 
@@ -284,7 +284,7 @@ template <class T> class IMATH_EXPORT_TEMPLATE_TYPE Shear6
     typedef T BaseType;
 };
 
-/// Stream output
+/// Stream output, as "(xy xz yz yx zx zy)"
 template <class T> std::ostream& operator<< (std::ostream& s, const Shear6<T>& h);
 
 /// Reverse multiplication: scalar * Shear6<T>

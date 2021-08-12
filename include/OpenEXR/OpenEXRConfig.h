@@ -26,7 +26,7 @@
 // Current internal library namepace name
 //
 #define OPENEXR_IMF_INTERNAL_NAMESPACE_CUSTOM 0
-#define OPENEXR_IMF_INTERNAL_NAMESPACE Imf_3_0
+#define OPENEXR_IMF_INTERNAL_NAMESPACE Imf_3_1
 
 //
 // Current public user namepace name
@@ -39,15 +39,17 @@
 // Version string for runtime access
 //
 
-#define OPENEXR_VERSION_STRING "3.0.3"
-#define OPENEXR_PACKAGE_STRING "OpenEXR 3.0.3"
+#define OPENEXR_VERSION_STRING "3.1.1"
+#define OPENEXR_PACKAGE_STRING "OpenEXR 3.1.1"
 
 #define OPENEXR_VERSION_MAJOR 3
-#define OPENEXR_VERSION_MINOR 0
-#define OPENEXR_VERSION_PATCH 3
+#define OPENEXR_VERSION_MINOR 1
+#define OPENEXR_VERSION_PATCH 1
+#define OPENEXR_VERSION_RELEASE_TYPE ""
+// Deprecated, for back compatibility:
 #define OPENEXR_VERSION_EXTRA ""
 
-#define OPENEXR_LIB_VERSION_STRING "28.0.0"
+#define OPENEXR_LIB_VERSION_STRING "30.1.0"
 
 // Version as a single hex number, e.g. 0x01000300 == 1.0.3
 #define OPENEXR_VERSION_HEX ((uint32_t(OPENEXR_VERSION_MAJOR) << 24) | \

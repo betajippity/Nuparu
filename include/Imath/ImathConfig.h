@@ -10,7 +10,15 @@
 
 //
 // Options / configuration based on O.S. / compiler
-/////////////////////
+//
+
+//
+// Define whether the half-to-float conversion should use the lookup
+// table method. Note that this is overriden by F16C compiler
+// flags. It is also overrided by the IMATH_HALF_NO_LOOKUP_TABLE
+// macro, if defined.
+//
+#define IMATH_HALF_USE_LOOKUP_TABLE
 
 //
 // Define if the target system has support for large
@@ -25,7 +33,7 @@
 // Current (internal) library namepace name and corresponding public
 // client namespaces.
 #define IMATH_INTERNAL_NAMESPACE_CUSTOM 0
-#define IMATH_INTERNAL_NAMESPACE Imath_3_0
+#define IMATH_INTERNAL_NAMESPACE Imath_3_1
 
 
 #define IMATH_NAMESPACE_CUSTOM 0
@@ -35,20 +43,36 @@
 //
 // Version information
 //
-#define IMATH_VERSION_STRING "3.0.3"
-#define IMATH_PACKAGE_STRING "Imath 3.0.3"
+#define IMATH_VERSION_STRING "3.1.2"
+#define IMATH_PACKAGE_STRING "Imath 3.1.2"
 
 #define IMATH_VERSION_MAJOR 3
-#define IMATH_VERSION_MINOR 0
-#define IMATH_VERSION_PATCH 3
+#define IMATH_VERSION_MINOR 1
+#define IMATH_VERSION_PATCH 2
+#define IMATH_VERSION_RELEASE_TYPE ""
 
 #define IMATH_VERSION_HEX ((uint32_t(IMATH_VERSION_MAJOR) << 24) | \
                              (uint32_t(IMATH_VERSION_MINOR) << 16) | \
                              (uint32_t(IMATH_VERSION_PATCH) <<  8))
 
 // IMATH_LIB_VERSION is the library API version: SOCURRENT.SOAGE.SOREVISION
-#define IMATH_LIB_VERSION_STRING "28.0.0"
+#define IMATH_LIB_VERSION_STRING "29.1.0"
 
+//
+// Code that depends on the v2 ExcMath mechanism of signal handlers
+// that throw exceptions is incompatible with noexcept, since
+// floating-point overflow and underflow can occur in a wide variety
+// of computations within Imath functions now marked with
+// noexcept. Code that needs to accomodate the exception-handling
+// behavior can build with the IMATH_USE_NOEXCEPT off.
+//
+
+#define IMATH_USE_NOEXCEPT 1
+#if IMATH_USE_NOEXCEPT
+#define IMATH_NOEXCEPT noexcept
+#else
+#define IMATH_NOEXCEPT
+#endif
 
 //
 // By default, opt into the interoparability constructors and assignments.
@@ -93,8 +117,13 @@
 // used only with thorough benchmarking.
 //
 #if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
-#    define IMATH_LIKELY(x) (__builtin_expect(bool(x), true))
-#    define IMATH_UNLIKELY(x) (__builtin_expect(bool(x), false))
+#    ifdef __cplusplus
+#        define IMATH_LIKELY(x) (__builtin_expect(static_cast<bool>(x), true))
+#        define IMATH_UNLIKELY(x) (__builtin_expect(static_cast<bool>(x), false))
+#    else
+#        define IMATH_LIKELY(x) (__builtin_expect((x), 1))
+#        define IMATH_UNLIKELY(x) (__builtin_expect((x), 0))
+#    endif
 #else
 #    define IMATH_LIKELY(x) (x)
 #    define IMATH_UNLIKELY(x) (x)
@@ -108,7 +137,7 @@
 //
 #if defined(_MSC_VER)
 # define IMATH_DEPRECATED(msg) __declspec(deprecated(msg))
-#elif __cplusplus >= 201402L
+#elif defined(__cplusplus) && __cplusplus >= 201402L
 # define IMATH_DEPRECATED(msg) [[deprecated(msg)]]
 #elif defined(__GNUC__) || defined(__clang__)
 # define IMATH_DEPRECATED(msg) __attribute__((deprecated(msg)))

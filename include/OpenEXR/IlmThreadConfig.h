@@ -13,13 +13,13 @@
 // C++ namespace configuration / options
 
 #define ILMTHREAD_THREADING_ENABLED 1
-#define ILMTHREAD_HAVE_POSIX_SEMAPHORES 1
+#define ILMTHREAD_HAVE_POSIX_SEMAPHORES 0
 
 //
 // Current internal library namepace name
 //
 #define ILMTHREAD_INTERNAL_NAMESPACE_CUSTOM 0
-#define ILMTHREAD_INTERNAL_NAMESPACE IlmThread_3_0
+#define ILMTHREAD_INTERNAL_NAMESPACE IlmThread_3_1
 
 //
 // Current public user namepace name

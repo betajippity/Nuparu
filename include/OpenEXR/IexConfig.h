@@ -16,7 +16,7 @@
 // Current internal library namepace name
 //
 #define IEX_INTERNAL_NAMESPACE_CUSTOM 0
-#define IEX_INTERNAL_NAMESPACE Iex_3_0
+#define IEX_INTERNAL_NAMESPACE Iex_3_1
 
 //
 // Current public user namepace name

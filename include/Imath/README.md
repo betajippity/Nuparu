@@ -38,6 +38,31 @@ or numerical analysis package.
 * Shear: Shear3f, Shear3d, Shear6f, Shear6
 * Miscellaneous math functions
   
+### New Features in 3.1
+
+The 3.1 release of Imath introduces optimized half-to-float and
+float-to-half conversion using the F16C SSE instruction set extension,
+if available. These single-instruction conversions offer a 5-10x
+speedup for float-to-half and 2x speedup for half-to-float over
+Imath/half's traditional table-based conversion (timings depend on the
+data).
+
+In the absence of the F16C instruction set, the lookup-table-based
+conversion from half to float is still the default, but Imath 3.1 also
+introduces an optimized bit-shift conversion algorithm as a
+compile-time option that does not require lookup tables, for
+architectures where memory is limited. The float-to-half conversion
+also no longer requires an exponent lookup table, further reducing
+memory requirements.
+
+These new conversions generate the same values as the tranditional
+methods, which ensures backwards compatibility.  See
+[INSTALL.md](INSTALL.md#imath-configuration-settings) for more
+installation and configuation options.
+
+Also, ``half.h`` can now be included in pure C code for a definition
+of the type and for conversions between half and float.
+
 ### Supported Platforms
 
 Imath builds on Linux, macOS, Microsoft Windows, and is
@@ -61,11 +86,11 @@ community. Read our [code of conduct](CODE_OF_CONDUCT.md).
 
 ### Developer Quick Start
 
+Technical documentation for the Imath classes and functions can be found at
+[imath.readthedocs.io](https://imath.readthedocs.io).
+
 See [INSTALL.md](INSTALL.md) for instructions on downloading and building Imath
 from source.
-
-Documentation for the Imath classes and functions can be found at
-[imath.readthedocs.io](https://imath.readthedocs.io).
 
 If you encounter problems compiling code or building projects written
 with an earlier release of Imath, the [porting
@@ -83,13 +108,15 @@ OpenEXR.
 
 ### Getting Help
 
-There are two primary ways to connect with the project:
+Connect with the project through:
 
 * The openexr-dev@lists.aswf.io mail list: This is a development
   focused mail list with a deep history of technical conversations and
   decisions that have shaped the project. Subscribe at
   [openexr-dev@lists.aswf.io](https://lists.aswf.io/g/openexr-dev).
 
+* Slack: [#openexr](https://academysoftwarefdn.slack.com/archives/CMLRW4N73)
+  
 * GitHub Issues: GitHub issues are used both to track bugs and to
   discuss feature requests. Submit an issue here:
   https://github.com/AcademySoftwareFoundation/imath/issues. 
