@@ -47,21 +47,24 @@ Notes:
 * On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64, Embree is built with NEON support.
 * Embree is built with a max nested instancing depth of 8.
 * OpenEXR is built without version numbers in namespaces.
-* OpenSubdiv is built with Ptex and TBB support only. Other backends, such as OpenCL, are not included.
+* OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
+    * CUDA is supported on Windows, Fedora 34 x86-64, and RHEL
+    * Metal is supported on macOS
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
     * On macOS, Python 3.9 from MacPorts
-    * On Fedora 33, the default system Python 3.9
+    * On Fedora 34, the default system Python 3.9
     * On RHEL, the default system Python 3.6
     * Python support is not provided on Windows
 * macOS libraries require at minimum macOS Big Sur and macOS's Clang variant (Apple LLVM 11.0 or greater) with libc++.
-* Windows libraries require at minimum Windows 10 and Visual Studio 2019 with \mt. 
-* Linux libraries require at minimum either Fedora 33 or Red Hat Enterprise Linux (RHEL) 7.6.
+* Windows libraries require at minimum Windows 10 and Visual Studio 2019 with \mt.
+* Linux libraries require at minimum either Fedora 34 or Red Hat Enterprise Linux (RHEL) 7.6.
     * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
-    * Fedora 33 libraries require GCC 10.1 on x86-64 and are in lib/linux-gcc10
-    * Fedora 33 libraries require GCC 10.1 on ARM arm64 and are in lib/linux-arm
+    * Fedora 34 libraries require GCC 11.2.x on x86-64 and are in lib/linux-gcc10
+    * Fedora 34 libraries require GCC 11.2.x on ARM arm64 and are in lib/linux-arm
     * RHEL libraries require GCC 8.3 and are in lib/linux-gcc8
+* Things with CUDA support are built using CUDA 11.4
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
