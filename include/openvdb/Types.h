@@ -9,7 +9,7 @@
 #include "TypeList.h" // backwards compat
 
 #ifdef OPENVDB_USE_IMATH_HALF
-#include <Imath/half.h>
+#include <OpenEXR/half.h>
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -317,7 +317,7 @@ template<typename FromType, typename ToType> struct CopyConstness {
     using Type = typename std::remove_const<ToType>::type;
 };
 
-/// @cond OPENVDB_TYPES_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
     using Type = const ToType;
 };

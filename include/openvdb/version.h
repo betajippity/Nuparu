@@ -60,7 +60,7 @@
 /// @hideinitializer
 #define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 1
 /// @hideinitializer
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
 ///@}
 
 /// @note  This ifndef exists for compatibility with older versions of OpenVDB.
@@ -79,18 +79,18 @@
 /// want the compile-time version number, not the runtime version number
 /// (although the two are usually the same).
 /// @hideinitializer
-#define OPENVDB_LIBRARY_VERSION_STRING "8.1.0"
+#define OPENVDB_LIBRARY_VERSION_STRING "8.1.1"
 
 /// @brief Library version number string of the form "<major>.<minor>.<patch>abi<abi>"
 /// @details This is a macro rather than a static constant because we typically
 /// want the compile-time version number, not the runtime version number
 /// (although the two are usually the same).
 /// @hideinitializer
-#define OPENVDB_LIBRARY_ABI_VERSION_STRING "8.1.0abi8"
+#define OPENVDB_LIBRARY_ABI_VERSION_STRING "8.1.1abi8"
 
 /// @brief Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
 /// @hideinitializer
-#define OPENVDB_LIBRARY_VERSION_NUMBER 134283264
+#define OPENVDB_LIBRARY_VERSION_NUMBER 134283265
 
 /// @brief The version namespace name for this library version
 /// @hideinitializer
@@ -117,13 +117,19 @@
 #endif
 
 /* Denotes whether VDB was built with IMath Half support */
-#define OPENVDB_USE_IMATH_HALF
+#ifndef OPENVDB_USE_IMATH_HALF
+/* #undef OPENVDB_USE_IMATH_HALF */
+#endif
 
 /* Denotes whether VDB was built with Blosc support */
+#ifndef OPENVDB_USE_BLOSC
 #define OPENVDB_USE_BLOSC
+#endif
 
 /* Denotes whether VDB was built with ZLIB support */
+#ifndef OPENVDB_USE_ZLIB
 #define OPENVDB_USE_ZLIB
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////
