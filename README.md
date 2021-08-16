@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.4.21.20a
+v0.5.21.32a
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
