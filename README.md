@@ -36,7 +36,7 @@ Nuparu currently consists of:
 Notes:
 
 * On all platforms, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and Linux-GCC8/Linux-GCC11.
+* x86-64 builds are included for macOS, Windows, and Linux-GCC10/Linux-GCC11.
 * arm64 builds are included for macOS and Linux-GCC11.
 * macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
 * Everything is built using C++14 or newer.
@@ -62,10 +62,10 @@ Notes:
     * Python support is not provided on Windows
 * macOS libraries require at minimum macOS Big Sur and macOS's Clang variant (Apple LLVM 11.0 or greater) with libc++.
 * Windows libraries require at minimum Windows 10 and Visual Studio 2019 with \mt.
-* Linux libraries require at minimum either Fedora 34 or Red Hat Enterprise Linux (RHEL) 7.6.
-    * On RHEL, GCC 8.3 is used through [Red Hat Developer Toolset 8.0](https://developers.redhat.com/products/developertoolset/updates/).
+* Linux libraries require at minimum either Fedora 34 or Red Hat Enterprise Linux (RHEL) 7.9.
+    * On RHEL, GCC 10.2.1 is used through [Red Hat Developer Toolset 10.0](https://developers.redhat.com/products/developertoolset/updates/).
     * Fedora 34 libraries require GCC 11.2.x on x86-64 and are in lib/linux-gcc11
     * Fedora 34 libraries require GCC 11.2.x on ARM arm64 and are in lib/linux-arm
-    * RHEL libraries require GCC 8.3 and are in lib/linux-gcc8
+    * RHEL libraries require GCC 10.2.x and are in lib/linux-gcc10
 * Things with CUDA support are built using CUDA 11.4
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
