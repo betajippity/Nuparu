@@ -8,16 +8,21 @@
 // Issues:
 //  [ ] Platform: Keys are all generally very broken. Best using [event keycode] and not [event characters]..
 
-// You can copy and use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
+// You can use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
+// Prefer including the entire imgui/ repository into your project (either as a copy or as a submodule), and only build the backends you need.
 // If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
 
 #include "imgui.h"
 #include "imgui_impl_osx.h"
 #import <Cocoa/Cocoa.h>
+#include <mach/mach_time.h>
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
+//  2021-09-21: Use mach_absolute_time as CFAbsoluteTimeGetCurrent can jump backwards.
+//  2021-08-17: Calling io.AddFocusEvent() on NSApplicationDidBecomeActiveNotification/NSApplicationDidResignActiveNotification events.
+//  2021-06-23: Inputs: Added a fix for shortcuts using CTRL key instead of CMD key.
 //  2021-04-19: Inputs: Added a fix for keys remaining stuck in pressed state when CMD-tabbing into different application.
 //  2021-01-27: Inputs: Added a fix for mouse position not being reported when mouse buttons other than left one are down.
 //  2020-10-28: Inputs: Added a fix for handling keypad-enter key.
@@ -34,7 +39,8 @@
 @class ImFocusObserver;
 
 // Data
-static CFAbsoluteTime g_Time = 0.0;
+static double         g_HostClockPeriod = 0.0;
+static double         g_Time = 0.0;
 static NSCursor*      g_MouseCursors[ImGuiMouseCursor_COUNT] = {};
 static bool           g_MouseCursorHidden = false;
 static bool           g_MouseJustPressed[ImGuiMouseButton_COUNT] = {};
@@ -49,6 +55,18 @@ static ImFocusObserver* g_FocusObserver = NULL;
 + (id)_windowResizeEastWestCursor;
 @end
 
+static void InitHostClockPeriod()
+{
+    struct mach_timebase_info info;
+    mach_timebase_info(&info);
+    g_HostClockPeriod = 1e-9 * ((double)info.denom / (double)info.numer); // Period is the reciprocal of frequency.
+}
+
+static double GetMachAbsoluteTimeInSeconds()
+{
+    return (double)mach_absolute_time() * g_HostClockPeriod;
+}
+
 static void resetKeys()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -58,14 +76,24 @@ static void resetKeys()
 
 @interface ImFocusObserver : NSObject
 
+- (void)onApplicationBecomeActive:(NSNotification*)aNotification;
 - (void)onApplicationBecomeInactive:(NSNotification*)aNotification;
 
 @end
 
 @implementation ImFocusObserver
 
+- (void)onApplicationBecomeActive:(NSNotification*)aNotification
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddFocusEvent(true);
+}
+
 - (void)onApplicationBecomeInactive:(NSNotification*)aNotification
 {
+    ImGuiIO& io = ImGui::GetIO();
+    io.AddFocusEvent(false);
+
     // Unfocused applications do not receive input events, therefore we must manually
     // release any pressed keys when application loses focus, otherwise they would remain
     // stuck in a pressed state. https://github.com/ocornut/imgui/issues/3832
@@ -154,6 +182,10 @@ bool ImGui_ImplOSX_Init()
 
     g_FocusObserver = [[ImFocusObserver alloc] init];
     [[NSNotificationCenter defaultCenter] addObserver:g_FocusObserver
+                                             selector:@selector(onApplicationBecomeActive:)
+                                                 name:NSApplicationDidBecomeActiveNotification
+                                               object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:g_FocusObserver
                                              selector:@selector(onApplicationBecomeInactive:)
                                                  name:NSApplicationDidResignActiveNotification
                                                object:nil];
@@ -215,8 +247,11 @@ void ImGui_ImplOSX_NewFrame(NSView* view)
 
     // Setup time step
     if (g_Time == 0.0)
-        g_Time = CFAbsoluteTimeGetCurrent();
-    CFAbsoluteTime current_time = CFAbsoluteTimeGetCurrent();
+    {
+        InitHostClockPeriod();
+        g_Time = GetMachAbsoluteTimeInSeconds();
+    }
+    double current_time = GetMachAbsoluteTimeInSeconds();
     io.DeltaTime = (float)(current_time - g_Time);
     g_Time = current_time;
 
@@ -302,12 +337,12 @@ bool ImGui_ImplOSX_HandleEvent(NSEvent* event, NSView* view)
         for (NSUInteger i = 0; i < len; i++)
         {
             int c = [str characterAtIndex:i];
-            if (!io.KeyCtrl && !(c >= 0xF700 && c <= 0xFFFF) && c != 127)
+            if (!io.KeySuper && !(c >= 0xF700 && c <= 0xFFFF) && c != 127)
                 io.AddInputCharacter((unsigned int)c);
 
             // We must reset in case we're pressing a sequence of special keys while keeping the command pressed
             int key = mapCharacterToKey(c);
-            if (key != -1 && key < 256 && !io.KeyCtrl)
+            if (key != -1 && key < 256 && !io.KeySuper)
                 resetKeys();
             if (key != -1)
                 io.KeysDown[key] = true;
