@@ -43,12 +43,12 @@
 //
 // Version information
 //
-#define IMATH_VERSION_STRING "3.1.2"
-#define IMATH_PACKAGE_STRING "Imath 3.1.2"
+#define IMATH_VERSION_STRING "3.1.3"
+#define IMATH_PACKAGE_STRING "Imath 3.1.3"
 
 #define IMATH_VERSION_MAJOR 3
 #define IMATH_VERSION_MINOR 1
-#define IMATH_VERSION_PATCH 2
+#define IMATH_VERSION_PATCH 3
 #define IMATH_VERSION_RELEASE_TYPE ""
 
 #define IMATH_VERSION_HEX ((uint32_t(IMATH_VERSION_MAJOR) << 24) | \
@@ -56,7 +56,7 @@
                              (uint32_t(IMATH_VERSION_PATCH) <<  8))
 
 // IMATH_LIB_VERSION is the library API version: SOCURRENT.SOAGE.SOREVISION
-#define IMATH_LIB_VERSION_STRING "29.1.0"
+#define IMATH_LIB_VERSION_STRING "29.2.0"
 
 //
 // Code that depends on the v2 ExcMath mechanism of signal handlers
@@ -127,6 +127,13 @@
 #else
 #    define IMATH_LIKELY(x) (x)
 #    define IMATH_UNLIKELY(x) (x)
+#endif
+
+
+// On modern versions of gcc & clang, __has_attribute can test support for
+// __attribute__((attr)).  Make sure it's safe for other compilers.
+#ifndef __has_attribute
+#    define __has_attribute(x) 0
 #endif
 
 

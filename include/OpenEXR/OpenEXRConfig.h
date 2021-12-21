@@ -39,22 +39,30 @@
 // Version string for runtime access
 //
 
-#define OPENEXR_VERSION_STRING "3.1.1"
-#define OPENEXR_PACKAGE_STRING "OpenEXR 3.1.1"
+#define OPENEXR_VERSION_STRING "3.1.3"
+#define OPENEXR_PACKAGE_STRING "OpenEXR 3.1.3"
 
 #define OPENEXR_VERSION_MAJOR 3
 #define OPENEXR_VERSION_MINOR 1
-#define OPENEXR_VERSION_PATCH 1
+#define OPENEXR_VERSION_PATCH 3
 #define OPENEXR_VERSION_RELEASE_TYPE ""
 // Deprecated, for back compatibility:
 #define OPENEXR_VERSION_EXTRA ""
 
-#define OPENEXR_LIB_VERSION_STRING "30.1.0"
+#define OPENEXR_LIB_VERSION_STRING "30.3.0"
 
 // Version as a single hex number, e.g. 0x01000300 == 1.0.3
 #define OPENEXR_VERSION_HEX ((uint32_t(OPENEXR_VERSION_MAJOR) << 24) | \
                              (uint32_t(OPENEXR_VERSION_MINOR) << 16) | \
                              (uint32_t(OPENEXR_VERSION_PATCH) <<  8))
+
+
+// On modern versions of gcc & clang, __has_attribute can test support for
+// __attribute__((attr)).  Make sure it's safe for other compilers.
+#ifndef __has_attribute
+#    define __has_attribute(x) 0
+#endif
+
 
 // Whether the user configured the library to have symbol visibility
 // tagged
@@ -137,6 +145,18 @@
 #  define OPENEXR_EXPORT_TYPE
 #  define OPENEXR_EXPORT_TEMPLATE_INSTANCE
 
+#endif
+
+#if defined(__cplusplus) && (__cplusplus >= 201402L)
+# define OPENEXR_DEPRECATED(msg) [[deprecated(msg)]]
+#endif
+
+#ifndef OPENEXR_DEPRECATED
+# ifdef _MSC_VER
+#  define OPENEXR_DEPRECATED(msg) __declspec(deprecated(msg))
+# else
+#  define OPENEXR_DEPRECATED(msg) __attribute__((deprecated(msg)))
+# endif
 #endif
 
 #endif // INCLUDED_OPENEXR_CONFIG_H
