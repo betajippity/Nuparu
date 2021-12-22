@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.5.21.32a
+v0.6.21.51
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -36,8 +36,8 @@ Nuparu currently consists of:
 Notes:
 
 * On all platforms, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and Linux-GCC10/Linux-GCC11.
-* arm64 builds are included for macOS and Linux-GCC11.
+* x86-64 builds are included for macOS, Windows, and RHEL 7.9 (Linux-GCC10), and Fedora 34 (Linux-GCC11).
+* arm64 builds are included for macOS, Fedora 34 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
 * macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
 * Everything is built using C++14 or newer.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
@@ -53,19 +53,22 @@ Notes:
     * Metal is supported on macOS
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.x and without explicit instantiation.
+* NanoVDB is built with CUDA support.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
     * On macOS, Python 3.9 from MacPorts
     * On Fedora 34, the default system Python 3.9
     * On RHEL, the default system Python 3.6
+    * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
 * macOS libraries require at minimum macOS Big Sur and macOS's Clang variant (Apple LLVM 11.0 or greater) with libc++.
 * Windows libraries require at minimum Windows 10 and Visual Studio 2019 with \mt.
-* Linux libraries require at minimum either Fedora 34 or Red Hat Enterprise Linux (RHEL) 7.9.
+* Linux libraries require at minimum either Fedora 34, Red Hat Enterprise Linux (RHEL) 7.9, or NVIDIA L4T 32.6.1.
     * On RHEL, GCC 10.2.1 is used through [Red Hat Developer Toolset 10.0](https://developers.redhat.com/products/developertoolset/updates/).
     * Fedora 34 libraries require GCC 11.2.x on x86-64 and are in lib/linux-gcc11
     * Fedora 34 libraries require GCC 11.2.x on ARM arm64 and are in lib/linux-arm
     * RHEL libraries require GCC 10.2.x and are in lib/linux-gcc10
+    * L4T libraries require GCC 7.5.x and are in lib/linux-l4t
 * Things with CUDA support are built using CUDA 11.4, except on L4T, in which case CUDA 10.2 is used
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
