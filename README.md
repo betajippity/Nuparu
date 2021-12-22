@@ -46,7 +46,7 @@ Notes:
 * Partio is built without support for .prt files.
 * RMSD has minor modifications for C++ support.
 * On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64, Embree is built with NEON support.
-* Embree is built with a max nested instancing depth of 8.
+* Embree is built with a max nested instancing depth of 16.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
     * CUDA is supported on Windows, Fedora 34 x86-64, L4T, and RHEL
@@ -62,7 +62,7 @@ Notes:
     * On RHEL, the default system Python 3.6
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
-* macOS libraries require at minimum macOS Big Sur and macOS's Clang variant (Apple LLVM 11.0 or greater) with libc++.
+* macOS libraries require at minimum macOS Monterey and macOS's Clang variant (Apple LLVM 11.0 or greater) with libc++.
 * Windows libraries require at minimum Windows 10 and Visual Studio 2019 with \mt.
 * Linux libraries require at minimum either Fedora 34, Red Hat Enterprise Linux (RHEL) 7.9, or NVIDIA L4T 32.6.1.
     * On RHEL, GCC 10.2.1 is used through [Red Hat Developer Toolset 10.0](https://developers.redhat.com/products/developertoolset/updates/).
