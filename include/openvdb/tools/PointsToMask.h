@@ -6,7 +6,7 @@
 /// @file tools/PointsToMask.h
 ///
 /// @brief This tool produces a grid where every voxel that contains a
-/// point is active. It employes thread-local storage for best performance.
+/// point is active. It employs thread-local storage for best performance.
 ///
 /// The @c PointListT template argument below refers to any class
 /// with the following interface (see unittest/TestPointsToMask.cc
@@ -110,7 +110,7 @@ public:
 
     /// @brief Constructor from a grid and optional interrupter
     ///
-    /// @param grid        Grid whoes voxels will have their state activated by points.
+    /// @param grid        Grid whose voxels will have their state activated by points.
     /// @param interrupter Optional interrupter to prematurely terminate execution.
     explicit PointsToMask(GridT& grid, InterrupterT* interrupter = nullptr)
         : mGrid(&grid)
@@ -123,20 +123,20 @@ public:
     /// @param points    List of points that active the voxels in the input grid.
     /// @param grainSize Set the grain-size used for multi-threading. A value of 0
     ///                  disables multi-threading!
-    template<typename PointListT>
+    template<typename PointListT, typename VecT = Vec3R>
     void addPoints(const PointListT& points, size_t grainSize = 1024)
     {
         if (mInterrupter) mInterrupter->start("PointsToMask: adding points");
         if (grainSize > 0) {
             typename GridT::Ptr examplar = mGrid->copyWithNewTree();
             PoolType pool( *examplar );//thread local storage pool of grids
-            AddPoints<PointListT> tmp(points, pool, grainSize, *this );
+            AddPoints<PointListT, VecT> tmp(points, pool, grainSize, *this );
             if ( this->interrupt() ) return;
             ReducePool reducePool(pool, mGrid, size_t(0));
         } else {
             const math::Transform& xform = mGrid->transform();
             typename GridT::Accessor acc = mGrid->getAccessor();
-            Vec3R wPos;
+            VecT wPos;
             for (size_t i = 0, n = points.size(); i < n; ++i) {
                 if ( this->interrupt() ) break;
                 points.getPos(i, wPos);
@@ -163,7 +163,7 @@ private:
     // Private struct that implements concurrent thread-local
     // insersion of points into a grid
     using PoolType = tbb::enumerable_thread_specific<GridT>;
-    template<typename PointListT> struct AddPoints;
+    template<typename PointListT, typename VecT = Vec3R> struct AddPoints;
 
     // Private class that implements concurrent reduction of a thread-local pool
     struct ReducePool;
@@ -175,7 +175,7 @@ private:
 // Private member class that implements concurrent thread-local
 // insersion of points into a grid
 template<typename GridT, typename InterrupterT>
-template<typename PointListT>
+template<typename PointListT, typename VecT>
 struct PointsToMask<GridT, InterrupterT>::AddPoints
 {
     AddPoints(const PointListT& points,
@@ -194,7 +194,7 @@ struct PointsToMask<GridT, InterrupterT>::AddPoints
         GridT& grid = mPool->local();
         const math::Transform& xform = grid.transform();
         typename GridT::Accessor acc = grid.getAccessor();
-        Vec3R wPos;
+        VecT wPos;
         for (size_t i=range.begin(), n=range.end(); i!=n; ++i) {
             mPoints->getPos(i, wPos);
             acc.setValueOn( xform.worldToIndexCellCentered( wPos ) );

@@ -350,15 +350,15 @@ public:
     /// Return the number of non-leaf nodes.
     Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
     /// Return the number of active voxels stored in leaf nodes.
-    Index64 activeLeafVoxelCount() const override { return mRoot.onLeafVoxelCount(); }
+    Index64 activeLeafVoxelCount() const override { return tools::countActiveLeafVoxels(*this); }
     /// Return the number of inactive voxels stored in leaf nodes.
-    Index64 inactiveLeafVoxelCount() const override { return mRoot.offLeafVoxelCount(); }
+    Index64 inactiveLeafVoxelCount() const override { return tools::countInactiveLeafVoxels(*this); }
     /// Return the total number of active voxels.
     Index64 activeVoxelCount() const override { return tools::countActiveVoxels(*this); }
     /// Return the number of inactive voxels within the bounding box of all active voxels.
-    Index64 inactiveVoxelCount() const override;
+    Index64 inactiveVoxelCount() const override { return tools::countInactiveVoxels(*this); }
     /// Return the total number of active tiles.
-    Index64 activeTileCount() const override { return mRoot.onTileCount(); }
+    Index64 activeTileCount() const override { return tools::countActiveTiles(*this); }
 
     /// Return the minimum and maximum active values in this tree.
     void evalMinMax(ValueType &min, ValueType &max) const;
@@ -701,7 +701,7 @@ public:
     ///
     /// @note This operation can delete branches in this grid if they
     /// overlap with inactive tiles in the other grid. Likewise active
-    /// voxels can be turned into unactive voxels resulting in leaf
+    /// voxels can be turned into inactive voxels resulting in leaf
     /// nodes with no active values. Thus, it is recommended to
     /// subsequently call tools::pruneInactive.
     template<typename OtherRootNodeType>
@@ -1969,20 +1969,6 @@ inline bool
 Tree<RootNodeType>::hasSameTopology(const Tree<OtherRootNodeType>& other) const
 {
     return mRoot.hasSameTopology(other.root());
-}
-
-
-template<typename RootNodeType>
-Index64
-Tree<RootNodeType>::inactiveVoxelCount() const
-{
-    Coord dim(0, 0, 0);
-    this->evalActiveVoxelDim(dim);
-    const Index64
-        totalVoxels = dim.x() * dim.y() * dim.z(),
-        activeVoxels = this->activeVoxelCount();
-    assert(totalVoxels >= activeVoxels);
-    return totalVoxels - activeVoxels;
 }
 
 

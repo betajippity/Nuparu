@@ -25,8 +25,8 @@ Nuparu currently consists of:
 * [TBB](https://www.threadingbuildingblocks.org/) 2020.3 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.78.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.4.4 (Mac/Win/Linux)
-* [OpenVDB](http://www.openvdb.org/) 8.1.0 (Mac/Win/Linux)
-* [NanoVDB](http://www.openvdb.org/) 32.3 (Src)
+* [OpenVDB](http://www.openvdb.org/) 9.0.0 (Mac/Win/Linux)
+* [NanoVDB](http://www.openvdb.org/) 9.0.0 (Src)
 * [blosc](https://github.com/Blosc) 1.21.1 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 3.17.3 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.16.1 (Mac/Win/Linux)
@@ -49,10 +49,10 @@ Notes:
 * Embree is built with a max nested instancing depth of 8.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
-    * CUDA is supported on Windows, Fedora 34 x86-64, and RHEL
+    * CUDA is supported on Windows, Fedora 34 x86-64, L4T, and RHEL
     * Metal is supported on macOS
 * blosc is built without AVX2 support.
-* OpenVDB is built without ABI compatibility for OpenVDB 3.x.
+* OpenVDB is built without ABI compatibility for OpenVDB 3.x.x and without explicit instantiation.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 implementation files.
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
@@ -67,5 +67,5 @@ Notes:
     * Fedora 34 libraries require GCC 11.2.x on x86-64 and are in lib/linux-gcc11
     * Fedora 34 libraries require GCC 11.2.x on ARM arm64 and are in lib/linux-arm
     * RHEL libraries require GCC 10.2.x and are in lib/linux-gcc10
-* Things with CUDA support are built using CUDA 11.4
+* Things with CUDA support are built using CUDA 11.4, except on L4T, in which case CUDA 10.2 is used
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.

@@ -77,7 +77,7 @@ __hostdev__ inline CoordT Floor(Vec3T<double>& xyz)
 
 // ------------------------------> NearestNeighborSampler <--------------------------------------
 
-/// @brief Neigherest neighbor, i.e. zero order, interpolator with caching
+/// @brief Nearest neighbor, i.e. zero order, interpolator with caching
 template<typename TreeOrAccT>
 class SampleFromVoxels<TreeOrAccT, 0, true>
 {
@@ -107,15 +107,15 @@ private:
     mutable ValueT    mVal; // private cache
 }; // SampleFromVoxels<TreeOrAccT, 0, true>
 
-/// @brief Neigherest neighbor, i.e. zero order, interpolator without caching
+/// @brief Nearest neighbor, i.e. zero order, interpolator without caching
 template<typename TreeOrAccT>
 class SampleFromVoxels<TreeOrAccT, 0, false>
 {
 public:
     using ValueT = typename TreeOrAccT::ValueType;
     using CoordT = typename TreeOrAccT::CoordType;
-    static const int ORDER = 0; 
-    
+    static const int ORDER = 0;
+
     /// @brief Construction from a Tree or ReadAccessor
     __hostdev__ SampleFromVoxels(const TreeOrAccT& acc)
         : mAcc(acc)
@@ -529,7 +529,7 @@ template<typename RealT, template<typename...> class Vec3T>
 typename TreeOrAccT::ValueType TriquadraticSampler<TreeOrAccT>::sample(const Vec3T<RealT> &uvw, const ValueT (&v)[3][3][3])
 {
     auto kernel = [](const ValueT* value, double weight)->ValueT {
-        return weight * (weight * (0.5f * (value[0] + value[2]) - value[1]) + 
+        return weight * (weight * (0.5f * (value[0] + value[2]) - value[1]) +
                         0.5f * (value[2] - value[0])) + value[1];
     };
 

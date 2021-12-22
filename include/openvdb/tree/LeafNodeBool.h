@@ -164,6 +164,13 @@ public:
     /// Return the global coordinates for a linear table offset.
     Coord offsetToGlobalCoord(Index n) const;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Return the transient data value.
+    Index32 transientData() const { return mTransientData; }
+    /// Set the transient data value.
+    void setTransientData(Index32 transientData) { mTransientData = transientData; }
+#endif
+
     /// Return a string representation of this node.
     std::string str() const;
 
@@ -459,7 +466,7 @@ public:
     ///
     /// @note This operation modifies only active states, not
     /// values. Also note that this operation can result in all voxels
-    /// being inactive so consider subsequnetly calling prune.
+    /// being inactive so consider subsequently calling prune.
     template<typename OtherType>
     void topologyIntersection(const LeafNode<OtherType, Log2Dim>& other, const bool&);
 
@@ -492,7 +499,7 @@ public:
     /// @brief Calls the templated functor BBoxOp with bounding box information.
     /// An additional level argument is provided to the callback.
     ///
-    /// @note The bounding boxes are guarenteed to be non-overlapping.
+    /// @note The bounding boxes are guaranteed to be non-overlapping.
     template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
 
     template<typename VisitorOp> void visit(VisitorOp&);
@@ -728,6 +735,10 @@ protected:
     Buffer mBuffer;
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Transient data (not serialized)
+    Index32 mTransientData = 0;
+#endif
 
 private:
     /// @brief During topology-only construction, access is needed
@@ -792,6 +803,9 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode &other)
     : mValueMask(other.valueMask())
     , mBuffer(other.mBuffer)
     , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
 }
 
@@ -803,6 +817,9 @@ inline
 LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other)
     : mValueMask(other.valueMask())
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     struct Local {
         /// @todo Consider using a value conversion functor passed as an argument instead.
@@ -823,6 +840,9 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
     : mValueMask(other.valueMask())
     , mBuffer(background)
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
 }
 
@@ -834,6 +854,9 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, Topolo
     : mValueMask(other.valueMask())
     , mBuffer(other.valueMask())// value = active state
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
 }
 
@@ -846,6 +869,9 @@ LeafNode<bool, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
     : mValueMask(other.valueMask())
     , mBuffer(other.valueMask())
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     if (offValue) { if (!onValue) mBuffer.mData.toggle(); else mBuffer.mData.setOn(); }
 }

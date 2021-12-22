@@ -401,7 +401,7 @@ public:
             RealT a = RealT(bbox.min()[i]), b = RealT(bbox.max()[i] + 1);
             if (a >= b) { // empty bounding box
                 return false;
-            } 
+            }
             a = (a - mEye[i]) * mInvDir[i];
             b = (b - mEye[i]) * mInvDir[i];
             if (a > b) {
@@ -500,14 +500,14 @@ public:
 
     /// @brief Return true if this ray intersects the specified bounding box.
     ///
-    /// @note For intersection this ray is clipped to the two intersection points
-    ///.
     /// @param bbox Axis-aligned bounding box in the same space as this ray.
     ///
     /// @warning If @a bbox is of the type CoordBBox it is converted to a floating-point
     ///          bounding box, which imples that the max is padded with one voxel, i.e.
     ///          bbox.max += 1! This avoids gaps between neighboring CoordBBox'es, say
     ///          from neighboring tree nodes.
+    ///
+    /// @note For intersection this ray is clipped to the two intersection points.
     template<typename BBoxT>
     __hostdev__ bool clip(const BBoxT& bbox)
     {

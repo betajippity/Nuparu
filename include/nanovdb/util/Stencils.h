@@ -7,9 +7,9 @@
 ///
 /// @file Stencils.h
 ///
-/// @brief Defines various finite-difference stencils that allow for the 
-///        computation of gradients of order 1 to 5, mean curvatures, 
-///        gaussian curvatures, principal curvatures, tri-linear interpolation, 
+/// @brief Defines various finite-difference stencils that allow for the
+///        computation of gradients of order 1 to 5, mean curvatures,
+///        gaussian curvatures, principal curvatures, tri-linear interpolation,
 ///        zero-crossing, laplacian, and closest point transform.
 
 #ifndef NANOVDB_STENCILS_HAS_BEEN_INCLUDED
@@ -32,34 +32,33 @@ namespace nanovdb {
 /// where the error is fifth-order in smooth regions: O(dx) <= error <=O(dx^5)
 template<typename ValueType, typename RealT = ValueType>
 __hostdev__ inline ValueType
-WENO5(const ValueType& v1, 
-      const ValueType& v2, 
+WENO5(const ValueType& v1,
+      const ValueType& v2,
       const ValueType& v3,
-      const ValueType& v4, 
-      const ValueType& v5, 
+      const ValueType& v4,
+      const ValueType& v5,
       RealT scale2 = 1.0)// openvdb uses scale2 = 0.01
 {
-    const RealT C = 13.0 / 12.0;
+    static const RealT C = 13.0 / 12.0;
     // WENO is formulated for non-dimensional equations, here the optional scale2
     // is a reference value (squared) for the function being interpolated.  For
     // example if 'v' is of order 1000, then scale2 = 10^6 is ok.  But in practice
     // leave scale2 = 1.
-    const RealT eps = 1.0e-6 * static_cast<RealT>(scale2);
+    const RealT eps = RealT(1.0e-6) * scale2;
     // {\tilde \omega_k} = \gamma_k / ( \beta_k + \epsilon)^2 in Shu's ICASE report)
-    const RealT A1=0.1f/Pow2(C*Pow2(v1-2*v2+v3)+0.25f*Pow2(v1-4*v2+3.0*v3)+eps),
-                A2=0.6f/Pow2(C*Pow2(v2-2*v3+v4)+0.25f*Pow2(v2-v4)+eps),
-                A3=0.3f/Pow2(C*Pow2(v3-2*v4+v5)+0.25f*Pow2(3.0*v3-4*v4+v5)+eps);
+    const RealT A1 = RealT(0.1)/Pow2(C*Pow2(v1-2*v2+v3)+RealT(0.25)*Pow2(v1-4*v2+3*v3)+eps),
+                A2 = RealT(0.6)/Pow2(C*Pow2(v2-2*v3+v4)+RealT(0.25)*Pow2(v2-v4)+eps),
+                A3 = RealT(0.3)/Pow2(C*Pow2(v3-2*v4+v5)+RealT(0.25)*Pow2(3*v3-4*v4+v5)+eps);
 
-    return static_cast<ValueType>(static_cast<ValueType>(
-        A1*(2.0f*v1 - 7.0f*v2 + 11.0f*v3) +
-        A2*(5.0f*v3 -      v2 +  2.0f*v4) +
-        A3*(2.0f*v3 + 5.0f*v4 -       v5))/(6.0f*(A1+A2+A3)));
+    return static_cast<ValueType>((A1*(2*v1 - 7*v2 + 11*v3) +
+                                   A2*(5*v3 -   v2 +  2*v4) +
+                                   A3*(2*v3 + 5*v4 -    v5))/(6*(A1+A2+A3)));
 }
 
 // ---------------------------- GodunovsNormSqrd ----------------------------
 
 template <typename RealT>
-__hostdev__ inline RealT 
+__hostdev__ inline RealT
 GodunovsNormSqrd(bool isOutside,
                  RealT dP_xm, RealT dP_xp,
                  RealT dP_ym, RealT dP_yp,
@@ -80,8 +79,8 @@ GodunovsNormSqrd(bool isOutside,
 
 template<typename RealT>
 __hostdev__ inline RealT
-GodunovsNormSqrd(bool isOutside, 
-                 const Vec3<RealT>& gradient_m, 
+GodunovsNormSqrd(bool isOutside,
+                 const Vec3<RealT>& gradient_m,
                  const Vec3<RealT>& gradient_p)
 {
     return GodunovsNormSqrd<RealT>(isOutside,
@@ -115,7 +114,7 @@ public:
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors. The method also takes a value of the center
     /// element of the stencil, assuming it is already known.
-    /// @param ijk Index coordinates of stnecil center
+    /// @param ijk Index coordinates of stencil center
     /// @param centerValue Value of the center element of the stencil
     __hostdev__ inline void moveTo(const Coord& ijk, const ValueType& centerValue)
     {
@@ -391,7 +390,7 @@ public:
         ValueType A = D[0] + (D[1]- D[0]) * v;
         ValueType B = D[2] + (D[3]- D[2]) * v;
         Vec3<ValueType> grad(0, 0, A + (B - A) * u);
- 
+
         D[0] = BaseType::template getValue<0,0,0>() + D[0] * w;
         D[1] = BaseType::template getValue<0,1,0>() + D[1] * w;
         D[2] = BaseType::template getValue<1,0,0>() + D[2] * w;
@@ -785,7 +784,7 @@ public:
     using GridType  = GridT;
     using TreeType  = typename GridT::TreeType;
     using ValueType = typename GridT::ValueType;
-    
+
     static constexpr int SIZE = 19;
 
     __hostdev__ CurvatureStencil(const GridType& grid)
@@ -881,7 +880,7 @@ public:
         }
     }
 
-    /// @brief Return the pair (minimum, maximum) principal curvature at the
+    /// @brief Computes the minimum and maximum principal curvature at the
     ///        previously buffered location.
     ///
     /// @note This method should not be called until the stencil
@@ -896,13 +895,6 @@ public:
             min = ValueType(mean - tmp);
             max = ValueType(mean + tmp);
         }
-    }
-    [[deprecated("Replaced by void principalCurvatures(ValueType &min, ValueType &max)")]]
-    __hostdev__ inline std::pair<ValueType, ValueType> principalCurvatures() const
-    {
-        std::pair<ValueType, ValueType> pair;// min, max
-        this->principalCurvatures(pair.first, pair.second);
-        return pair;
     }
 
     /// Return the Laplacian computed at the previously buffered

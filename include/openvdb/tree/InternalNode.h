@@ -247,7 +247,7 @@ public:
     /// @return The level of this node
     /// @details Level 0 is by definition the level of the leaf nodes
     static Index getLevel() { return LEVEL; }
-    /// @brief Populated an stil::vector with the dimension of all the
+    /// @brief Populated an std::vector with the dimension of all the
     /// nodes in the branch starting with this node.
     static void getNodeLog2Dims(std::vector<Index>& dims);
     /// @return The dimension of the child nodes of this node.
@@ -267,6 +267,13 @@ public:
     const Coord& origin() const { return mOrigin; }
     /// Set the grid index coordinates of this node's local origin.
     void setOrigin(const Coord& origin) { mOrigin = origin; }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Return the transient data value.
+    Index32 transientData() const { return mTransientData; }
+    /// Set the transient data value.
+    void setTransientData(Index32 transientData) { mTransientData = transientData; }
+#endif
 
     Index32 leafCount() const;
     void nodeCount(std::vector<Index32> &vec) const;
@@ -313,7 +320,7 @@ public:
     /// @param state     Is updated with the state of all values IF method
     ///                  returns @c true. Else the value is undefined!
     /// @param tolerance The tolerance used to determine if values are
-    ///                  approximatly constant.
+    ///                  approximately constant.
     ///
     /// @note This method also returns @c false if this node contains any child nodes.
     bool isConstant(ValueType& minValue, ValueType& maxValue,
@@ -527,7 +534,7 @@ public:
     ///
     /// @note This operation can delete branches in this grid if they
     /// overlap with inactive tiles in the other grid. Likewise active
-    /// voxels can be turned into unactive voxels resulting in leaf
+    /// voxels can be turned into inactive voxels resulting in leaf
     /// nodes with no active values. Thus, it is recommended to
     /// subsequently call prune.
     template<typename OtherChildNodeType>
@@ -544,7 +551,7 @@ public:
     ///
     /// @note This operation modifies only active states, not
     /// values. Also note that this operation can result in all voxels
-    /// being inactive so consider subsequnetly calling prune.
+    /// being inactive so consider subsequently calling prune.
     template<typename OtherChildNodeType>
     void topologyDifference(const InternalNode<OtherChildNodeType, Log2Dim>& other,
                             const ValueType& background);
@@ -565,7 +572,7 @@ public:
     /// information for all active tiles and leaf nodes in this node.
     /// An additional level argument is provided for each callback.
     ///
-    /// @note The bounding boxes are guarenteed to be non-overlapping.
+    /// @note The bounding boxes are guaranteed to be non-overlapping.
     template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
 
     template<typename VisitorOp> void visit(VisitorOp&);
@@ -818,6 +825,10 @@ protected:
     NodeMaskType mChildMask, mValueMask;
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Transient data (not serialized)
+    Index32 mTransientData = 0;
+#endif
 }; // class InternalNode
 
 
@@ -897,10 +908,13 @@ struct InternalNode<ChildT, Log2Dim>::DeepCopy
 
 template<typename ChildT, Index Log2Dim>
 inline
-InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode& other):
-    mChildMask(other.mChildMask),
-    mValueMask(other.mValueMask),
-    mOrigin(other.mOrigin)
+InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode& other)
+    : mChildMask(other.mChildMask)
+    , mValueMask(other.mValueMask)
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     DeepCopy<InternalNode<ChildT, Log2Dim> > tmp(&other, this);
 }
@@ -914,6 +928,9 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeTyp
     : mChildMask(other.mChildMask)
     , mValueMask(other.mValueMask)
     , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     DeepCopy<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this);
 }
@@ -946,10 +963,13 @@ template<typename ChildT, Index Log2Dim>
 template<typename OtherChildNodeType>
 inline
 InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
-                                            const ValueType& background, TopologyCopy):
-    mChildMask(other.mChildMask),
-    mValueMask(other.mValueMask),
-    mOrigin(other.mOrigin)
+                                            const ValueType& background, TopologyCopy)
+    : mChildMask(other.mChildMask)
+    , mValueMask(other.mValueMask)
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     TopologyCopy1<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this, background);
 }
@@ -983,10 +1003,13 @@ template<typename OtherChildNodeType>
 inline
 InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeType, Log2Dim>& other,
                                             const ValueType& offValue,
-                                            const ValueType& onValue, TopologyCopy):
-    mChildMask(other.mChildMask),
-    mValueMask(other.mValueMask),
-    mOrigin(other.mOrigin)
+                                            const ValueType& onValue, TopologyCopy)
+    : mChildMask(other.mChildMask)
+    , mValueMask(other.mValueMask)
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     TopologyCopy2<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this, offValue, onValue);
 }

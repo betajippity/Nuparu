@@ -132,12 +132,19 @@ NanoToOpenVDB<T>::operator()(const NanoGrid<T>& grid, int /*verbose*/)
     for (uint32_t i=0; i<data->mTableSize; ++i) {
         auto *tile = data->tile(i);
         if (tile->isChild()) {
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
             root.addChild( this->process( data->getChild(tile)) );
+#else// hack since RootNode::addChild is not available in older versions
+            root.addTile(tile->origin(), root.background(), false);//dummy tile
+            auto it = root.beginChildAll();
+            while(it.getCoord() != tile->origin()) ++it;// find tile
+            it.setChild(this->process( data->getChild(tile)) );//replace tile with child
+#endif
         } else {
             root.addTile(tile->origin(), tile->value, tile->state);
         }
     }
-    
+
     return dstGrid;
 }
 
@@ -179,13 +186,13 @@ NanoToOpenVDB<T>::processNode(const SrcNodeT *srcNode)
 } // processNode
 
 template<typename T>
-typename NanoToOpenVDB<T>::DstNode0* 
+typename NanoToOpenVDB<T>::DstNode0*
 NanoToOpenVDB<T>::process(const SrcNode0 *srcNode)
 {
     DstNode0* dstNode = new DstNode0(); // un-initialized for fast construction
     dstNode->setOrigin(srcNode->origin());
     dstNode->setValueMask(srcNode->valueMask());
-   
+
     const ValueT* src = srcNode->data()->mValues;// doesn't work for compressed data, bool or ValueMask
     for (ValueT *dst = dstNode->buffer().data(), *end = dst + DstNode0::SIZE; dst != end; dst += 4, src += 4) {
         dst[0] = src[0];

@@ -182,6 +182,13 @@ public:
     /// Return the global coordinates for a linear table offset.
     Coord offsetToGlobalCoord(Index n) const;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Return the transient data value.
+    Index32 transientData() const { return mTransientData; }
+    /// Set the transient data value.
+    void setTransientData(Index32 transientData) { mTransientData = transientData; }
+#endif
+
     /// Return a string representation of this node.
     std::string str() const;
 
@@ -654,7 +661,7 @@ public:
     ///
     /// @note This operation modifies only active states, not
     /// values. Also note that this operation can result in all voxels
-    /// being inactive so consider subsequnetly calling prune.
+    /// being inactive so consider subsequently calling prune.
     template<typename OtherType>
     void topologyIntersection(const LeafNode<OtherType, Log2Dim>& other, const ValueType&);
 
@@ -688,7 +695,7 @@ public:
     /// information. An additional level argument is provided to the
     /// callback.
     ///
-    /// @note The bounding boxes are guarenteed to be non-overlapping.
+    /// @note The bounding boxes are guaranteed to be non-overlapping.
     template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
 
     template<typename VisitorOp> void visit(VisitorOp&);
@@ -767,7 +774,7 @@ public:
     /// @param state       Is updated with the state of all values IF method
     ///                    returns @c true. Else the value is undefined!
     /// @param tolerance   The tolerance used to determine if values are
-    ///                    approximatly equal to the for value.
+    ///                    approximately equal to the for value.
     bool isConstant(ValueType& firstValue, bool& state,
                     const ValueType& tolerance = zeroVal<ValueType>()) const;
 
@@ -781,7 +788,7 @@ public:
     /// @param state     Is updated with the state of all values IF method
     ///                  returns @c true. Else the value is undefined!
     /// @param tolerance The tolerance used to determine if values are
-    ///                  approximatly constant.
+    ///                  approximately constant.
     bool isConstant(ValueType& minValue, ValueType& maxValue,
                     bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
 
@@ -795,7 +802,7 @@ public:
     ///
     /// @note If tmp = this->buffer().data() then the median
     ///       value is computed very efficiently (in place) but
-    ///       the voxel values in this node are re-shuffeled!
+    ///       the voxel values in this node are re-shuffled!
     ///
     /// @warning If tmp != nullptr then it is the responsibility of
     ///          the client code that it points to enough memory to
@@ -899,6 +906,10 @@ private:
     NodeMaskType mValueMask;
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Transient data (not serialized)
+    Index32 mTransientData = 0;
+#endif
 }; // end of LeafNode class
 
 
@@ -950,10 +961,13 @@ LeafNode<T, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, const ValueType&
 
 template<typename T, Index Log2Dim>
 inline
-LeafNode<T, Log2Dim>::LeafNode(const LeafNode& other):
-    mBuffer(other.mBuffer),
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+LeafNode<T, Log2Dim>::LeafNode(const LeafNode& other)
+    : mBuffer(other.mBuffer)
+    , mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
 }
 
@@ -962,9 +976,12 @@ LeafNode<T, Log2Dim>::LeafNode(const LeafNode& other):
 template<typename T, Index Log2Dim>
 template<typename OtherValueType>
 inline
-LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other):
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other)
+    : mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     struct Local {
         /// @todo Consider using a value conversion functor passed as an argument instead.
@@ -981,10 +998,13 @@ template<typename T, Index Log2Dim>
 template<typename OtherValueType>
 inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other,
-                               const ValueType& background, TopologyCopy):
-    mBuffer(background),
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+                               const ValueType& background, TopologyCopy)
+    : mBuffer(background)
+    , mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
 }
 
@@ -993,9 +1013,12 @@ template<typename T, Index Log2Dim>
 template<typename OtherValueType>
 inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other,
-    const ValueType& offValue, const ValueType& onValue, TopologyCopy):
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+    const ValueType& offValue, const ValueType& onValue, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     for (Index i = 0; i < SIZE; ++i) {
         mBuffer[i] = (mValueMask.isOn(i) ? onValue : offValue);

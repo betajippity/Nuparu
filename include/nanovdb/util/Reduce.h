@@ -14,7 +14,7 @@
 #ifndef NANOVDB_REDUCE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_REDUCE_H_HAS_BEEN_INCLUDED
 
-#include "Range.h"// for Range1D 
+#include "Range.h"// for Range1D
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_reduce.h>
@@ -28,7 +28,7 @@ namespace nanovdb {
 
 /// @return reduction
 ///
-/// @param RangeT Range<dim,T>, CoordBBox, tbb::blocked_range, blocked_range2D, or blocked_range3D.
+/// @param range  RangeT can be Range<dim,T>, CoordBBox, tbb::blocked_range, blocked_range2D, or blocked_range3D.
 /// @param func   functor with signature T FuncT::operator()(const RangeT& range, const T& a) const
 /// @param join   functor with the signature T JoinT::operator()(const T& a, const T& b) const
 /// @code
@@ -71,7 +71,7 @@ inline T reduce(RangeT range, const T& identity, const FuncT &func, const JoinT 
     return identity;// should never happen
 }
 
-/// @brief Simple wrapper to the function defined above 
+/// @brief Simple wrapper to the function defined above
 template <typename T, typename FuncT, typename JoinT >
 inline T reduce(size_t begin, size_t end, size_t grainSize, const T& identity, const FuncT& func, const JoinT& join)
 {

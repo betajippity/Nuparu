@@ -56,11 +56,11 @@
 ///@{
 /// @brief Library major, minor and patch version numbers
 /// @hideinitializer
-#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 8
+#define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 9
 /// @hideinitializer
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 1
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
 /// @hideinitializer
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 ///@}
 
 /// @note  This ifndef exists for compatibility with older versions of OpenVDB.
@@ -71,7 +71,7 @@
 #ifndef OPENVDB_ABI_VERSION_NUMBER
 /// @brief The ABI version that OpenVDB was built with
 /// @hideinitializer
-#define OPENVDB_ABI_VERSION_NUMBER 8
+#define OPENVDB_ABI_VERSION_NUMBER 9
 #endif
 
 /// @brief Library version number string of the form "<major>.<minor>.<patch>"
@@ -79,18 +79,18 @@
 /// want the compile-time version number, not the runtime version number
 /// (although the two are usually the same).
 /// @hideinitializer
-#define OPENVDB_LIBRARY_VERSION_STRING "8.1.1"
+#define OPENVDB_LIBRARY_VERSION_STRING "9.0.0"
 
 /// @brief Library version number string of the form "<major>.<minor>.<patch>abi<abi>"
 /// @details This is a macro rather than a static constant because we typically
 /// want the compile-time version number, not the runtime version number
 /// (although the two are usually the same).
 /// @hideinitializer
-#define OPENVDB_LIBRARY_ABI_VERSION_STRING "8.1.1abi8"
+#define OPENVDB_LIBRARY_ABI_VERSION_STRING "9.0.0abi9"
 
 /// @brief Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
 /// @hideinitializer
-#define OPENVDB_LIBRARY_VERSION_NUMBER 134283265
+#define OPENVDB_LIBRARY_VERSION_NUMBER 150994944
 
 /// @brief The version namespace name for this library version
 /// @hideinitializer
@@ -111,14 +111,16 @@
 ///
 /// where X, Y and N are the major, minor and ABI version numbers, respectively.
 #if OPENVDB_ABI_VERSION_NUMBER == OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
-    #define OPENVDB_VERSION_NAME v8_1
+    #define OPENVDB_VERSION_NAME v9_0
 #else
-    #define OPENVDB_VERSION_NAME v8_1abi8
+    #define OPENVDB_VERSION_NAME v9_0abi9
 #endif
 
 /* Denotes whether VDB was built with IMath Half support */
 #ifndef OPENVDB_USE_IMATH_HALF
 /* #undef OPENVDB_USE_IMATH_HALF */
+/* Denotes whether VDB was built against Imath 3+ */
+/* #undef OPENVDB_IMATH_VERSION */
 #endif
 
 /* Denotes whether VDB was built with Blosc support */
@@ -131,6 +133,22 @@
 #define OPENVDB_USE_ZLIB
 #endif
 
+/* Denotes whether VDB was built with explicit template instantiation */
+#ifndef OPENVDB_USE_EXPLICIT_INSTANTIATION
+/* #undef OPENVDB_USE_EXPLICIT_INSTANTIATION */
+#endif
+
+/* Defines the macros for explicit template declarations. */
+#define OPENVDB_INSTANTIATE extern template OPENVDB_TEMPLATE_IMPORT
+#define OPENVDB_INSTANTIATE_CLASS extern template class OPENVDB_TEMPLATE_IMPORT
+#define OPENVDB_INSTANTIATE_STRUCT extern template struct OPENVDB_TEMPLATE_IMPORT
+
+/* Defines the macros for explicit template instantiations. */
+#define OPENVDB_REAL_TREE_INSTANTIATE(Function)     
+#define OPENVDB_NUMERIC_TREE_INSTANTIATE(Function)  
+#define OPENVDB_VEC3_TREE_INSTANTIATE(Function)     
+#define OPENVDB_VOLUME_TREE_INSTANTIATE(Function)   
+#define OPENVDB_ALL_TREE_INSTANTIATE(Function)      
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
@@ -141,10 +159,10 @@
     // This can be suppressed by defining OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
     // Note that, whilst the VDB CMake does not allow this option to be hit,
     // it exists to propagate this message to downstream targets
-    #if OPENVDB_ABI_VERSION_NUMBER == 9
-        #ifndef OPENVDB_USE_FUTURE_ABI_9
-            PRAGMA(message("NOTE: ABI = 9 is still in active development and has not been finalized, "
-                "define OPENVDB_USE_FUTURE_ABI_9 to suppress this message"))
+    #if OPENVDB_ABI_VERSION_NUMBER == 10
+        #ifndef OPENVDB_USE_FUTURE_ABI_10
+            PRAGMA(message("NOTE: ABI = 10 is still in active development and has not been finalized, "
+                "define OPENVDB_USE_FUTURE_ABI_10 to suppress this message"))
         #endif
     #else
         #error expected OPENVDB_ABI_VERSION_NUMBER <= OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
@@ -158,6 +176,12 @@
 #ifndef OPENVDB_USE_DEPRECATED_ABI_6
     #if OPENVDB_ABI_VERSION_NUMBER == 6
         PRAGMA(message("NOTE: ABI = 6 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_6 "
+            "to suppress this message"))
+    #endif
+#endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_7
+    #if OPENVDB_ABI_VERSION_NUMBER == 7
+        PRAGMA(message("NOTE: ABI = 7 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_7 "
             "to suppress this message"))
     #endif
 #endif
