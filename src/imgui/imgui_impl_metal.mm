@@ -14,6 +14,7 @@
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
 //  2022-XX-XX: Metal: Added support for multiple windows via the ImGuiPlatformIO interface.
+//  2022-06-01: Metal: Fixed null dereference on exit inside command buffer completion handler.
 //  2022-04-27: Misc: Store backend data in a per-context struct, allowing to use this backend with multiple contexts.
 //  2022-01-03: Metal: Ignore ImDrawCmd where ElemCount == 0 (very rare but can technically be manufactured by user code).
 //  2021-12-30: Metal: Added Metal C++ support. Enable with '#define IMGUI_IMPL_METAL_CPP' in your imconfig.h file.
@@ -74,16 +75,16 @@ static void ImGui_ImplMetal_InvalidateDeviceObjectsForPlatformWindows();
 
 struct ImGui_ImplMetal_Data
 {
-    MetalContext*            SharedMetalContext;
+    MetalContext*               SharedMetalContext;
 
-    ImGui_ImplMetal_Data()  { memset(this, 0, sizeof(*this)); }
+    ImGui_ImplMetal_Data()      { memset(this, 0, sizeof(*this)); }
 };
 
-static ImGui_ImplMetal_Data*     ImGui_ImplMetal_CreateBackendData()  { return IM_NEW(ImGui_ImplMetal_Data)(); }
-static ImGui_ImplMetal_Data*     ImGui_ImplMetal_GetBackendData()     { return ImGui::GetCurrentContext() ? (ImGui_ImplMetal_Data*)ImGui::GetIO().BackendRendererUserData : NULL; }
-static void                      ImGui_ImplMetal_DestroyBackendData() { IM_DELETE(ImGui_ImplMetal_GetBackendData()); }
+static ImGui_ImplMetal_Data*    ImGui_ImplMetal_CreateBackendData() { return IM_NEW(ImGui_ImplMetal_Data)(); }
+static ImGui_ImplMetal_Data*    ImGui_ImplMetal_GetBackendData()    { return ImGui::GetCurrentContext() ? (ImGui_ImplMetal_Data*)ImGui::GetIO().BackendRendererUserData : NULL; }
+static void                     ImGui_ImplMetal_DestroyBackendData(){ IM_DELETE(ImGui_ImplMetal_GetBackendData()); }
 
-static inline CFTimeInterval     GetMachAbsoluteTimeInSeconds()       { return static_cast<CFTimeInterval>(static_cast<double>(clock_gettime_nsec_np(CLOCK_UPTIME_RAW)) / 1e9); }
+static inline CFTimeInterval    GetMachAbsoluteTimeInSeconds()      { return (CFTimeInterval)(double)(clock_gettime_nsec_np(CLOCK_UPTIME_RAW) / 1e9); }
 
 #ifdef IMGUI_IMPL_METAL_CPP
 
@@ -306,8 +307,11 @@ void ImGui_ImplMetal_RenderDrawData(ImDrawData* drawData, id<MTLCommandBuffer> c
     {
         dispatch_async(dispatch_get_main_queue(), ^{
             ImGui_ImplMetal_Data* bd = ImGui_ImplMetal_GetBackendData();
-            [bd->SharedMetalContext.bufferCache addObject:vertexBuffer];
-            [bd->SharedMetalContext.bufferCache addObject:indexBuffer];
+            if (bd != NULL)
+            {
+                [bd->SharedMetalContext.bufferCache addObject:vertexBuffer];
+                [bd->SharedMetalContext.bufferCache addObject:indexBuffer];
+            }
         });
     }];
 }
@@ -458,7 +462,7 @@ static void ImGui_ImplMetal_RenderWindow(ImGuiViewport* viewport, void*)
     }
     data->FirstFrame = false;
 
-    viewport->DpiScale = static_cast<float>(window.backingScaleFactor);
+    viewport->DpiScale = (float)window.backingScaleFactor;
     if (data->MetalLayer.contentsScale != viewport->DpiScale)
     {
         data->MetalLayer.contentsScale = viewport->DpiScale;
