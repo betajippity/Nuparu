@@ -180,7 +180,9 @@
 #ifdef _WIN32
 #        include <intrin.h>
 #elif defined(__x86_64__)
-#        include <x86intrin.h>
+#    include <x86intrin.h>
+#elif defined(__F16C__)
+#    include <immintrin.h>
 #endif
 
 #include <stdint.h>
@@ -323,7 +325,7 @@ imath_half_to_float (imath_half_bits_t h)
         // other compilers may provide count-leading-zeros primitives,
         // but we need the community to inform us of the variants
         uint32_t lc;
-#    if defined(_MSC_VER)
+#    if defined(_MSC_VER) && (_M_IX86 || _M_X64)
         lc = __lzcnt (hexpmant);
 #    elif defined(__GNUC__) || defined(__clang__)
         lc = (uint32_t) __builtin_clz (hexpmant);
@@ -888,6 +890,83 @@ IMATH_EXPORT std::ostream& operator<< (std::ostream& os, IMATH_INTERNAL_NAMESPAC
 
 /// Input h from is
 IMATH_EXPORT std::istream& operator>> (std::istream& is, IMATH_INTERNAL_NAMESPACE::half& h);
+
+#include <limits>
+
+namespace std
+{
+
+template <> class numeric_limits<IMATH_INTERNAL_NAMESPACE::half>
+{
+public:
+    static const bool is_specialized = true;
+
+    static constexpr IMATH_INTERNAL_NAMESPACE::half min () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x0400); /*HALF_MIN*/
+    }
+    static constexpr IMATH_INTERNAL_NAMESPACE::half max () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x7bff); /*HALF_MAX*/
+    }
+    static constexpr IMATH_INTERNAL_NAMESPACE::half lowest ()
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0xfbff); /* -HALF_MAX */
+    }
+
+    static constexpr int  digits       = HALF_MANT_DIG;
+    static constexpr int  digits10     = HALF_DIG;
+    static constexpr int  max_digits10 = HALF_DECIMAL_DIG;
+    static constexpr bool is_signed    = true;
+    static constexpr bool is_integer   = false;
+    static constexpr bool is_exact     = false;
+    static constexpr int  radix        = HALF_RADIX;
+    static constexpr IMATH_INTERNAL_NAMESPACE::half epsilon () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x1400); /*HALF_EPSILON*/
+    }
+    static constexpr IMATH_INTERNAL_NAMESPACE::half round_error () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x3800); /*0.5*/
+    }
+
+    static constexpr int min_exponent   = HALF_DENORM_MIN_EXP;
+    static constexpr int min_exponent10 = HALF_DENORM_MIN_10_EXP;
+    static constexpr int max_exponent   = HALF_MAX_EXP;
+    static constexpr int max_exponent10 = HALF_MAX_10_EXP;
+
+    static constexpr bool               has_infinity      = true;
+    static constexpr bool               has_quiet_NaN     = true;
+    static constexpr bool               has_signaling_NaN = true;
+    static constexpr float_denorm_style has_denorm        = denorm_present;
+    static constexpr bool               has_denorm_loss   = false;
+    static constexpr IMATH_INTERNAL_NAMESPACE::half               infinity () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x7c00); /*half::posInf()*/
+    }
+    static constexpr IMATH_INTERNAL_NAMESPACE::half quiet_NaN () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x7fff); /*half::qNan()*/
+    }
+    static constexpr IMATH_INTERNAL_NAMESPACE::half signaling_NaN () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x7dff); /*half::sNan()*/
+    }
+    static constexpr IMATH_INTERNAL_NAMESPACE::half denorm_min () IMATH_NOEXCEPT
+    {
+        return IMATH_INTERNAL_NAMESPACE::half (IMATH_INTERNAL_NAMESPACE::half::FromBits, 0x0001); /*HALF_DENORM_MIN*/
+    }
+
+    static constexpr bool is_iec559  = false;
+    static constexpr bool is_bounded = false;
+    static constexpr bool is_modulo  = false;
+
+    static constexpr bool              traps           = true;
+    static constexpr bool              tinyness_before = false;
+    static constexpr float_round_style round_style     = round_to_nearest;
+};
+
+} // namespace std
 
 //----------
 // Debugging
