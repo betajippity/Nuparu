@@ -11,7 +11,7 @@ Nuparu currently consists of:
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.2.2 (Win)
 * [GLFW](http://www.glfw.org) 3.3.7 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.2.0 (Mac/Win/Linux)
-* [Embree](https://embree.github.io) 3.13.2 (Mac/Win/Linux)
+* [Embree](https://embree.github.io) 3.13.4 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.5 (Mac/Win/Linux)
 * [Imath](https://github.com/AcademySoftwareFoundation/Imath) 3.1.5 (Mac/Win/Linux)
 * [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) 3.1.5 (Mac/Win/Linux)
@@ -46,7 +46,7 @@ Notes:
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
 * Partio is built without support for .prt files.
 * RMSD has minor modifications for C++ support.
-* On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64, Embree is built with NEON support.
+* On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64, Embree is built with NEON 2X support.
 * Embree is built with a max nested instancing depth of 16.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:

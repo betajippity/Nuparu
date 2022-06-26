@@ -1,4 +1,4 @@
-% Embree: High Performance Ray Tracing Kernels 3.13.2
+% Embree: High Performance Ray Tracing Kernels 3.13.4
 % Intel Corporation
 
 Embree Overview
@@ -17,12 +17,12 @@ highest benefit from future improvements. Intel® Embree is released as Open
 Source under the
 [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0).
 
-Intel® Embree supports applications written with the Intel® SPMD Program
-Compiler (ISPC, <https://ispc.github.io/>) by also providing an ISPC
+Intel® Embree supports applications written with the Intel® Implicit SPMD
+Program Compiler (Intel® ISPC, <https://ispc.github.io/>) by also providing an Intel® ISPC
 interface to the core ray tracing algorithms. This makes it possible
-to write a renderer in ISPC that automatically vectorizes and
-leverages SSE, AVX, AVX2, and AVX-512 instructions. ISPC also supports
-runtime code selection, thus ISPC will select the best code path for
+to write a renderer in Intel® ISPC that automatically vectorizes and
+leverages SSE, AVX, AVX2, and AVX-512 instructions. Intel® ISPC also supports
+runtime code selection, thus Intel® ISPC will select the best code path for
 your application.
 
 Intel® Embree contains algorithms optimized for incoherent workloads (e.g.
@@ -75,93 +75,41 @@ list](https://groups.google.com/d/forum/embree/).
 Installation of Embree
 ======================
 
-Windows MSI Installer
----------------------
-
-You can install the Embree library using the Windows MSI installer
-[embree-3.13.2-x64.vc14.msi](https://github.com/embree/embree/releases/download/v3.13.2/embree-3.13.2.x64.vc14.msi). This
-will install the 64-bit Embree version by default in `Program
-Files\Intel\Embree3`.
-
-You have to set the path to the `bin` folders manually to your `PATH`
-environment variable for applications to find Embree.
-
-To compile applications with Embree using CMake, please have a look at
-the `find_embree` tutorial. To compile this tutorial, you need to set
-the `embree_DIR` CMake variable of this tutorial to `Program
-Files\Intel\Embree3`.
-
-To uninstall Embree, open `Programs and Features` by clicking the
-`Start button`, clicking `Control Panel`, clicking `Programs`, and
-then clicking `Programs and Features`. Select `Embree
-3.13.2 x64` and uninstall it.
-
 Windows ZIP File
 -----------------
 
 Embree linked against Visual Studio 2015 are provided as a ZIP file
-[embree-3.13.2.x64.vc14.windows.zip](https://github.com/embree/embree/releases/download/v3.13.2/embree-3.13.2.x64.vc14.windows.zip). After
+[embree-3.13.4.x64.vc14.windows.zip](https://github.com/embree/embree/releases/download/v3.13.4/embree-3.13.4.x64.vc14.windows.zip). After
 unpacking this ZIP file, you should set the path to the `lib` folder
 manually to your `PATH` environment variable for applications to find
-Embree. To compile applications with Embree, you also have to set the
-`Include Directories` path in Visual Studio to the `include` folder of
-the Embree installation.
-
-If you plan to ship Embree with your application, best use the Embree
-version from this ZIP file.
+Embree.
 
 Linux tar.gz Files
 ------------------
 
 The Linux version of Embree is also delivered as a `tar.gz` file:
-[embree-3.13.2.x86_64.linux.tar.gz](https://github.com/embree/embree/releases/download/v3.13.2/embree-3.13.2.x86_64.linux.tar.gz). Unpack
+[embree-3.13.4.x86_64.linux.tar.gz](https://github.com/embree/embree/releases/download/v3.13.4/embree-3.13.4.x86_64.linux.tar.gz). Unpack
 this file using `tar` and source the provided `embree-vars.sh` (if you
 are using the bash shell) or `embree-vars.csh` (if you are using the C
 shell) to set up the environment properly:
 
-    tar xzf embree-3.13.2.x86_64.linux.tar.gz
-    source embree-3.13.2.x86_64.linux/embree-vars.sh
-
-If you want to ship Embree with your application, best use the Embree
-version provided in the `tar.gz` file.
+    tar xzf embree-3.13.4.x86_64.linux.tar.gz
+    source embree-3.13.4.x86_64.linux/embree-vars.sh
 
 We recommend adding a relative `RPATH` to your application that points
 to the location where Embree (and TBB) can be found, e.g. `$ORIGIN/../lib`.
-
-macOS PKG Installer
--------------------
-
-To install the Embree library on your macOS system use the
-provided package installer inside
-[embree-3.13.2.x86_64.pkg](https://github.com/embree/embree/releases/download/v3.13.2/embree-3.13.2.x86_64.pkg). This
-will install Embree by default into `/opt/local/lib` and
-`/opt/local/include` directories. The Embree tutorials are installed
-into the `/Applications/Embree3` directory.
-
-You also have to install the Intel® Threading Building Blocks (TBB)
-using [MacPorts](http://www.macports.org/):
-
-    sudo port install tbb
-
-Alternatively you can download the latest TBB version from
-[https://www.threadingbuildingblocks.org/download](https://www.threadingbuildingblocks.org/download)
-and set the `DYLD_LIBRARY_PATH` environment variable to point
-to the TBB library.
-
-To uninstall Embree, execute the uninstaller script
-`/Applications/Embree3/uninstall.command`.
 
 macOS ZIP file
 -----------------
 
 The macOS version of Embree is also delivered as a ZIP file:
-[embree-3.13.2.x86_64.macosx.zip](https://github.com/embree/embree/releases/download/v3.13.2/embree-3.13.2.x86_64.macosx.zip). Unpack
+[embree-3.13.4.x86_64.macosx.zip](https://github.com/embree/embree/releases/download/v3.13.4/embree-3.13.4.x86_64.macosx.zip). Unpack
 this file using `tar` and source the provided `embree-vars.sh` (if you
 are using the bash shell) or `embree-vars.csh` (if you are using the C
 shell) to set up the environment properly:
 
-    unzip embree-3.13.2.x64.macosx.zip
-    source embree-3.13.2.x64.macosx/embree-vars.sh
+    unzip embree-3.13.4.x64.macosx.zip
+    source embree-3.13.4.x64.macosx/embree-vars.sh
 
 If you want to ship Embree with your application, please use the Embree
 library of the provided ZIP file. The library name of that Embree
@@ -184,6 +132,7 @@ C++11. Embree is tested with the following compilers:
 
 Linux
 
+  - Intel® oneAPI DPC++/C++ Compiler 2022.0.0
   - Intel® Compiler 2020 Update 1
   - Intel® Compiler 2019 Update 4
   - Intel® Compiler 2017 Update 1
@@ -213,15 +162,15 @@ to use Embree with the Intel® Threading Building Blocks (TBB) and best
 also use TBB inside your application. Optionally you can disable TBB
 in Embree through the `EMBREE_TASKING_SYSTEM` CMake variable.
 
-Embree supports the Intel® SPMD Program Compiler (ISPC), which allows
+Embree supports the Intel® Implicit SPMD Program Compiler (Intel® ISPC), which allows
 straightforward parallelization of an entire renderer. If you do not
-want to use ISPC then you can disable `EMBREE_ISPC_SUPPORT` in
-CMake. Otherwise, download and install the ISPC binaries (we have
-tested ISPC version 1.9.1) from
+want to use Intel® ISPC then you can disable `EMBREE_ISPC_SUPPORT` in
+CMake. Otherwise, download and install the Intel® ISPC binaries (we have
+tested Intel® ISPC version 1.9.1) from
 [ispc.github.io](https://ispc.github.io/downloads.html). After
 installation, put the path to `ispc` permanently into your `PATH`
 environment variable or you need to correctly set the
-`ISPC_EXECUTABLE` variable during CMake configuration.
+`EMBREE_ISPC_EXECUTABLE` variable during CMake configuration.
 
 You additionally have to install CMake 3.1.0 or higher and the developer
 version of GLUT.
@@ -304,6 +253,7 @@ Embree is tested using the following compilers under Windows:
   - Visual Studio 2019
   - Visual Studio 2017
   - Visual Studio 2015 (Update 1)
+  - Intel® oneAPI DPC++/C++ Compiler 2022.0.0
   - Intel® Compiler 2019 Update 6
   - Intel® Compiler 2017 Update 8
   - LLVM Clang 9.0.0
@@ -319,28 +269,28 @@ in Embree through the `EMBREE_TASKING_SYSTEM` CMake variable.
 Embree will either find the Intel® Threading Building Blocks (TBB)
 installation that comes with the Intel® Compiler, or you can install the
 binary distribution of TBB directly from
-[www.threadingbuildingblocks.org](https://www.threadingbuildingblocks.org/download)
+[https://github.com/oneapi-src/oneTBB/releases](https://github.com/oneapi-src/oneTBB/releases)
 into a folder named `tbb` into your Embree root directory. You also have
 to make sure that the libraries `tbb.dll` and `tbb_malloc.dll` can be
 found when executing your Embree applications, e.g. by putting the path
 to these libraries into your `PATH` environment variable.
 
-Embree supports the Intel® SPMD Program Compiler (ISPC), which allows
+Embree supports the Intel® Implicit SPMD Program Compiler (Intel® ISPC), which allows
 straightforward parallelization of an entire renderer. When installing
-ISPC, make sure to download an ISPC version from
+Intel® ISPC, make sure to download an Intel® ISPC version from
 [ispc.github.io](https://ispc.github.io/downloads.html) that is
 compatible with your Visual Studio version. After installation, put
 the path to `ispc.exe` permanently into your `PATH` environment
-variable or you need to correctly set the `ISPC_EXECUTABLE` variable
-during CMake configuration. If you do not want to use ISPC then you
+variable or you need to correctly set the `EMBREE_ISPC_EXECUTABLE` variable
+during CMake configuration. If you do not want to use Intel® ISPC then you
 can disable `EMBREE_ISPC_SUPPORT` in CMake.
 
-We have tested Embree with the following ISPC versions:
+We have tested Embree with the following Intel® ISPC versions:
 
-  - ISPC 1.14.1
-  - ISPC 1.13.0
-  - ISPC 1.12.0
-  - ISPC 1.9.2
+  - Intel® ISPC 1.14.1
+  - Intel® ISPC 1.13.0
+  - Intel® ISPC 1.12.0
+  - Intel® ISPC 1.9.2
 
 You additionally have to install [CMake](http://www.cmake.org/download/)
 (version 2.8.11 or higher). Note that you need a native Windows CMake
@@ -425,7 +375,7 @@ parameters that can be configured in CMake:
 + `EMBREE_STACK_PROTECTOR`: Enables protection of return address
   from buffer overwrites. This option is OFF by default.
 
-+ `EMBREE_ISPC_SUPPORT`: Enables ISPC support of Embree. This option
++ `EMBREE_ISPC_SUPPORT`: Enables Intel® ISPC support of Embree. This option
   is ON by default.
 
 + `EMBREE_STATIC_LIB`: Builds Embree as a static library (OFF by
@@ -461,7 +411,7 @@ parameters that can be configured in CMake:
 + `EMBREE_RAY_PACKETS`: Enables ray packet traversal kernels. This
   feature is turned ON by default. When turned on packet traversal is
   used internally and packets passed to rtcIntersect4/8/16 are kept
-  intact in callbacks (when the ISA of appropiate width is enabled).
+  intact in callbacks (when the ISA of appropriate width is enabled).
 
 + `EMBREE_IGNORE_INVALID_RAYS`: Makes code robust against the risk of
   full-tree traversals caused by invalid rays (e.g. rays containing
@@ -472,19 +422,23 @@ parameters that can be configured in CMake:
   only), or an internal tasking system (INTERNAL). By default TBB is
   used.
 
-+ `EMBREE_TBB_ROOT`: If Intel® Threading TBB Building Blocks (TBB)
++ `EMBREE_TBB_ROOT`: If Intel® Threading Building Blocks (TBB)
   is used as a tasking system, search the library in this directory
   tree.
 
-+ `EMBREE_TBB_POSTFIX`: If Intel® Threading TBB Building Blocks (TBB)
++ `EMBREE_TBB_COMPONENT`: The component/libary name of Intel® Threading 
+  Building Blocks (TBB). Embree searches for this library name (default: tbb)
+  when TBB is used as tasking system.
+
++ `EMBREE_TBB_POSTFIX`: If Intel® Threading Building Blocks (TBB)
   is used as a tasking system, link to tbb<EMBREE_TBB_POSTFIX>.(so,dll,lib).
   Defaults to the empty string.
 
-+ `EMBREE_TBB_DEBUG_ROOT`: If Intel® Threading TBB Building Blocks (TBB)
++ `EMBREE_TBB_DEBUG_ROOT`: If Intel® Threading Building Blocks (TBB)
   is used as a tasking system, search the library in this directory
   tree in Debug mode. Defaults to `EMBREE_TBB_ROOT`.
 
-+ `EMBREE_TBB_DEBUG_POSTFIX`: If Intel® Threading TBB Building Blocks (TBB)
++ `EMBREE_TBB_DEBUG_POSTFIX`: If Intel® Threading Building Blocks (TBB)
   is used as a tasking system, link to tbb<EMBREE_TBB_DEBUG_POSTFIX>.(so,dll,lib)
   in Debug mode. Defaults to "_debug".
 
@@ -555,12 +509,8 @@ CMake find Embree using the `FIND_PACKAGE` function inside your
 
      FIND_PACKAGE(embree 3.0 REQUIRED)
 
-If you installed Embree using the Linux RPM or macOS PKG installer,
-this will automatically find Embree. If you used the `zip` or `tar.gz`
-files to extract Embree, you need to set the `embree_DIR` variable to
-the folder you extracted Embree to. If you used the Windows MSI
-installer, you need to set `embree_DIR` to point to the Embree install
-location (e.g. `C:\Program Files\Intel\Embree3`).
+To cmake to properly find Embree you need to set the `embree_DIR`
+variable to the folder you extracted Embree to.
 
 The `FIND_PACKAGE` function will create an embree target that
 you can add to your target link libraries:
@@ -580,12 +530,13 @@ construct 3D scenes and perform ray queries of different types inside
 these scenes. All API calls carry the prefix `rtc` (or `RTC` for types)
 which stands for **r**ay **t**racing **c**ore.
 
-The API also exists in an ISPC version, which is almost identical but
-contains additional functions that operate on ray packets with a size
-of the native SIMD width used by ISPC. For simplicity this document
-refers to the C99 version of the API functions. For changes when
-upgrading from the Embree 2 to the current Embree 3 API see Section
-[Upgrading from Embree 2 to Embree 3].
+The API also exists in an Intel® Implicit SPMD Program Compiler (Intel®
+ISPC) version, which is almost identical but contains additional
+functions that operate on ray packets with a size of the native SIMD
+width used by Intel® ISPC. For simplicity this document refers to the
+C99 version of the API functions. For changes when upgrading from the
+Embree 2 to the current Embree 3 API see Section [Upgrading from
+Embree 2 to Embree 3].
 
 The API supports scenes consisting of different geometry types such as
 triangle meshes, quad meshes (triangle pairs), grid meshes, flat
@@ -763,7 +714,7 @@ See Section [rtcCollide] for a detailed description of how to set up
 collision detection.
 
 Seen tutorial [Collision Detection](#collision-detection) for a
-complete example of collsion detection being used on a simple cloth
+complete example of collision detection being used on a simple cloth
 solver.
 
 Miscellaneous
@@ -801,7 +752,7 @@ files:
     ./scripts/cpp-patch.py --patch embree2_to_embree3.patch
       --in infile.cpp --out outfile.cpp
 
-When invoked for ISPC files, add the `--ispc` option:
+When invoked for Intel® ISPC files, add the `--ispc` option:
 
     ./scripts/cpp-patch.py --ispc --patch embree2_to_embree3.patch
       --in infile.ispc --out outfile.ispc
@@ -1048,18 +999,20 @@ Miscellaneous {#miscellaneous}
     change from the initial size and ordering when entering a filter
     callback.
 
--   We no longer export ISPC-specific symbols. This has the advantage
-    that certain linking issues went away, e.g. it is now possible to
-    link an ISPC application compiled for any combination of ISAs, and
-    link this to an Embree library compiled with a different set of
-    ISAs. Previously the ISAs of the application had to be a subset of
-    the ISAs of Embree, and when the user enabled exactly one ISA, they
-    had to do this in Embree and the application.
+-   We no longer export Intel® ISPC-specific symbols. This has the
+    advantage that certain linking issues went away, e.g. it is now
+    possible to link an Intel® ISPC application compiled for any
+    combination of ISAs, and link this to an Embree library compiled
+    with a different set of ISAs. Previously the ISAs of the
+    application had to be a subset of the ISAs of Embree, and when the
+    user enabled exactly one ISA, they had to do this in Embree and the
+    application.
 
--   We no longer export the ISPC tasking system, which means that the
-    application has the responsibility to implement the ISPC tasking
-    system itself. ISPC comes with example code on how to do this. This
-    change is not performed by the script and must be done manually.
+-   We no longer export the Intel® ISPC tasking system, which means
+    that the application has the responsibility to implement the Intel®
+    ISPC tasking system itself. Intel® ISPC comes with example code on
+    how to do this. This change is not performed by the script and must
+    be done manually.
 
 -   Fixed many naming inconsistencies, and changed names of further API
     functions. All these renamings are properly done by the script and
@@ -1718,9 +1671,9 @@ rtcAttachGeometry
 The `rtcAttachGeometry` function attaches a geometry (`geometry`
 argument) to a scene (`scene` argument) and assigns a geometry ID to
 that geometry. All geometries attached to a scene are defined to be
-included inside the scene. A geometry can get attached to multiplee
-scene. The geometry ID is unique for the scene, and is used to identify
-the geometry when hit by a ray during ray queries.
+included inside the scene. A geometry can get attached to multiple
+scenes. The geometry ID is unique for the scene, and is used to
+identify the geometry when hit by a ray during ray queries.
 
 This function is thread-safe, thus multiple threads can attach
 geometries to a scene in parallel.
@@ -2888,7 +2841,7 @@ RTC\_GEOMETRY\_TYPE\_CURVE
       flat normal oriented curve geometry with Catmull-Rom basis
 
     RTC_GEOMETRY_TYPE_CONE_LINEAR_CURVE -
-      capped cone curve geometry with linear basis - discontinous at edge boundaries
+      capped cone curve geometry with linear basis - discontinuous at edge boundaries
 
     RTC_GEOMETRY_TYPE_ROUND_LINEAR_CURVE -
       capped cone curve geometry with linear basis and spherical ending
@@ -2986,14 +2939,14 @@ neighbor bits are automatically calculated base on the index buffer
 segment exists if segment(id+1)-1 == segment(id)).
 
 A left neighbor segment is assumed to end at the start vertex of the
-current segement, and to start at the previous vertex in the vertex
+current segment, and to start at the previous vertex in the vertex
 buffer. Similarly, the right neighbor segment is assumed to start at
 the end vertex of the current segment, and to end at the next vertex in
 the vertex buffer.
 
 Only when the left and right bits are properly specified the current
 segment can properly attach to the left and/or right neighbor,
-otherwise the touching area may not get rendererd properly.
+otherwise the touching area may not get rendered properly.
 
 ##### Bézier Basis
 
@@ -3013,8 +2966,8 @@ This basis is not interpolating, thus the curve does in general not go
 through any of the control points directly. A big advantage of this
 basis is that 3 control points can be shared for two continuous
 neighboring curve segments, e.g. the curves (p0,p1,p2,p3) and
-(p1,p2,p3,p4) are C1 continuous. This feature make this basis a good
-choise to construct continuous multi-segment curves, as memory
+(p1,p2,p3,p4) are C1 continuous. This feature makes this basis a good
+choice to construct continuous multi-segment curves, as memory
 consumption can be kept minimal.
 
 ##### Hermite Basis
@@ -3028,7 +2981,7 @@ order derivative at the begin and end matches exactly the value
 specified in the tangent buffer. When connecting two segments
 continuously, the end point and tangent of the previous segment can be
 shared. Different versions of Catmull-Rom splines can be easily
-constructed usig the Hermite basis, by calculating a proper tangent
+constructed using the Hermite basis, by calculating a proper tangent
 buffer from the control points.
 
 ##### Catmull-Rom Basis
@@ -3072,7 +3025,10 @@ product of the normal from the normal spline and tangent of the vertex
 spline. Note that this construction does not work when the provided
 normals are parallel to the curve direction. For this reason the
 provided normals should best be kept as perpendicular to the curve
-direction as possible.
+direction as possible. We further assume second order derivatives of
+the center curve to be zero for this construction, as otherwise very
+large curvatures occurring in corner cases, can thicken the constructed
+curve significantly.
 
 ##### Round Curves
 
@@ -3085,7 +3041,7 @@ touches a start-sphere and end-sphere. The start sphere is rendered
 when no previous segments is indicated by the neighbor bits. The end
 sphere is always rendered but parts that lie inside the next segment
 are clipped away (if that next segment exists). This way a curve is
-closed on both ends and the interiour will render properly as long as
+closed on both ends and the interior will render properly as long as
 only neighboring segments penetrate into a segment. For this to work
 properly it is important that the flags buffer is properly populated
 with neighbor information.
@@ -3880,7 +3836,7 @@ elements (`byteStride` argument), the format of the buffer elements
 
 The start address (`byteOffset` argument) and stride (`byteStride`
 argument) must be both aligned to 4 bytes; otherwise the
-`rtcSetGeometryBuffer` function will fail.
+`rtcSetSharedGeometryBuffer` function will fail.
 
 When the buffer will be used as a vertex buffer
 (`RTC_BUFFER_TYPE_VERTEX` and `RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE`), the
@@ -4917,17 +4873,17 @@ efficient. If there is no instance transform, the similarity scale is
 1.
 
 The callback function will potentially be called for primitives outside
-the query domain for two resons: First, the callback is invoked for all
-primitives inside a BVH leaf node since no geometry data of primitives
-is determined internally and therefore individual primitives are not
-culled (only their (aggregated) bounding boxes). Second, in case non
-similarity transformations are used, the resulting ellipsoidal query
-domain (in instance space) is approximated by its axis aligned bounding
-box internally and therefore inner nodes that do not intersect the
-original domain might intersect the approximative bounding box which
-results in unneccessary callbacks. In any case, the callbacks are
+the query domain for two reasons: First, the callback is invoked for
+all primitives inside a BVH leaf node since no geometry data of
+primitives is determined internally and therefore individual primitives
+are not culled (only their (aggregated) bounding boxes). Second, in
+case non similarity transformations are used, the resulting ellipsoidal
+query domain (in instance space) is approximated by its axis aligned
+bounding box internally and therefore inner nodes that do not intersect
+the original domain might intersect the approximative bounding box
+which results in unnecessary callbacks. In any case, the callbacks are
 conservative, i.e. if a primitive is inside the query domain a callback
-will be invoked but the reverse is not neccessarily true.
+will be invoked but the reverse is not necessarily true.
 
 For efficiency, the radius of the `query` object can be decreased (in
 world space) inside the callback function to improve culling of
@@ -7236,7 +7192,7 @@ instancing (see tutorial [ClosestPoint] for a reference
 implementation of point queries with user defined instancing).
 
 The context is an necessary argument to [rtcPointQuery] and Embree
-internally uses the topmost instance tranformation of the stack to
+internally uses the topmost instance transformation of the stack to
 transform the point query into instance space.
 
 #### EXIT STATUS {#exit-status}
@@ -7329,7 +7285,7 @@ has to be taken when the instance transformation contains anisotropic
 scaling or sheering. In these cases distance computations have to be
 performed in world space to ensure correctness and the ellipsoidal
 query domain (in instance space) will be approximated with its axis
-aligned bounding box interally. Therefore, the callback function might
+aligned bounding box internally. Therefore, the callback function might
 be invoked even for primitives in inner BVH nodes that do not intersect
 the query domain. See [rtcSetGeometryPointQueryFunction] for details.
 
@@ -7337,7 +7293,7 @@ The point query structure must be aligned to 16 bytes.
 
 #### SUPPORTED PRIMITIVES
 
-Currenly, all primitive types are supported by the point query API
+Currently, all primitive types are supported by the point query API
 except of points (see [RTC\_GEOMETRY\_TYPE\_POINT]), curves (see
 [RTC\_GEOMETRY\_TYPE\_CURVE]) and sudivision surfaces (see
 [RTC\_GEOMETRY\_SUBDIVISION]).
@@ -7655,7 +7611,7 @@ build flags (`buildFlags` member), re-build performance for dynamic
 scenes is improved at the cost of higher memory requirements.
 
 To spatially split primitives in high quality mode, the builder needs
-extra space at the end of the build primitive array to store splitted
+extra space at the end of the build primitive array to store split
 primitives. The total capacity of the build primitive array is passed
 using the `primitiveArrayCapacity` member, and should be about twice
 the number of primitives when using spatial splits.
@@ -7967,12 +7923,12 @@ Embree Tutorials
 Embree comes with a set of tutorials aimed at helping users understand
 how Embree can be used and extended. There is a very basic minimal
 that can be compiled as both C and C++, which should get new users started quickly. 
-All other tutorials exist in an ISPC and C++ version to demonstrate 
+All other tutorials exist in an Intel® ISPC and C++ version to demonstrate 
 the two versions of the API. Look for files
-named `tutorialname_device.ispc` for the ISPC implementation of the
+named `tutorialname_device.ispc` for the Intel® ISPC implementation of the
 tutorial, and files named `tutorialname_device.cpp` for the single ray C++
 version of the tutorial. To start the C++ version use the `tutorialname`
-executables, to start the ISPC version use the `tutorialname_ispc`
+executables, to start the Intel® ISPC version use the `tutorialname_ispc`
 executables. All tutorials can print available command line options
 using the `--help` command line parameter.
 
