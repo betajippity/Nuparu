@@ -85,8 +85,8 @@ static inline CFTimeInterval    GetMachAbsoluteTimeInSeconds()      { return (CF
 static void ImGui_ImplOSX_InitPlatformInterface();
 static void ImGui_ImplOSX_ShutdownPlatformInterface();
 static void ImGui_ImplOSX_UpdateMonitors();
-static void ImGui_ImplOSX_AddTrackingArea(NSView* _Nonnull view);
-static bool ImGui_ImplOSX_HandleEvent(NSEvent* event, NSView* view);
+// static void ImGui_ImplOSX_AddTrackingArea(NSView* _Nonnull view);
+// static bool ImGui_ImplOSX_HandleEvent(NSEvent* event, NSView* view);
 
 // Undocumented methods for creating cursors.
 @interface NSCursor()
@@ -452,7 +452,7 @@ bool ImGui_ImplOSX_Init(NSView* view)
     bd->KeyEventResponder = [[KeyEventResponder alloc] initWithFrame:NSZeroRect];
     bd->InputContext = [[NSTextInputContext alloc] initWithClient:bd->KeyEventResponder];
     [view addSubview:bd->KeyEventResponder];
-    ImGui_ImplOSX_AddTrackingArea(view);
+    // ImGui_ImplOSX_AddTrackingArea(view);
 
     io.SetPlatformImeDataFn = [](ImGuiViewport* viewport, ImGuiPlatformImeData* data) -> void
     {
@@ -605,7 +605,8 @@ void ImGui_ImplOSX_NewFrame(NSView* view)
     ImGui_ImplOSX_UpdateImePosWithView(view);
 }
 
-static bool ImGui_ImplOSX_HandleEvent(NSEvent* event, NSView* view)
+// static bool ImGui_ImplOSX_HandleEvent(NSEvent* event, NSView* view)
+bool ImGui_ImplOSX_HandleEvent(NSEvent* event, NSView* view)
 {
     ImGuiIO& io = ImGui::GetIO();
 
@@ -743,6 +744,7 @@ static bool ImGui_ImplOSX_HandleEvent(NSEvent* event, NSView* view)
     return false;
 }
 
+/*
 static void ImGui_ImplOSX_AddTrackingArea(NSView* _Nonnull view)
 {
     // If we want to receive key events, we either need to be in the responder chain of the key view,
@@ -766,6 +768,7 @@ static void ImGui_ImplOSX_AddTrackingArea(NSView* _Nonnull view)
         return event;
     }];
 }
+*/
 
 //--------------------------------------------------------------------------------------------------------
 // MULTI-VIEWPORT / PLATFORM INTERFACE SUPPORT
