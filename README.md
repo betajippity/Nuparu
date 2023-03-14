@@ -30,8 +30,8 @@ Nuparu currently consists of:
 * [blosc](https://github.com/Blosc) 1.21.1 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 21.1 (Mac/Win/Linux)
 * [ispc](https://ispc.github.io) 1.18.0 (Mac/Win/Linux)
-* [dear imgui](https://github.com/ocornut/imgui) 1.87 with Docking (Src)
-* [imnodes](https://github.com/Nelarius/imnodes) 0.4 (Src)
+* [dear imgui](https://github.com/ocornut/imgui) 1.89.3 with Docking (Src)
+* [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
 * [im-neo-sequencer](https://gitlab.com/GroGy/im-neo-sequencer) 0.1 (Src)
 
 Notes:
