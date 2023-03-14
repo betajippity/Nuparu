@@ -9,7 +9,7 @@ Nuparu currently consists of:
 
 * [GLM](http://glm.g-truc.net) 0.9.9.8 (Src)
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.2.2 (Win)
-* [GLFW](http://www.glfw.org) 3.3.7 (Mac/Win/Linux)
+* [GLFW](http://www.glfw.org) 3.3.8 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.2.0 (Mac/Win/Linux)
 * [Embree](https://embree.github.io) 3.13.4 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.5 (Mac/Win/Linux)
@@ -37,8 +37,8 @@ Nuparu currently consists of:
 Notes:
 
 * On all platforms, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and RHEL 7.9 (Linux-GCC10), and Fedora 35 (Linux-GCC11).
-* arm64 builds are included for macOS, Fedora 35 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
+* x86-64 builds are included for macOS, Windows, and RHEL 7.9 (Linux-GCC10), and Fedora 35 (Linux-GCC12).
+* arm64 builds are included for macOS, Fedora 37 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
 * macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
 * Everything is built using C++14 or newer.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
@@ -50,7 +50,7 @@ Notes:
 * Embree is built with a max nested instancing depth of 16.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
-    * CUDA is supported on Windows, Fedora 35 x86-64, L4T, and RHEL
+    * CUDA is supported on Windows, Fedora 37 x86-64, L4T, and RHEL
     * Metal is supported on macOS
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.x and without explicit instantiation.
@@ -60,17 +60,17 @@ Notes:
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
     * On macOS, Python 3.9 from MacPorts
-    * On Fedora 35, the default system Python 3.10
+    * On Fedora 37, the default system Python 3.10
     * On RHEL, the default system Python 3.6
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
-* macOS libraries require at minimum macOS Monterey and macOS's Clang variant (Apple LLVM 11.1 or greater) with libc++.
-* Windows libraries require at minimum Windows 10 and Visual Studio 2022 with \mt.
-* Linux libraries require at minimum either Fedora 35, Red Hat Enterprise Linux (RHEL) 7.9, or NVIDIA L4T 32.6.1.
+* macOS libraries require at minimum macOS Ventura and macOS's Clang variant (Apple LLVM 14 or greater) with libc++.
+* Windows libraries require at minimum Windows 11 and Visual Studio 2022 with \mt.
+* Linux libraries require at minimum either Fedora 37, Red Hat Enterprise Linux (RHEL) 7.9, or NVIDIA L4T 32.6.1.
     * On RHEL, GCC 10.2.1 is used through [Red Hat Developer Toolset 10.0](https://developers.redhat.com/products/developertoolset/updates/).
-    * Fedora 35 libraries require GCC 11.3.x on x86-64 and are in lib/linux-gcc11
-    * Fedora 35 libraries require GCC 11.3.x on ARM arm64 and are in lib/linux-arm
+    * Fedora 37 libraries require GCC 12.x on x86-64 and are in lib/linux-gcc12
+    * Fedora 37 libraries require GCC 12.x on ARM arm64 and are in lib/linux-arm
     * RHEL libraries require GCC 10.2.x and are in lib/linux-gcc10
     * L4T libraries require GCC 7.5.x and are in lib/linux-l4t
-* Things with CUDA support are built using CUDA 11.7, except on L4T, in which case CUDA 10.2 is used
+* Things with CUDA support are built using CUDA 12.1, except on L4T, in which case CUDA 10.2 is used
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
