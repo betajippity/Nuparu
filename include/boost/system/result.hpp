@@ -97,6 +97,14 @@ private:
 
 public:
 
+    using value_type = T;
+    using error_type = E;
+
+    static constexpr in_place_value_t in_place_value{};
+    static constexpr in_place_error_t in_place_error{};
+
+public:
+
     // constructors
 
     // default
@@ -135,7 +143,8 @@ public:
     template<class... A, class En = typename std::enable_if<
         std::is_constructible<T, A...>::value &&
         !(detail::is_errc_t<A...>::value && std::is_arithmetic<T>::value) &&
-        !std::is_constructible<E, A...>::value
+        !std::is_constructible<E, A...>::value &&
+        sizeof...(A) >= 1
         >::type>
     explicit constexpr result( A&&... a )
         noexcept( std::is_nothrow_constructible<T, A...>::value )
@@ -146,7 +155,8 @@ public:
     // explicit, error
     template<class... A, class En2 = void, class En = typename std::enable_if<
         !std::is_constructible<T, A...>::value &&
-        std::is_constructible<E, A...>::value
+        std::is_constructible<E, A...>::value &&
+        sizeof...(A) >= 1
         >::type>
     explicit constexpr result( A&&... a )
         noexcept( std::is_nothrow_constructible<E, A...>::value )
@@ -174,6 +184,43 @@ public:
     {
     }
 
+    // converting
+    template<class T2, class E2, class En = typename std::enable_if<
+        std::is_convertible<T2, T>::value &&
+        std::is_convertible<E2, E>::value
+        >::type>
+    BOOST_CXX14_CONSTEXPR result( result<T2, E2> const& r2 )
+        noexcept(
+            std::is_nothrow_constructible<T, T2 const&>::value &&
+            std::is_nothrow_constructible<E, E2>::value &&
+            std::is_nothrow_default_constructible<E2>::value &&
+            std::is_nothrow_copy_constructible<E2>::value )
+        : v_( in_place_error, r2.error() )
+    {
+        if( r2 )
+        {
+            v_.template emplace<0>( *r2 );
+        }
+    }
+
+    template<class T2, class E2, class En = typename std::enable_if<
+        std::is_convertible<T2, T>::value &&
+        std::is_convertible<E2, E>::value
+        >::type>
+    BOOST_CXX14_CONSTEXPR result( result<T2, E2>&& r2 )
+        noexcept(
+            std::is_nothrow_constructible<T, T2&&>::value &&
+            std::is_nothrow_constructible<E, E2>::value &&
+            std::is_nothrow_default_constructible<E2>::value &&
+            std::is_nothrow_copy_constructible<E2>::value )
+        : v_( in_place_error, r2.error() )
+    {
+        if( r2 )
+        {
+            v_.template emplace<0>( std::move( *r2 ) );
+        }
+    }
+
     // queries
 
     constexpr bool has_value() const noexcept
@@ -183,7 +230,7 @@ public:
 
     constexpr bool has_error() const noexcept
     {
-        return v_.index() != 0;
+        return v_.index() == 1;
     }
 
     constexpr explicit operator bool() const noexcept
@@ -354,6 +401,14 @@ public:
         return has_error()? variant2::unsafe_get<1>( v_ ): E();
     }
 
+    // emplace
+
+    template<class... A>
+    BOOST_CXX14_CONSTEXPR T& emplace( A&&... a )
+    {
+        return v_.template emplace<0>( std::forward<A>(a)... );
+    }
+
     // swap
 
     BOOST_CXX14_CONSTEXPR void swap( result& r )
@@ -404,6 +459,14 @@ template<class E> class result<void, E>
 private:
 
     variant2::variant<variant2::monostate, E> v_;
+
+public:
+
+    using value_type = void;
+    using error_type = E;
+
+    static constexpr in_place_value_t in_place_value{};
+    static constexpr in_place_error_t in_place_error{};
 
 public:
 
@@ -472,7 +535,7 @@ public:
 
     constexpr bool has_error() const noexcept
     {
-        return v_.index() != 0;
+        return v_.index() == 1;
     }
 
     constexpr explicit operator bool() const noexcept
@@ -516,6 +579,13 @@ public:
         noexcept( std::is_nothrow_default_constructible<E>::value && std::is_nothrow_copy_constructible<E>::value )
     {
         return has_error()? variant2::unsafe_get<1>( v_ ): E();
+    }
+
+    // emplace
+
+    BOOST_CXX14_CONSTEXPR void emplace()
+    {
+        v_.template emplace<0>();
     }
 
     // swap

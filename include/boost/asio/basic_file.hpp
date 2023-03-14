@@ -335,7 +335,7 @@ public:
   typename constraint<
     is_convertible<Executor1, Executor>::value,
     basic_file&
-  >::type operator=(basic_file<Executor1> && other)
+  >::type operator=(basic_file<Executor1>&& other)
   {
     basic_file tmp(std::move(other));
     impl_ = std::move(tmp.impl_);
@@ -344,7 +344,7 @@ public:
 #endif // defined(BOOST_ASIO_HAS_MOVE) || defined(GENERATING_DOCUMENTATION)
 
   /// Get the executor associated with the object.
-  executor_type get_executor() BOOST_ASIO_NOEXCEPT
+  const executor_type& get_executor() BOOST_ASIO_NOEXCEPT
   {
     return impl_.get_executor();
   }

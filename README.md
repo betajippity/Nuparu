@@ -23,7 +23,7 @@ Nuparu currently consists of:
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.12 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2021.5.0 (Mac/Win/Linux)
-* [Boost](http://www.boost.org) 1.79.0 (Mac/Win/Linux)
+* [Boost](http://www.boost.org) 1.81.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.4.4 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 9.1.0 (Mac/Win/Linux)
 * [NanoVDB](http://www.openvdb.org/) 9.1.0 (Src)
@@ -37,7 +37,7 @@ Nuparu currently consists of:
 Notes:
 
 * On all platforms, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and RHEL 7.9 (Linux-GCC10), and Fedora 35 (Linux-GCC12).
+* x86-64 builds are included for macOS, Windows, and RHEL 7.9 (Linux-GCC10), and Fedora 37 (Linux-GCC12).
 * arm64 builds are included for macOS, Fedora 37 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
 * macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
 * Everything is built using C++14 or newer.
@@ -59,8 +59,8 @@ Notes:
 * im-neo-sequencer includes some bugfixes and additional functionality not found in the original project
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
-    * On macOS, Python 3.9 from MacPorts
-    * On Fedora 37, the default system Python 3.10
+    * On macOS, Python 3.11 from MacPorts
+    * On Fedora 37, the default system Python 3.11
     * On RHEL, the default system Python 3.6
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows

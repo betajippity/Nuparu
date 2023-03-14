@@ -46,6 +46,7 @@
 #include <boost/move/make_unique.hpp>
 #include <boost/move/iterator.hpp>
 #include <boost/move/adl_move_swap.hpp>
+#include <boost/move/detail/iterator_to_raw_pointer.hpp>
 #include <boost/move/detail/force_ptr.hpp>
 #include <boost/move/algo/adaptive_sort.hpp>
 #include <boost/move/algo/detail/pdqsort.hpp>
@@ -1396,15 +1397,15 @@ class flat_tree
 
    BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
       container_type extract_sequence()
-   {
-      return boost::move(m_data.m_seq);
-   }
+   {  return boost::move(m_data.m_seq);   }
 
    BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
       container_type &get_sequence_ref()
-   {
-      return m_data.m_seq;
-   }
+   {  return m_data.m_seq; }
+
+   BOOST_CONTAINER_ATTRIBUTE_NODISCARD BOOST_CONTAINER_FORCEINLINE
+      const container_type &get_sequence_cref() const
+   {  return m_data.m_seq; }
 
    BOOST_CONTAINER_FORCEINLINE void adopt_sequence_equal(BOOST_RV_REF(container_type) seq)
    {

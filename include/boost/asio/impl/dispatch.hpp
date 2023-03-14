@@ -50,12 +50,16 @@ public:
     typename associated_allocator<handler_t>::type alloc(
         (get_associated_allocator)(handler));
 
-    execution::execute(
-        boost::asio::prefer(ex,
-          execution::blocking.possibly,
-          execution::allocator(alloc)),
+#if defined(BOOST_ASIO_NO_DEPRECATED)
+    boost::asio::prefer(ex, execution::allocator(alloc)).execute(
         boost::asio::detail::bind_handler(
           BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)));
+#else // defined(BOOST_ASIO_NO_DEPRECATED)
+    execution::execute(
+        boost::asio::prefer(ex, execution::allocator(alloc)),
+        boost::asio::detail::bind_handler(
+          BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)));
+#endif // defined(BOOST_ASIO_NO_DEPRECATED)
   }
 
   template <typename CompletionHandler>
@@ -116,12 +120,16 @@ public:
     typename associated_allocator<handler_t>::type alloc(
         (get_associated_allocator)(handler));
 
-    execution::execute(
-        boost::asio::prefer(ex_,
-          execution::blocking.possibly,
-          execution::allocator(alloc)),
+#if defined(BOOST_ASIO_NO_DEPRECATED)
+    boost::asio::prefer(ex_, execution::allocator(alloc)).execute(
         boost::asio::detail::bind_handler(
           BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)));
+#else // defined(BOOST_ASIO_NO_DEPRECATED)
+    execution::execute(
+        boost::asio::prefer(ex_, execution::allocator(alloc)),
+        boost::asio::detail::bind_handler(
+          BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler)));
+#endif // defined(BOOST_ASIO_NO_DEPRECATED)
   }
 
   template <typename CompletionHandler>
@@ -147,12 +155,16 @@ public:
     typename associated_allocator<handler_t>::type alloc(
         (get_associated_allocator)(handler));
 
-    execution::execute(
-        boost::asio::prefer(ex_,
-          execution::blocking.possibly,
-          execution::allocator(alloc)),
+#if defined(BOOST_ASIO_NO_DEPRECATED)
+    boost::asio::prefer(ex_, execution::allocator(alloc)).execute(
         detail::work_dispatcher<handler_t, handler_ex_t>(
           BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler), handler_ex));
+#else // defined(BOOST_ASIO_NO_DEPRECATED)
+    execution::execute(
+        boost::asio::prefer(ex_, execution::allocator(alloc)),
+        detail::work_dispatcher<handler_t, handler_ex_t>(
+          BOOST_ASIO_MOVE_CAST(CompletionHandler)(handler), handler_ex));
+#endif // defined(BOOST_ASIO_NO_DEPRECATED)
   }
 
   template <typename CompletionHandler>
@@ -213,8 +225,11 @@ private:
 } // namespace detail
 
 template <BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) NullaryToken>
-BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
+BOOST_ASIO_INITFN_AUTO_RESULT_TYPE_PREFIX(NullaryToken, void()) dispatch(
     BOOST_ASIO_MOVE_ARG(NullaryToken) token)
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE_SUFFIX((
+    async_initiate<NullaryToken, void()>(
+        declval<detail::initiate_dispatch>(), token)))
 {
   return async_initiate<NullaryToken, void()>(
       detail::initiate_dispatch(), token);
@@ -222,11 +237,14 @@ BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
 
 template <typename Executor,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) NullaryToken>
-BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
+BOOST_ASIO_INITFN_AUTO_RESULT_TYPE_PREFIX(NullaryToken, void()) dispatch(
     const Executor& ex, BOOST_ASIO_MOVE_ARG(NullaryToken) token,
     typename constraint<
       execution::is_executor<Executor>::value || is_executor<Executor>::value
     >::type)
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE_SUFFIX((
+    async_initiate<NullaryToken, void()>(
+        declval<detail::initiate_dispatch_with_executor<Executor> >(), token)))
 {
   return async_initiate<NullaryToken, void()>(
       detail::initiate_dispatch_with_executor<Executor>(ex), token);
@@ -234,10 +252,14 @@ BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
 
 template <typename ExecutionContext,
     BOOST_ASIO_COMPLETION_TOKEN_FOR(void()) NullaryToken>
-inline BOOST_ASIO_INITFN_AUTO_RESULT_TYPE(NullaryToken, void()) dispatch(
+inline BOOST_ASIO_INITFN_AUTO_RESULT_TYPE_PREFIX(NullaryToken, void()) dispatch(
     ExecutionContext& ctx, BOOST_ASIO_MOVE_ARG(NullaryToken) token,
     typename constraint<is_convertible<
       ExecutionContext&, execution_context&>::value>::type)
+  BOOST_ASIO_INITFN_AUTO_RESULT_TYPE_SUFFIX((
+    async_initiate<NullaryToken, void()>(
+        declval<detail::initiate_dispatch_with_executor<
+          typename ExecutionContext::executor_type> >(), token)))
 {
   return async_initiate<NullaryToken, void()>(
       detail::initiate_dispatch_with_executor<
