@@ -861,8 +861,9 @@ static void ImGui_ImplOSX_CreateWindow(ImGuiViewport* viewport)
 
 static void ImGui_ImplOSX_DestroyWindow(ImGuiViewport* viewport)
 {
-    // NSWindow* window = (__bridge_transfer NSWindow*)viewport->PlatformHandleRaw;
-    // window = nil;
+    NSWindow* window = (__bridge_transfer NSWindow*)viewport->PlatformHandleRaw;
+    window = nil;
+    (void)window;
 
     if (ImGuiViewportDataOSX* data = (ImGuiViewportDataOSX*)viewport->PlatformUserData)
     {
