@@ -21,7 +21,7 @@ Nuparu currently consists of:
 * [RMSD](http://boscoh.com/code/) (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
-* [Zlib](https://www.zlib.net) 1.2.12 (Mac/Win/Linux)
+* [Zlib](https://www.zlib.net) 1.2.13 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2021.5.0 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.81.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.4.4 (Mac/Win/Linux)
