@@ -19,13 +19,11 @@ extern "C" {
 /* Version numbers */
 #define BLOSC_VERSION_MAJOR    1    /* for major interface/format changes  */
 #define BLOSC_VERSION_MINOR    21   /* for minor interface/format changes  */
-#define BLOSC_VERSION_RELEASE  1    /* for tweaks, bug-fixes, or development */
+#define BLOSC_VERSION_RELEASE  3    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "1.21.1"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_STRING   "1.21.3"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2021-10-06 #$"    /* date version */
-
-#define BLOSCLZ_VERSION_STRING "2.5.1"   /* the internal compressor version */
+#define BLOSC_VERSION_DATE     "$Date:: 2022-12-15 #$"    /* date version */
 
 /* The *_FORMAT symbols should be just 1-byte long */
 #define BLOSC_VERSION_FORMAT    2   /* Blosc format version, starting at 1 */
@@ -178,7 +176,7 @@ BLOSC_EXPORT void blosc_destroy(void);
   ---------------------
 
   blosc_compress() honors different environment variables to control
-  internal parameters without the need of doing that programatically.
+  internal parameters without the need of doing that programmatically.
   Here are the ones supported:
 
   BLOSC_CLEVEL=(INTEGER): This will overwrite the `clevel` parameter
@@ -268,7 +266,7 @@ BLOSC_EXPORT int blosc_compress_ctx(int clevel, int doshuffle, size_t typesize,
   ---------------------
 
   blosc_decompress() honors different environment variables to control
-  internal parameters without the need of doing that programatically.
+  internal parameters without the need of doing that programmatically.
   Here are the ones supported:
 
   BLOSC_NTHREADS=(INTEGER): This will call
