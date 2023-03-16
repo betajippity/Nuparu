@@ -23,13 +23,13 @@
 // C++ namespace configuration / options
 
 //
-// Current internal library namepace name
+// Current internal library namespace name
 //
 #define OPENEXR_IMF_INTERNAL_NAMESPACE_CUSTOM 0
 #define OPENEXR_IMF_INTERNAL_NAMESPACE Imf_3_1
 
 //
-// Current public user namepace name
+// Current public user namespace name
 //
 
 #define OPENEXR_IMF_NAMESPACE_CUSTOM 0
@@ -39,17 +39,17 @@
 // Version string for runtime access
 //
 
-#define OPENEXR_VERSION_STRING "3.1.5"
-#define OPENEXR_PACKAGE_STRING "OpenEXR 3.1.5"
+#define OPENEXR_VERSION_STRING "3.1.6"
+#define OPENEXR_PACKAGE_STRING "OpenEXR 3.1.6"
 
 #define OPENEXR_VERSION_MAJOR 3
 #define OPENEXR_VERSION_MINOR 1
-#define OPENEXR_VERSION_PATCH 5
+#define OPENEXR_VERSION_PATCH 6
 #define OPENEXR_VERSION_RELEASE_TYPE ""
 // Deprecated, for back compatibility:
 #define OPENEXR_VERSION_EXTRA ""
 
-#define OPENEXR_LIB_VERSION_STRING "30.5.1"
+#define OPENEXR_LIB_VERSION_STRING "30.6.1"
 
 // Version as a single hex number, e.g. 0x01000300 == 1.0.3
 #define OPENEXR_VERSION_HEX ((uint32_t(OPENEXR_VERSION_MAJOR) << 24) | \

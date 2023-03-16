@@ -19,6 +19,7 @@
 
 #include "ImfTileDescription.h"
 
+#include <cstdint>
 #include <ImathBox.h>
 
 OPENEXR_IMF_INTERNAL_NAMESPACE_HEADER_ENTER
@@ -313,7 +314,7 @@ class IMF_EXPORT_TYPE DeepTiledInputFile : public GenericInputFile
     //   dy must lie in the interval [0, numYTiles(ly)-1]
     //
     //   lx must lie in the interval [0, numXLevels()-1]
-    //   ly must lie in the inverval [0, numYLevels()-1]
+    //   ly must lie in the interval [0, numYLevels()-1]
     //
     // readTile(dx, dy, level) is a convenience function used
     // for ONE_LEVEL and MIPMAP_LEVELS files.  It calls
@@ -370,7 +371,7 @@ class IMF_EXPORT_TYPE DeepTiledInputFile : public GenericInputFile
     // dy must lie in the interval [0, numYTiles(ly)-1]
     //
     // lx must lie in the interval [0, numXLevels()-1]
-    // ly must lie in the inverval [0, numYLevels()-1]
+    // ly must lie in the interval [0, numYLevels()-1]
     //
     // readPixelSampleCounts(dx1, dx2, dy1, dy2, lx, ly) reads all
     // the sample counts for tiles within range

@@ -177,8 +177,10 @@
 /// floats in question.
 ///
 
-#ifdef _WIN32
-#        include <intrin.h>
+#ifdef __CUDA_ARCH__
+// do not include intrinsics headers on Cuda
+#elif defined(_WIN32)
+#    include <intrin.h>
 #elif defined(__x86_64__)
 #    include <x86intrin.h>
 #elif defined(__F16C__)
@@ -445,7 +447,7 @@ IMATH_INTERNAL_NAMESPACE_HEADER_ENTER
 
 ///
 ///
-/// class half -- 16-bit floating point number
+/// class half represents a 16-bit floating point number
 ///
 /// Type half can represent positive and negative numbers whose
 /// magnitude is between roughly 6.1e-5 and 6.5e+4 with a relative
@@ -618,10 +620,10 @@ class IMATH_EXPORT_TYPE half
     /// @name Access to the internal representation
 
     /// Return the bit pattern
-    IMATH_EXPORT constexpr uint16_t bits() const IMATH_NOEXCEPT;
+    constexpr uint16_t bits () const IMATH_NOEXCEPT;
 
     /// Set the bit pattern
-    IMATH_EXPORT IMATH_CONSTEXPR14 void setBits (uint16_t bits) IMATH_NOEXCEPT;
+    IMATH_CONSTEXPR14 void setBits (uint16_t bits) IMATH_NOEXCEPT;
 
     /// @}
 

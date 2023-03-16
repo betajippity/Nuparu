@@ -1033,7 +1033,7 @@ addOffset (const Matrix44<T>& inMat,
     Matrix44<T> O;
 
     Vec3<T> _rOffset (rOffset);
-    _rOffset *= M_PI / 180.0;
+    _rOffset *= T(M_PI / 180.0);
     O.rotate (_rOffset);
 
     O[3][0] = tOffset[0];
@@ -1063,7 +1063,8 @@ computeRSMatrix (bool keepRotateA, bool keepScaleA, const Matrix44<T>& A, const 
     extractSHRT (A, as, ah, ar, at);
 
     Vec3<T> bs, bh, br, bt;
-    extractSHRT (B, bs, bh, br, bt);
+    if (!extractSHRT (B, bs, bh, br, bt))
+        throw std::domain_error ("degenerate B matrix in computeRSMatrix");
 
     if (!keepRotateA)
         ar = br;
