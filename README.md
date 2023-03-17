@@ -16,7 +16,7 @@ Nuparu currently consists of:
 * [Imath](https://github.com/AcademySoftwareFoundation/Imath) 3.1.7 (Mac/Win/Linux)
 * [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) 3.1.6 (Mac/Win/Linux)
 * [stb_image](https://github.com/nothings/stb) 2.28 (Src)
-* [Ptex](http://ptex.us) 2.4.1 (Mac/Win/Linux)
+* [Ptex](http://ptex.us) 2.4.2 (Mac/Win/Linux)
 * [Partio](https://www.disneyanimation.com/technology/partio.html) 1.14.6 (Mac/Win/Linux)
 * [RMSD](http://boscoh.com/code/) (Src)
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
