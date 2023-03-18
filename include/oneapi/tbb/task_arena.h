@@ -114,7 +114,9 @@ static constexpr int priority_stride = INT_MAX / 4;
 
 class task_arena_base {
     friend struct r1::task_arena_impl;
+#ifndef __CUDACC__
     friend void r1::observe(d1::task_scheduler_observer&, bool);
+#endif
 public:
     enum class priority : int {
         low    = 1 * priority_stride,
