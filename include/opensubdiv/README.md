@@ -29,7 +29,7 @@ For more details about OpenSubdiv, see [Pixar Graphics Technologies](http://grap
 
 | Lib                           | Min Version | Note       |
 | ----------------------------- | ----------- | ---------- |
-| [CMake](http://www.cmake.org) | 2.8.6       | *Required* |
+| [CMake](http://www.cmake.org) | 3.12        | *Required* |
 
  * Osd optional requirements:
 
@@ -116,12 +116,9 @@ cmake --build . --config Release --target install
 
 ### iOS
 
-  * Because OpenSubdiv uses a self-built build tool (stringify) as part of the build process, you'll want to build for macOS and build the stringify target
-
 ```
 SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path) cmake -D NO_PTEX=1 -D NO_DOC=1 \
       -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 \
-      -D STRINGIFY_LOCATION="*YOUR MACOS BUILD LOCATION*"/bin/stringify \
       -D CMAKE_TOOLCHAIN_FILE=../cmake/iOSToolchain.cmake -G Xcode \
       ..
 ```
