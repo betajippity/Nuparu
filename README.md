@@ -29,6 +29,7 @@ Nuparu currently consists of:
 * [NanoVDB](http://www.openvdb.org/) 10.0.1 (Src)
 * [blosc](https://github.com/Blosc) 1.21.3 (Mac/Win/Linux)
 * [Protobuf](https://developers.google.com/protocol-buffers/) 21.1 (Mac/Win/Linux)
+* [cereal](https://uscilab.github.io/cereal/) 1.3.2 (Src)
 * [ispc](https://ispc.github.io) 1.18.0 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui) 1.89.4 with Docking (Src)
 * [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
