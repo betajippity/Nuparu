@@ -22,7 +22,7 @@ Nuparu currently consists of:
 * [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.13 (Mac/Win/Linux)
-* [TBB](https://www.threadingbuildingblocks.org/) 2021.8.0 (Mac/Win/Linux)
+* [TBB](https://www.threadingbuildingblocks.org/) 2021.11.0 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.81.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.5.0 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 10.0.1 (Mac/Win/Linux)
@@ -65,7 +65,7 @@ Notes:
     * On RHEL, the default system Python 3.6
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
-* macOS libraries require at minimum macOS Ventura and macOS's Clang variant (Apple LLVM 14 or greater) with libc++.
+* macOS libraries require at minimum macOS Sonoma and macOS's Clang variant (Apple LLVM 15 or greater) with libc++.
 * Windows libraries require at minimum Windows 11 and Visual Studio 2022 with \mt.
 * Linux libraries require at minimum either Fedora 37, Red Hat Enterprise Linux (RHEL) 7.9, or NVIDIA L4T 32.6.1.
     * On RHEL, GCC 10.2.1 is used through [Red Hat Developer Toolset 10.0](https://developers.redhat.com/products/developertoolset/updates/).
