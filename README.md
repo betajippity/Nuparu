@@ -23,7 +23,7 @@ Nuparu currently consists of:
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.2.13 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2021.11.0 (Mac/Win/Linux)
-* [Boost](http://www.boost.org) 1.81.0 (Mac/Win/Linux)
+* [Boost](http://www.boost.org) 1.84.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.5.0 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 10.0.1 (Mac/Win/Linux)
 * [NanoVDB](http://www.openvdb.org/) 10.0.1 (Src)
