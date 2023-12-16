@@ -99,8 +99,8 @@ private:
 
 public:
     ParticleAccessor(const ParticleAttribute& attr)
-        :stride(0),basePointer(0),attributeIndex(attr.attributeIndex),
-        count(attr.count),type(attr.type),next(0)
+        :stride(0),basePointer(nullptr),attributeIndex(attr.attributeIndex),
+        count(attr.count),type(attr.type),next(nullptr)
     {}
 
     template<class TDATA,class TITERATOR> TDATA* raw(const TITERATOR& it)
@@ -144,19 +144,31 @@ private:
 public:
     //! Construct an invalid iterator
     ParticleIterator()
-        :particles(0),index(0),indexEnd(0),accessors(0)
+        :particles(nullptr),index(0),indexEnd(0),accessors(nullptr)
     {}
 
     //! Copy constructor. NOTE: Invalidates any accessors that have been registered with it
     ParticleIterator(const ParticleIterator& other)
-		:particles(other.particles),index(other.index),indexEnd(other.indexEnd),accessors(0)
+        :particles(other.particles),index(other.index),indexEnd(other.indexEnd),accessors(nullptr)
     {}
+
+    //! Assignment operator. NOTE: Invalidates any accessors that have been registered with it
+    ParticleIterator& operator=(const ParticleIterator& other)
+    {
+        if (this == &other)
+            return *this;
+        particles = other.particles;
+        index = other.index;
+        indexEnd = other.indexEnd;
+        accessors = nullptr;
+        return *this;
+    }
 
     //! Construct an iterator with iteration parameters. This is typically only
     //! called by implementations of Particle (not by users). For users, use
     //! begin() and end() on the particle type
     ParticleIterator(PROVIDER* particles,size_t index,size_t indexEnd)
-        :particles(particles),index(index),indexEnd(indexEnd)
+        :particles(particles),index(index),indexEnd(indexEnd),accessors(nullptr)
     {}
 
     //! Whether the iterator is valid
