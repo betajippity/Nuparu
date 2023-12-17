@@ -36,7 +36,7 @@ For more details about OpenSubdiv, see [Pixar Graphics Technologies](http://grap
 | Lib                                                                | Min Version | Note                        |
 | ------------------------------------------------------------------ | ----------- | ----------------------------|
 | [CUDA](http://developer.nvidia.com/cuda-toolkit)                   | 4.0         | cuda backend                |
-| [TBB](https://www.threadingbuildingblocks.org)                     | 4.0         | TBB backend                 |
+| [TBB](https://www.threadingbuildingblocks.org)                     | 2018        | TBB backend                 |
 | [OpenCL](http://www.khronos.org/opencl)                            | 1.1         | CL backend                  |
 | [DX11 SDK](http://www.microsoft.com/download/details.aspx?id=6812) |             | DX backend                  |
 | [Metal](https://developer.apple.com/metal/)                        | 1.2         | Metal backend               |
@@ -135,6 +135,8 @@ SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path) cmake -D NO_PTEX=1 -D NO_DOC=1 \
 -DCMAKE_TOOLCHAIN_FILE=[toolchain file for crossplatform builds]
 
 -DCUDA_TOOLKIT_ROOT_DIR=[path to CUDA Toolkit]
+-DOSD_CUDA_NVCC_FLAGS=[CUDA options, e.g. --gpu-architecture]
+
 -DPTEX_LOCATION=[path to Ptex]
 -DGLFW_LOCATION=[path to GLFW]
 -DSTRINGIFY_LOCATION=[path to stringify utility]

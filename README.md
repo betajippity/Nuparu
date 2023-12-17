@@ -24,7 +24,7 @@ Nuparu currently consists of:
 * [Zlib](https://www.zlib.net) 1.3 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2021.11.0 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.84.0 (Mac/Win/Linux)
-* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.5.0 (Mac/Win/Linux)
+* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.6.0 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 10.0.1 (Mac/Win/Linux)
 * [NanoVDB](http://www.openvdb.org/) 10.0.1 (Src)
 * [blosc](https://github.com/Blosc) 1.21.3 (Mac/Win/Linux)
@@ -53,6 +53,7 @@ Notes:
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
     * CUDA is supported on Windows, Fedora 37 x86-64, L4T, and RHEL
     * Metal is supported on macOS
+    * OpenSubdiv has been modified to work with OneTBB
 * blosc is built without AVX2 support.
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.x and without explicit instantiation.
 * NanoVDB is built with CUDA support.
