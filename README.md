@@ -27,7 +27,7 @@ Nuparu currently consists of:
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.6.0 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 10.0.1 (Mac/Win/Linux)
 * [NanoVDB](http://www.openvdb.org/) 10.0.1 (Src)
-* [blosc](https://github.com/Blosc) 1.21.3 (Mac/Win/Linux)
+* [blosc](https://github.com/Blosc) 1.21.5 (Mac/Win/Linux)
 * [cereal](https://uscilab.github.io/cereal/) 1.3.2 (Src)
 * [ispc](https://ispc.github.io) 1.18.0 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui) 1.89.4 with Docking (Src)

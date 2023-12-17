@@ -3,7 +3,7 @@
 
   Author: Francesc Alted <francesc@blosc.org>
 
-  See LICENSES/BLOSC.txt for details about copyright and rights to use.
+  See LICENSE.txt for details about copyright and rights to use.
 **********************************************************************/
 #ifndef BLOSC_H
 #define BLOSC_H
@@ -19,11 +19,11 @@ extern "C" {
 /* Version numbers */
 #define BLOSC_VERSION_MAJOR    1    /* for major interface/format changes  */
 #define BLOSC_VERSION_MINOR    21   /* for minor interface/format changes  */
-#define BLOSC_VERSION_RELEASE  3    /* for tweaks, bug-fixes, or development */
+#define BLOSC_VERSION_RELEASE  5    /* for tweaks, bug-fixes, or development */
 
-#define BLOSC_VERSION_STRING   "1.21.3"  /* string version.  Sync with above! */
+#define BLOSC_VERSION_STRING   "1.21.5"  /* string version.  Sync with above! */
 #define BLOSC_VERSION_REVISION "$Rev$"   /* revision version */
-#define BLOSC_VERSION_DATE     "$Date:: 2022-12-15 #$"    /* date version */
+#define BLOSC_VERSION_DATE     "$Date:: 2023-05-16 #$"    /* date version */
 
 /* The *_FORMAT symbols should be just 1-byte long */
 #define BLOSC_VERSION_FORMAT    2   /* Blosc format version, starting at 1 */
