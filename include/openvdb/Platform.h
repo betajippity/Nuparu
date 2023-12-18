@@ -35,9 +35,12 @@
     #define OPENVDB_CHECK_GCC(MAJOR, MINOR) 0
 #endif
 
-/// OpenVDB now requires C++11
-#define OPENVDB_HAS_CXX11 1
+/// OpenVDB now requires C++17
+#define OPENVDB_HAS_CXX11 1 // kept for backward compatibility
 
+#if __cplusplus >= 202002L
+    #define OPENVDB_HAS_CXX20
+#endif
 
 /// SIMD Intrinsic Headers
 #if defined(OPENVDB_USE_SSE42) || defined(OPENVDB_USE_AVX)
@@ -64,12 +67,6 @@
     #if defined(_DLL) && !defined(OPENVDB_STATICLIB) && !defined(OPENVDB_DLL)
         #define OPENVDB_DLL
     #endif
-
-    // By default, assume that we're dynamically linking OpenEXR, unless
-    // OPENVDB_OPENEXR_STATICLIB is defined.
-    #if !defined(OPENVDB_OPENEXR_STATICLIB) && !defined(OPENEXR_DLL)
-        #define OPENEXR_DLL
-    #endif
 #endif
 
 /// Macros to suppress undefined behaviour sanitizer warnings. Should be used
@@ -78,6 +75,32 @@
 #define OPENVDB_UBSAN_SUPPRESS(X) __attribute__((no_sanitize(X)))
 #else
 #define OPENVDB_UBSAN_SUPPRESS(X)
+#endif
+
+/// Macros to alias to compiler builtins which hint at critical edge selection
+/// during conditional statements.
+#if defined(__GNUC__) || defined(__clang__) || defined(__INTEL_COMPILER)
+#ifdef __cplusplus
+#define OPENVDB_LIKELY(x) (__builtin_expect(static_cast<bool>(x), true))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect(static_cast<bool>(x), false))
+#else
+#define OPENVDB_LIKELY(x) (__builtin_expect((x), 1))
+#define OPENVDB_UNLIKELY(x) (__builtin_expect((x), 0))
+#endif
+#else
+#define OPENVDB_LIKELY(x) (x)
+#define OPENVDB_UNLIKELY(x) (x)
+#endif
+
+/// Force inline function macros. These macros do not necessary guarantee that
+/// the decorated function will be inlined, but provide the strongest vendor
+/// annotations to that end.
+#if defined(__GNUC__)
+#define OPENVDB_FORCE_INLINE __attribute__((always_inline)) inline
+#elif defined(_MSC_VER)
+#define OPENVDB_FORCE_INLINE __forceinline
+#else
+#define OPENVDB_FORCE_INLINE inline
 #endif
 
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,

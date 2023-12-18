@@ -164,8 +164,6 @@ private:
     tbb::spin_mutex mMutex; // 1 byte
     //int8_t mReserved[3]; // padding for alignment
 
-    static const ValueType sZero;
-
     friend class ::TestLeaf;
     // Allow the parent LeafNode to access this buffer's data pointer.
     template<typename, Index> friend class LeafNode;
@@ -173,10 +171,6 @@ private:
 
 
 ////////////////////////////////////////
-
-
-template<typename T, Index Log2Dim>
-const T LeafBuffer<T, Log2Dim>::sZero = zeroVal<T>();
 
 
 template<typename T, Index Log2Dim>
@@ -383,6 +377,7 @@ template<typename T, Index Log2Dim>
 inline const typename LeafBuffer<T, Log2Dim>::ValueType&
 LeafBuffer<T, Log2Dim>::at(Index i) const
 {
+    static const ValueType sZero = zeroVal<T>();
     assert(i < SIZE);
     this->loadValues();
     // We can't use the ternary operator here, otherwise Visual C++ returns
@@ -480,9 +475,8 @@ public:
     static const Index WORD_COUNT = NodeMaskType::WORD_COUNT;
     static const Index SIZE = 1 << 3 * Log2Dim;
 
-    // These static declarations must be on separate lines to avoid VC9 compiler errors.
-    static const bool sOn;
-    static const bool sOff;
+    static inline const bool sOn = true;
+    static inline const bool sOff = false;
 
     LeafBuffer() {}
     LeafBuffer(bool on): mData(on) {}
@@ -525,16 +519,6 @@ private:
 
     NodeMaskType mData;
 }; // class LeafBuffer
-
-
-/// @internal For consistency with other nodes and with iterators, methods like
-/// LeafNode::getValue() return a reference to a value.  Since it's not possible
-/// to return a reference to a bit in a node mask, we return a reference to one
-/// of the following static values instead.
-///
-/// @todo  Make these static inline with C++17
-template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOn = true;
-template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOff = false;
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME

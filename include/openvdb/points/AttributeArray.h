@@ -767,10 +767,8 @@ public:
     /// Return @c true if all data has been loaded
     bool isDataLoaded() const override;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Return the raw data buffer
     inline const StorageType* constData() const { return this->data(); }
-#endif
 
 protected:
     AccessorBasePtr getAccessor() const override;
@@ -819,7 +817,6 @@ private:
         return TypedAttributeArray::create(n, strideOrTotalSize, constantStride, metadata);
     }
 
-    static std::unique_ptr<const NamePair> sTypeName;
     std::unique_ptr<StorageType[]>      mData;
     Index                               mSize;
     Index                               mStrideOrTotalSize;
@@ -1125,9 +1122,6 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
 
 // TypedAttributeArray implementation
 
-template<typename ValueType_, typename Codec_>
-std::unique_ptr<const NamePair> TypedAttributeArray<ValueType_, Codec_>::sTypeName;
-
 
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
@@ -1209,12 +1203,10 @@ template<typename ValueType_, typename Codec_>
 inline const NamePair&
 TypedAttributeArray<ValueType_, Codec_>::attributeType()
 {
-    static std::once_flag once;
-    std::call_once(once, []()
-    {
-        sTypeName.reset(new NamePair(typeNameAsString<ValueType>(), Codec::name()));
-    });
-    return *sTypeName;
+    static NamePair sTypeName = []() {
+        return NamePair(typeNameAsString<ValueType>(), Codec::name());
+    }();
+    return sTypeName;
 }
 
 
@@ -1870,7 +1862,7 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
     uint8_t flags(mFlags);
     uint8_t serializationFlags(0);
     Index size(mSize);
-    Index stride(mStrideOrTotalSize);
+    Index strideOrTotalSize(mStrideOrTotalSize);
     bool strideOfOne(this->stride() == 1);
 
     bool bloscCompression = io::getDataCompression(os) & io::COMPRESS_BLOSC;
@@ -1912,7 +1904,7 @@ TypedAttributeArray<ValueType_, Codec_>::writeMetadata(std::ostream& os, bool ou
     os.write(reinterpret_cast<const char*>(&size), sizeof(Index));
 
     // write strided
-    if (!strideOfOne)       os.write(reinterpret_cast<const char*>(&stride), sizeof(Index));
+    if (!strideOfOne) os.write(reinterpret_cast<const char*>(&strideOrTotalSize), sizeof(Index));
 }
 
 

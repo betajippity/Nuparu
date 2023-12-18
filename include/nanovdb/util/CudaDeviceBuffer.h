@@ -8,53 +8,17 @@
 
     \date January 8, 2020
 
-    \brief Implements a simple CUDA allocator!
+    \brief Implements a simple dual (host/device) CUDA buffer.
 
-          CudaDeviceBuffer - a class for simple cuda buffer allocation and management
+    \note This file has no device-only (kernel) function calls,
+          which explains why it's a .h and not .cuh file.
 */
 
 #ifndef NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 
-#include "HostBuffer.h" // for BufferTraits
-
-#include <cuda_runtime_api.h> // for cudaMalloc/cudaMallocManaged/cudaFree
-
-#if defined(DEBUG) || defined(_DEBUG)
-    static inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true)
-    {
-        if (code != cudaSuccess) {
-            fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(code), file, line);
-            if (abort) exit(code);
-        }
-    }
-    static inline void ptrAssert(void* ptr, const char* msg, const char* file, int line, bool abort = true)
-    {
-        if (ptr == nullptr) {
-            fprintf(stderr, "NULL pointer error: %s %s %d\n", msg, file, line);
-            if (abort) exit(1);
-        }
-        if (uint64_t(ptr) % NANOVDB_DATA_ALIGNMENT) {
-            fprintf(stderr, "Pointer misalignment error: %s %s %d\n", msg, file, line);
-            if (abort) exit(1);
-        }
-    }
-#else
-    static inline void gpuAssert(cudaError_t, const char*, int, bool = true){}
-    static inline void ptrAssert(void*, const char*, const char*, int, bool = true){}
-#endif
-
-// Convenience function for checking CUDA runtime API results
-// can be wrapped around any runtime API call. No-op in release builds.
-#define cudaCheck(ans) \
-    { \
-        gpuAssert((ans), __FILE__, __LINE__); \
-    }
-
-#define checkPtr(ptr, msg) \
-    { \
-        ptrAssert((ptr), (msg), __FILE__, __LINE__); \
-    }
+#include "../HostBuffer.h" // for BufferTraits
+#include "CudaUtils.h"// for cudaMalloc/cudaMallocManaged/cudaFree
 
 namespace nanovdb {
 
@@ -67,19 +31,34 @@ namespace nanovdb {
 ///        it is significantly slower then cached (un-pinned) memory on the host.
 class CudaDeviceBuffer
 {
-    uint64_t mSize; // total number of bytes for the NanoVDB grid.
-    uint8_t *mCpuData, *mGpuData; // raw buffer for the NanoVDB grid.
+
+    uint64_t mSize; // total number of bytes managed by this buffer (assumed to be identical for host and device)
+    uint8_t *mCpuData, *mGpuData; // raw pointers to the host and device buffers
 
 public:
-    CudaDeviceBuffer(uint64_t size = 0)
+    /// @brief Static factory method that return an instance of this buffer
+    /// @param size byte size of buffer to be initialized
+    /// @param dummy this argument is currently ignored but required to match the API of the HostBuffer
+    /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
+    /// @param stream optional stream argument (defaults to stream NULL)
+    /// @return An instance of this class using move semantics
+    static CudaDeviceBuffer create(uint64_t size, const CudaDeviceBuffer* dummy = nullptr, bool host = true, void* stream = nullptr);
+
+    /// @brief Constructor
+    /// @param size byte size of buffer to be initialized
+    /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
+    /// @param stream optional stream argument (defaults to stream NULL)
+    CudaDeviceBuffer(uint64_t size = 0, bool host = true, void* stream = nullptr)
         : mSize(0)
         , mCpuData(nullptr)
         , mGpuData(nullptr)
     {
-        this->init(size);
+        if (size > 0) this->init(size, host, stream);
     }
+
     /// @brief Disallow copy-construction
     CudaDeviceBuffer(const CudaDeviceBuffer&) = delete;
+
     /// @brief Move copy-constructor
     CudaDeviceBuffer(CudaDeviceBuffer&& other) noexcept
         : mSize(other.mSize)
@@ -90,12 +69,14 @@ public:
         other.mCpuData = nullptr;
         other.mGpuData = nullptr;
     }
+
     /// @brief Disallow copy assignment operation
     CudaDeviceBuffer& operator=(const CudaDeviceBuffer&) = delete;
+
     /// @brief Move copy assignment operation
     CudaDeviceBuffer& operator=(CudaDeviceBuffer&& other) noexcept
     {
-        clear();
+        this->clear();
         mSize = other.mSize;
         mCpuData = other.mCpuData;
         mGpuData = other.mGpuData;
@@ -104,90 +85,106 @@ public:
         other.mGpuData = nullptr;
         return *this;
     }
+
     /// @brief Destructor frees memory on both the host and device
     ~CudaDeviceBuffer() { this->clear(); };
 
-    void init(uint64_t size);
+    /// @brief Initialize buffer
+    /// @param size byte size of buffer to be initialized
+    /// @param host If true buffer is initialized only on the host/CPU, else on the device/GPU
+    /// @note All existing buffers are first cleared
+    /// @warning size is expected to be non-zero. Use clear() clear buffer!
+    void init(uint64_t size, bool host = true, void* stream = nullptr);
 
-    // @brief Retuns a pointer to the raw memory buffer managed by this allocator.
-    ///
-    /// @warning Note that the pointer can be NULL is the allocator was not initialized!
+    /// @brief Retuns a raw pointer to the host/CPU buffer managed by this allocator.
+    /// @warning Note that the pointer can be NULL!
     uint8_t* data() const { return mCpuData; }
+
+    /// @brief Retuns a raw pointer to the device/GPU buffer managed by this allocator.
+    /// @warning Note that the pointer can be NULL!
     uint8_t* deviceData() const { return mGpuData; }
 
-    /// @brief Copy grid from the CPU/host to the GPU/device. If @c sync is false the memory copy is asynchronous!
-    ///
-    /// @note This will allocate memory on the GPU/device if it is not already allocated
-    void deviceUpload(void* stream = 0, bool sync = true) const;
+    /// @brief  Upload this buffer from the host to the device, i.e. CPU -> GPU.
+    /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @param sync if false the memory copy is asynchronous
+    /// @note If the device/GPU buffer does not exist it is first allocated
+    /// @warning Assumes that the host/CPU buffer already exists
+    void deviceUpload(void* stream = nullptr, bool sync = true) const;
 
-    /// @brief Copy grid from the GPU/device to the CPU/host. If @c sync is false the memory copy is asynchronous!
-    void deviceDownload(void* stream = 0, bool sync = true) const;
+    /// @brief Upload this buffer from the device to the host, i.e. GPU -> CPU.
+    /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @param sync if false the memory copy is asynchronous
+    /// @note If the host/CPU buffer does not exist it is first allocated
+    /// @warning Assumes that the device/GPU buffer already exists
+    void deviceDownload(void* stream = nullptr, bool sync = true) const;
 
     /// @brief Returns the size in bytes of the raw memory buffer managed by this allocator.
     uint64_t size() const { return mSize; }
 
+    //@{
     /// @brief Returns true if this allocator is empty, i.e. has no allocated memory
     bool empty() const { return mSize == 0; }
+    bool isEmpty() const { return mSize == 0; }
+    //@}
 
-    /// @brief De-allocate all memory managed by this allocator and set all pointer to NULL
-    void clear();
-
-    static CudaDeviceBuffer create(uint64_t size, const CudaDeviceBuffer* context = nullptr);
+    /// @brief De-allocate all memory managed by this allocator and set all pointers to NULL
+    void clear(void* stream = nullptr);
 
 }; // CudaDeviceBuffer class
 
 template<>
 struct BufferTraits<CudaDeviceBuffer>
 {
-    static const bool hasDeviceDual = true;
+    static constexpr bool hasDeviceDual = true;
 };
 
 // --------------------------> Implementations below <------------------------------------
 
-inline CudaDeviceBuffer CudaDeviceBuffer::create(uint64_t size, const CudaDeviceBuffer*)
+inline CudaDeviceBuffer CudaDeviceBuffer::create(uint64_t size, const CudaDeviceBuffer*, bool host, void* stream)
 {
-    return CudaDeviceBuffer(size);
+    return CudaDeviceBuffer(size, host, stream);
 }
 
-inline void CudaDeviceBuffer::init(uint64_t size)
+inline void CudaDeviceBuffer::init(uint64_t size, bool host, void* stream)
 {
-    if (size == mSize)
-        return;
-    if (mSize > 0)
-        this->clear();
-    if (size == 0)
-        return;
+    if (mSize>0) this->clear(stream);
+    NANOVDB_ASSERT(size > 0);
+    if (host) {
+        cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
+        checkPtr(mCpuData, "CudaDeviceBuffer::init: failed to allocate host buffer");
+    } else {
+        cudaCheck(cudaMallocAsync((void**)&mGpuData, size, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
+        checkPtr(mGpuData, "CudaDeviceBuffer::init: failed to allocate device buffer");
+    }
     mSize = size;
-    cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
-    checkPtr(mCpuData, "failed to allocate host data");
 } // CudaDeviceBuffer::init
 
 inline void CudaDeviceBuffer::deviceUpload(void* stream, bool sync) const
 {
     checkPtr(mCpuData, "uninitialized cpu data");
-    if (mGpuData == nullptr)
-        cudaCheck(cudaMalloc((void**)&mGpuData, mSize)); // un-managed memory on the device, always 32B aligned!
+    if (mGpuData == nullptr) {
+        cudaCheck(cudaMallocAsync((void**)&mGpuData, mSize, reinterpret_cast<cudaStream_t>(stream))); // un-managed memory on the device, always 32B aligned!
+    }
     checkPtr(mGpuData, "uninitialized gpu data");
     cudaCheck(cudaMemcpyAsync(mGpuData, mCpuData, mSize, cudaMemcpyHostToDevice, reinterpret_cast<cudaStream_t>(stream)));
-    if (sync)
-        cudaCheck(cudaStreamSynchronize(reinterpret_cast<cudaStream_t>(stream)));
+    if (sync) cudaCheck(cudaStreamSynchronize(reinterpret_cast<cudaStream_t>(stream)));
 } // CudaDeviceBuffer::gpuUpload
 
 inline void CudaDeviceBuffer::deviceDownload(void* stream, bool sync) const
 {
-    checkPtr(mCpuData, "uninitialized cpu data");
     checkPtr(mGpuData, "uninitialized gpu data");
+    if (mCpuData == nullptr) {
+        cudaCheck(cudaMallocHost((void**)&mCpuData, mSize)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
+    }
+    checkPtr(mCpuData, "uninitialized cpu data");
     cudaCheck(cudaMemcpyAsync(mCpuData, mGpuData, mSize, cudaMemcpyDeviceToHost, reinterpret_cast<cudaStream_t>(stream)));
-    if (sync)
-        cudaCheck(cudaStreamSynchronize(reinterpret_cast<cudaStream_t>(stream)));
+    if (sync) cudaCheck(cudaStreamSynchronize(reinterpret_cast<cudaStream_t>(stream)));
 } // CudaDeviceBuffer::gpuDownload
 
-inline void CudaDeviceBuffer::clear()
+inline void CudaDeviceBuffer::clear(void *stream)
 {
-    if (mGpuData)
-        cudaCheck(cudaFree(mGpuData));
-    if (mCpuData)
-        cudaCheck(cudaFreeHost(mCpuData));
+    if (mGpuData) cudaCheck(cudaFreeAsync(mGpuData, reinterpret_cast<cudaStream_t>(stream)));
+    if (mCpuData) cudaCheck(cudaFreeHost(mCpuData));
     mCpuData = mGpuData = nullptr;
     mSize = 0;
 } // CudaDeviceBuffer::clear
