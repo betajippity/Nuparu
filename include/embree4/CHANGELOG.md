@@ -1,6 +1,27 @@
 Version History
 ---------------
 
+### Embree 4.3.0
+-   Added instance array primitive for reducing memony requirements in scenes
+    with large amounts of similar instances.
+-   Properly checks driver if L0 RTAS extension can get loaded.
+-   Added varying version of rtcGetGeometryTransform for ISPC.
+-   Fixed signature of RTCMemoryMonitorFunction for ISPC.
+-   Add support for ARM64 Windows platform in CMake.
+
+### Embree 4.2.0
+-   SYCL version of Embree with GPU support is no longer in beta phase.
+-   Improved BVH build performance on many core machines for applications that oversubscribe threads.
+-   Added rtcGetGeometryTransformFromScene API function that can get used inside SYCL kernels.
+-   No longer linking to ze_loader in SYCL mode to avoid Intel(R) oneAPI Level Zero dependency
+    for CPU rendering.
+-   Releasing test package to test Embree.
+
+### Embree 4.1.0
+-   Added support for Intel® Data Center GPU Max Series.
+-   Added ARM64 Linux support.
+-   Added EMBREE_BACKFACE_CULLING_SPHERES cmake option. The new cmake option defaults to OFF.
+
 ### Embree 4.0.1
 -   Improved performance for Tiger Lake, Comet Lake, Cannon Lake, Kaby Lake,
     and Skylake client CPUs by using 256 bit SIMD instructions by default.
