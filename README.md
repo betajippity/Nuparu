@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.7.23.50
+v0.8.24.15
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -38,8 +38,8 @@ Nuparu currently consists of:
 Notes:
 
 * On all platforms, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and RHEL 7.9 (Linux-GCC11), and Fedora 37 (Linux-GCC12).
-* arm64 builds are included for macOS, Fedora 37 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
+* x86-64 builds are included for macOS, Windows, and RHEL 9.x (Linux-GCC12), and Fedora 39 (Linux-GCC13).
+* arm64 builds are included for macOS, Fedora 39 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
 * macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
 * Everything is built using C++14 or newer.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
@@ -52,7 +52,7 @@ Notes:
 * Embree currently is built without SYCL support; this will be added later.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
-    * CUDA is supported on Windows, Fedora 37 x86-64, L4T, and RHEL
+    * CUDA is supported on Windows, Fedora 39 x86-64, L4T, and RHEL 9.x
     * Metal is supported on macOS
     * OpenSubdiv has been modified to work with OneTBB
 * blosc is built without AVX2 support.
@@ -63,17 +63,16 @@ Notes:
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
     * On macOS, Python 3.11 from MacPorts
-    * On Fedora 37, the default system Python 3.11
-    * On RHEL, the default system Python 3.6
+    * On Fedora 39, the default system Python 3.12
+    * On RHEL, the default system Python 3.9
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
 * macOS libraries require at minimum macOS Sonoma and macOS's Clang variant (Apple LLVM 15 or greater) with libc++.
 * Windows libraries require at minimum Windows 11 and Visual Studio 2022 with \mt.
-* Linux libraries require at minimum either Fedora 37, Red Hat Enterprise Linux (RHEL) 7.9, or NVIDIA L4T 32.6.1.
-    * On RHEL, GCC 11.2.1 is used through [Red Hat Developer Toolset 11.0](https://developers.redhat.com/products/developertoolset/updates/).
-    * Fedora 37 libraries require GCC 12.x on x86-64 and are in lib/linux-gcc12
-    * Fedora 37 libraries require GCC 12.x on ARM arm64 and are in lib/linux-arm
-    * RHEL libraries require GCC 11.2.x and are in lib/linux-gcc11
+* Linux libraries require at minimum either Fedora 39, Red Hat Enterprise Linux (RHEL) 9.x, or NVIDIA L4T 32.6.1.
+    * RHEL 9.x libraries require GCC 12.x on x86-64 and are in lib/linux-gcc12
+    * Fedora 39 libraries require GCC 13.x on x86-64 and are in lib/linux-gcc13
+    * Fedora 39 libraries require GCC 13.x on ARM arm64 and are in lib/linux-arm
     * L4T libraries require GCC 7.5.x and are in lib/linux-l4t
 * Things with CUDA support are built using CUDA 12.1, except on L4T, in which case CUDA 10.2 is used
 * Licenses for each library are included either in each library's include/ directory, or in source files directly.
