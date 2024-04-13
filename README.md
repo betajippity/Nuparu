@@ -33,6 +33,7 @@ Nuparu currently consists of:
 * [dear imgui](https://github.com/ocornut/imgui) 1.90.3 with Docking (Src)
 * [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
 * [im-neo-sequencer](https://gitlab.com/GroGy/im-neo-sequencer) 0.1 (Src)
+* [cpuinfo](https://github.com/pytorch/cpuinfo) f42f5ea (Mac/Win/Linux)
 
 Notes:
 
