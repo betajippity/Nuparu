@@ -32,7 +32,6 @@ Nuparu currently consists of:
 * [ispc](https://ispc.github.io) 1.18.0 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui) 1.90.3 with Docking (Src)
 * [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
-* [im-neo-sequencer](https://gitlab.com/GroGy/im-neo-sequencer) 0.1 (Src)
 * [cpuinfo](https://github.com/pytorch/cpuinfo) f42f5ea (Mac/Win/Linux)
 * [zmq] (https://github.com/zeromq/libzmq) 4.3.5 (Mac/Win/Linux)
 
@@ -60,7 +59,6 @@ Notes:
 * OpenVDB is built without ABI compatibility for OpenVDB 3.x.x and without explicit instantiation.
 * NanoVDB is built with CUDA support.
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 and AppKit/Metal implementation files.
-* im-neo-sequencer includes some bugfixes and additional functionality not found in the original project
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
     * On macOS, Python 3.11 from MacPorts
