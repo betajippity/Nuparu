@@ -34,6 +34,7 @@ Nuparu currently consists of:
 * [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
 * [im-neo-sequencer](https://gitlab.com/GroGy/im-neo-sequencer) 0.1 (Src)
 * [cpuinfo](https://github.com/pytorch/cpuinfo) f42f5ea (Mac/Win/Linux)
+* [zmq] (https://github.com/zeromq/libzmq) 4.3.5 (Mac/Win/Linux)
 
 Notes:
 
@@ -67,6 +68,7 @@ Notes:
     * On RHEL, the default system Python 3.9
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
+* ZMQ is built without Websockets and without TLS support
 * macOS libraries require at minimum macOS Sonoma and macOS's Clang variant (Apple LLVM 15 or greater) with libc++.
 * Windows libraries require at minimum Windows 11 and Visual Studio 2022 with \mt.
 * Linux libraries require at minimum either Fedora 39, Red Hat Enterprise Linux (RHEL) 9.x, or NVIDIA L4T 32.6.1.
