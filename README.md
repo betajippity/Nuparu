@@ -9,7 +9,7 @@ Nuparu currently consists of:
 
 * [GLM](http://glm.g-truc.net) 1.0.1 (Src)
 * [FreeGLUT](http://freeglut.sourceforge.net) 3.4.0 (Win)
-* [GLFW](http://www.glfw.org) 3.3.8 (Mac/Win/Linux)
+* [GLFW](http://www.glfw.org) 3.4 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.2.0 (Mac/Win/Linux)
 * [Embree](https://embree.github.io) 4.3.1 (Mac/Win/Linux)
 * [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.5 (Mac/Win/Linux)
