@@ -30,7 +30,7 @@ Nuparu currently consists of:
 * [blosc](https://github.com/Blosc) 1.21.5 (Mac/Win/Linux)
 * [cereal](https://uscilab.github.io/cereal/) 1.3.2 (Src)
 * [ispc](https://ispc.github.io) 1.18.0 (Mac/Win/Linux)
-* [dear imgui](https://github.com/ocornut/imgui) 1.90.3 with Docking (Src)
+* [dear imgui](https://github.com/ocornut/imgui) 1.90.5 with Docking (Src)
 * [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
 * [cpuinfo](https://github.com/pytorch/cpuinfo) f42f5ea (Mac/Win/Linux)
 * [zmq](https://github.com/zeromq/libzmq) 4.3.5 (Mac/Win/Linux)
