@@ -1,7 +1,7 @@
 Nuparu
 ======
 
-v0.8.24.18
+v0.8.24.19
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
@@ -32,7 +32,7 @@ Nuparu currently consists of:
 * [ispc](https://ispc.github.io) 1.18.0 (Mac/Win/Linux)
 * [dear imgui](https://github.com/ocornut/imgui) 1.90.5 with Docking (Src)
 * [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
-* [cpuinfo](https://github.com/pytorch/cpuinfo) f42f5ea (Mac/Win/Linux)
+* [cpuinfo](https://github.com/pytorch/cpuinfo) 3c8b153 (Mac/Win/Linux)
 * [zmq](https://github.com/zeromq/libzmq) 4.3.5 (Mac/Win/Linux)
 
 Notes:
