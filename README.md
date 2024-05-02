@@ -66,7 +66,7 @@ Notes:
     * On RHEL, the default system Python 3.9
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
-* ZMQ is built without Websockets and without TLS support
+* ZMQ is built with draft API support, without Websockets, without TLS support, and without libbsd
 * macOS libraries require at minimum macOS Sonoma and macOS's Clang variant (Apple LLVM 15 or greater) with libc++.
 * Windows libraries require at minimum Windows 11 and Visual Studio 2022 with \mt.
 * Linux libraries require at minimum either Fedora 39, Red Hat Enterprise Linux (RHEL) 9.x, or NVIDIA L4T 32.6.1.
