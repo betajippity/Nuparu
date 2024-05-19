@@ -46,7 +46,7 @@ Notes:
 * Since macOS ships with GLUT by default, Nuparu does not include FreeGLUT for macOS.
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
 * RMSD has minor modifications for C++ support.
-* On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64, Embree is built with NEON 2X support.
+* On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64 for Mac/Linux, Embree is built with NEON 2X support. On arm64 for Windows, Embree is built with NEON 1X support and without ispc.
 * Embree is built with a max nested instancing depth of 16.
 * Embree currently is built without SYCL support; this will be added later.
 * OpenEXR is built without version numbers in namespaces.
