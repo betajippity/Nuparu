@@ -1067,6 +1067,7 @@ static void ImGui_ImplOSX_UpdateMonitors()
     platform_io.Monitors.resize(0);
 
     NSRect firstScreenFrame = NSScreen.screens[0].frame;
+    (void)firstScreenFrame;
     IM_ASSERT(firstScreenFrame.origin.x == 0 && firstScreenFrame.origin.y == 0);
 
     for (NSScreen* screen in NSScreen.screens)

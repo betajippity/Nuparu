@@ -152,6 +152,7 @@ bool ImGui_ImplMetal_Init(id<MTLDevice> device)
 void ImGui_ImplMetal_Shutdown()
 {
     ImGui_ImplMetal_Data* bd = ImGui_ImplMetal_GetBackendData();
+    (void)bd;
     IM_ASSERT(bd != nullptr && "No renderer backend to shutdown, or already shutdown?");
     ImGui_ImplMetal_ShutdownPlatformInterface();
     ImGui_ImplMetal_DestroyDeviceObjects();
