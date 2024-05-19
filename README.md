@@ -51,7 +51,7 @@ Notes:
 * Embree currently is built without SYCL support; this will be added later.
 * OpenEXR is built without version numbers in namespaces.
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
-    * CUDA is supported on Windows, Fedora 39 x86-64, L4T, and RHEL 9.x
+    * CUDA is supported on Windows x86-64, Fedora 39 x86-64, L4T, and RHEL 9.x
     * Metal is supported on macOS
     * OpenSubdiv has been modified to work with OneTBB
 * blosc is built without AVX2 support.
