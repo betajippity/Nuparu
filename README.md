@@ -39,7 +39,7 @@ Notes:
 
 * On all platforms, all binary libraries except for TBB are statically linked.
 * x86-64 builds are included for macOS, Windows, and RHEL 9.x (Linux-GCC12), and Fedora 39 (Linux-GCC13).
-* arm64 builds are included for macOS, Fedora 39 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
+* arm64 builds are included for macOS, Windows, Fedora 39 (Linux-ARM), and NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04).
 * macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
 * Everything is built using C++14 or newer.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
