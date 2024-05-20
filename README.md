@@ -1,14 +1,13 @@
 Nuparu
 ======
 
-v0.8.24.19
+v0.9.24.20
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
 Nuparu currently consists of:
 
 * [GLM](http://glm.g-truc.net) 1.0.1 (Src)
-* [FreeGLUT](http://freeglut.sourceforge.net) 3.4.0 (Win)
 * [GLFW](http://www.glfw.org) 3.4 (Mac/Win/Linux)
 * [GLEW](https://github.com/nigels-com/glew) 2.2.0 (Mac/Win/Linux)
 * [Embree](https://embree.github.io) 4.3.1 (Mac/Win/Linux)
@@ -43,7 +42,6 @@ Notes:
 * macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
 * Everything is built using C++14 or newer.
 * The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
-* Since macOS ships with GLUT by default, Nuparu does not include FreeGLUT for macOS.
 * Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
 * RMSD has minor modifications for C++ support.
 * On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64 for Mac/Linux, Embree is built with NEON 2X support. On arm64 for Windows, Embree is built with NEON 1X support and without ispc.
