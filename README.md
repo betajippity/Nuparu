@@ -22,7 +22,7 @@ Nuparu currently consists of:
 * [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
 * [Zlib](https://www.zlib.net) 1.3.1 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2021.12.0 (Mac/Win/Linux)
-* [Boost](http://www.boost.org) 1.84.0 (Mac/Win/Linux)
+* [Boost](http://www.boost.org) 1.88.0 (Mac/Win/Linux)
 * [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.6.0 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 11.0.0 (Mac/Win/Linux)
 * [NanoVDB](http://www.openvdb.org/) 11.0.0 (Src)
@@ -58,9 +58,8 @@ Notes:
 * dear imgui includes the core imgui library and the GLFW3/OpenGL3 and AppKit/Metal implementation files.
 * Only a subset of boost necessary to support OpenVDB and USD is included.
 * For boost, the following versions of Python are supported:
-    * On macOS, Python 3.11 from MacPorts
-    * On Fedora 39, the default system Python 3.13
-    * On RHEL, the default system Python 3.9
+    * On macOS, Python 3.13 from MacPorts
+    * On Fedora 41 and RHEL, the default system Python 3.13
     * On L4T, the default system Python 3.6
     * Python support is not provided on Windows
 * ZMQ is built with draft API support, without Websockets, without TLS support, and without libbsd
