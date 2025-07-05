@@ -23,7 +23,7 @@ Nuparu currently consists of:
 * [Zlib](https://www.zlib.net) 1.3.1 (Mac/Win/Linux)
 * [TBB](https://www.threadingbuildingblocks.org/) 2022.1.0 (Mac/Win/Linux)
 * [Boost](http://www.boost.org) 1.88.0 (Mac/Win/Linux)
-* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.6.0 (Mac/Win/Linux)
+* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.6.1 (Mac/Win/Linux)
 * [OpenVDB](http://www.openvdb.org/) 11.0.0 (Mac/Win/Linux)
 * [NanoVDB](http://www.openvdb.org/) 11.0.0 (Src)
 * [blosc](https://github.com/Blosc) 1.21.6 (Mac/Win/Linux)

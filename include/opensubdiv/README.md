@@ -21,44 +21,45 @@ For more details about OpenSubdiv, see [Pixar Graphics Technologies](http://grap
 ## Forum
  * [OpenSubdiv Google Groups](https://groups.google.com/forum/embed/?place=forum/opensubdiv)
 
-## Prerequisite
-  For complete information, please refer OpenSubdiv documents:
-  [Building with CMake](http://graphics.pixar.com/opensubdiv/docs/cmake_build.html)
+## Prerequisites and Building
 
- * General requirements:
+The OpenSubdiv core libraries are implemented in C++ with no dependencies other than the C++ standard library.
 
-| Lib                           | Min Version | Note       |
-| ----------------------------- | ----------- | ---------- |
-| [CMake](http://www.cmake.org) | 3.12        | *Required* |
+The OpenSubdiv::Osd library contains additional conditionally compiled components which use specific external CPU and GPU APIs for evaluation and display and there are also optional interactive examples. Some of these optional aspects are enabled by default but can be disabled while configuring the OpenSubdiv build.
 
- * Osd optional requirements:
+For complete information, please see:
+[Building with CMake](http://graphics.pixar.com/opensubdiv/docs/cmake_build.html)
 
-| Lib                                                                | Min Version | Note                        |
-| ------------------------------------------------------------------ | ----------- | ----------------------------|
-| [CUDA](http://developer.nvidia.com/cuda-toolkit)                   | 4.0         | cuda backend                |
-| [TBB](https://www.threadingbuildingblocks.org)                     | 2018        | TBB backend                 |
-| [OpenCL](http://www.khronos.org/opencl)                            | 1.1         | CL backend                  |
-| [DX11 SDK](http://www.microsoft.com/download/details.aspx?id=6812) |             | DX backend                  |
-| [Metal](https://developer.apple.com/metal/)                        | 1.2         | Metal backend               |
+## Versions
 
- * Requirements for building optional examples:
+These are the versions of external dependencies used to test the current release of OpenSubdiv. Generally, OpenSubdiv will also work with earlier and later versions of these external dependencies, but this represents versions known to work.
 
-| Lib                                  | Min Version | Note                              |
-| -------------------------------------| ----------- | --------------------------------- |
-| [GLFW](http://www.glfw.org)          | 3.0.0       | GL examples                       |
-| [Ptex](https://github.com/wdas/ptex) | 2.0         | ptex viewers                      |
-| [Zlib](http://www.zlib.net)          |             | (required for Ptex under windows) |
+| Core Dependencies                                                            | Version     | Note                   |
+| ---------------------------------------------------------------------------- | ----------- | ---------------------- |
+| [CMake](https://www.cmake.org)                                               | 3.14        | *Required*             |
 
- * Requirements for building documentation:
+| Optional OpenSubdiv::Osd Dependencies                                        | Version     | Note                   |
+| ---------------------------------------------------------------------------- | ----------- | ---------------------- |
+| [OpenGL](https://www.opengl.org)                                             | 4.1+        | OpenGL                 |
+| [Metal](https://developer.apple.com/metal)                                   | 3+          | Metal                  |
+| [CUDA](https://developer.nvidia.com/cuda-toolkit)                            | 12.6        | CUDA                   |
+| [TBB](https://github.com/uxlfoundation/oneTBB)                               | 2021.12.0   | oneTBB                 |
+| [OpenCL](https://www.khronos.org/opencl)                                     | 1.1         | OpenCL                 |
+| [DirectX11](https://www.microsoft.com/en-us/download/details.aspx?id=6812)   | 11+         | DirectX11              |
 
-| Lib                                         |
-| ------------------------------------------- |
-| [Docutils](http://docutils.sourceforge.net) |
-| [Doxygen](http://www.doxygen.org)           |
-| [Graphviz](https://graphviz.gitlab.io/)     |
+| Optional Interactive Example Dependencies                                    | Version     | Note                   |
+| ---------------------------------------------------------------------------- | ----------- | ---------------------- |
+| [GLFW](https://www.glfw.org)                                                 | 3.3.3       | OpenGL example viewers |
+| [Ptex](https://github.com/wdas/ptex)                                         | 2.4.2       | Ptex example viewers   |
+| [Zlib](https://www.zlib.net)                                                 | 1.2.13      | Ptex example viewers   |
 
+| Optional Documentation Dependencies                                          | Version     | Note                   |
+| ---------------------------------------------------------------------------- |------------ |----------------------- |
+| [Doxygen](https://www.doxygen.nl)                                            | 1.14.0      | C++ API Documentation  |
+| [Docutils](https://pypi.org/project/docutils)                                | 0.21.2      | general documentation  |
+| [Pygments](https://pypi.org/project/Pygments)                                | 2.19        | general documentation  |
 
-## Build example to run glViewer and other example programs with minimal dependency
+## Building with minimal dependencies to run glViewer and other example programs
 
 ### All platforms:
 
@@ -72,87 +73,106 @@ For more details about OpenSubdiv, see [Pixar Graphics Technologies](http://grap
    ${GLFW_LOCATION}/lib/glfw3.lib (windows)
 ```
 
-  * Clone OpenSubdiv repository, and create a build directory.
+  * Clone OpenSubdiv repository
 ```
    git clone https://github.com/PixarAnimationStudios/OpenSubdiv
-   mkdir build
-   cd build
+   cd OpenSubdiv
 ```
 
 ### Windows (Visual Studio)
 
 ```
-cmake ^
-    -G "Visual Studio 15 2017 Win64" ^
-    -D NO_PTEX=1 -D NO_DOC=1 ^
-    -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 ^
-    -D "GLFW_LOCATION=*YOUR GLFW INSTALL LOCATION*" ^
-    ..
+cmake -B buildDir ^
+      -D CMAKE_INSTALL_PREFIX=instDir ^
+      -G "Visual Studio 16 2019" -A x64 ^
+      -D NO_PTEX=1 -D NO_DOC=1 ^
+      -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 ^
+      -D "GLFW_LOCATION=C:\path\to\glfw" ^
+      -S .
 
-cmake --build . --config Release --target install
+cmake --build buildDir --config Release --target install
 ```
 
 ### Linux
 
 ```
-cmake -D NO_PTEX=1 -D NO_DOC=1 \
+cmake -B buildDir \
+      -D CMAKE_INSTALL_PREFIX=instDir \
+      -D NO_PTEX=1 -D NO_DOC=1 \
       -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 \
-      -D GLFW_LOCATION="*YOUR GLFW INSTALL LOCATION*" \
-      ..
+      -D "GLFW_LOCATION=/path/to/glfw" \
+      -S .
 
-cmake --build . --config Release --target install
+cmake --build buildDir --config Release --target install
 ```
 
 ### macOS
 
 ```
-cmake -G Xcode -D NO_PTEX=1 -D NO_DOC=1 \
+cmake -B buildDir \
+      -D CMAKE_INSTALL_PREFIX=instDir \
+      -G Xcode \
+      -D NO_PTEX=1 -D NO_DOC=1 \
       -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 \
-      -D GLFW_LOCATION="*YOUR GLFW INSTALL LOCATION*" \
-      ..
+      -D "GLFW_LOCATION=/path/to/glfw" \
+      -S .
 
-cmake --build . --config Release --target install
+cmake --build buildDir --config Release --target install
 ```
 
 ### iOS
 
+Use CMAKE_SYSTEM_NAME to have CMake use the appropriate cross-compilation toolchain when building for iOS.
+
 ```
-SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path) cmake -D NO_PTEX=1 -D NO_DOC=1 \
+SDKROOT=$(xcrun --sdk iphoneos --show-sdk-path) \
+cmake -B buildDir \
+      -D CMAKE_INSTALL_PREFIX=instDir \
+      -G Xcode \
+      -D CMAKE_SYSTEM_NAME=iOS \
+      -D NO_PTEX=1 -D NO_DOC=1 \
       -D NO_OMP=1 -D NO_TBB=1 -D NO_CUDA=1 -D NO_OPENCL=1 -D NO_CLEW=1 \
-      -D CMAKE_TOOLCHAIN_FILE=../cmake/iOSToolchain.cmake -G Xcode \
-      ..
+      -D NO_TUTORIALS=1 -D NO_EXAMPLES=1 -D NO_REGRESSION=1 -D NO_OPENGL=1 \
+      -S .
 ```
 
-  * This will produce an "OpenSubdiv.xcodeproj" that can be open and the targets 'mtlViewer' and 'mtlPtexViewer' (if NO_PTEX is ommitted and libPtex.a is installed in the iOS SDK) that can be run
+  * This will produce an "OpenSubdiv.xcodeproj" that can be opened with Xcode.
+  * Use `SDKROOT=$(xcrun --sdk iphonesimulator --show-sdk-path)` instead for an iOS-Sim target
 
 ### Useful cmake options and environment variables
 
 ````
 -DCMAKE_BUILD_TYPE=[Debug|Release]
 
--DCMAKE_INSTALL_PREFIX=[base path to install OpenSubdiv]
+-DCMAKE_INSTALL_PREFIX=[base path to install OpenSubdiv (default: Current directory)]
 -DCMAKE_LIBDIR_BASE=[library directory basename (default: lib)]
--DCMAKE_TOOLCHAIN_FILE=[toolchain file for crossplatform builds]
+-DCMAKE_SYSTEM_NAME=[target system name for cross-compilation builds, e.g. iOS]
 
--DCUDA_TOOLKIT_ROOT_DIR=[path to CUDA Toolkit]
+-DCMAKE_PREFIX_PATH=[semicolon-separated list of directories specifying installation prefixes to be searched by the find_package() command (default: empty list)]
+
+-DCUDA_SDK_ROOT_DIR=[path to CUDA]
+-DCUDA_TOOLKIT_ROOT_DIR=[path to CUDA]
 -DOSD_CUDA_NVCC_FLAGS=[CUDA options, e.g. --gpu-architecture]
 
--DPTEX_LOCATION=[path to Ptex]
--DGLFW_LOCATION=[path to GLFW]
--DSTRINGIFY_LOCATION=[path to stringify utility]
+-DGLFW_LOCATION=[path to GLFW for OpenGL example viewers]
+-DPTEX_LOCATION=[path to Ptex for Ptex example viewers]
 
 -DNO_LIB=1        // disable the opensubdiv libs build (caveat emptor)
 -DNO_EXAMPLES=1   // disable examples build
 -DNO_TUTORIALS=1  // disable tutorials build
 -DNO_REGRESSION=1 // disable regression tests build
--DNO_PTEX=1       // disable PTex support
+-DNO_PTEX=1       // disable Ptex examples
 -DNO_DOC=1        // disable documentation build
 -DNO_OMP=1        // disable OpenMP
 -DNO_TBB=1        // disable TBB
 -DNO_CUDA=1       // disable CUDA
 -DNO_OPENCL=1     // disable OpenCL
+-DNO_CLEW=1       // disable OpenCL loader library
 -DNO_OPENGL=1     // disable OpenGL
--DNO_CLEW=1       // disable CLEW wrapper library
 -DNO_METAL=1      // disable Metal
+
+-DOSD_PATCH_SHADER_SOURCE_GLSL=1  // GLSL Patch Shader Source
+-DOSD_PATCH_SHADER_SOURCE_HLSL=1  // HLSL Patch Shader Source
+-DOSD_PATCH_SHADER_SOURCE_MSL=1   // MSL Patch Shader Source
 ````
 
