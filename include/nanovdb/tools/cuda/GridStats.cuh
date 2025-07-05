@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
-// SPDX-License-Identifier: MPL-2.0
+// SPDX-License-Identifier: Apache-2.0
 
 /*!
-    \file CudaGridStats.cuh
+    \file nanovdb/tools/cuda/GridStats.cuh
 
     \author Ken Museth
 
@@ -12,27 +12,29 @@
            pre-existing NanoVDB grid on the device.
 */
 
-#ifndef NANOVDB_CUDAGRIDSTATS_CUH_HAS_BEEN_INCLUDED
-#define NANOVDB_CUDAGRIDSTATS_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_GRIDSTATS_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_GRIDSTATS_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
-#include <nanovdb/util/GridStats.h>
+#include <nanovdb/tools/GridStats.h>
 
 namespace nanovdb {
 
-/// @brief Re-computes the min/max, stats and bbox information for an existing NanoVDB Grid
-///
+namespace tools::cuda {
+
+/// @brief Update, i.e. re-compute, grid statistics like min/max, stats and bbox
+///        information for an existing NanoVDB Grid.
 /// @param grid   Grid whose stats to update
 /// @param mode   Mode of computation for the statistics.
 /// @param stream Optional cuda stream (defaults to zero)
 template<typename BuildT>
-void cudaGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode = StatsMode::Default, cudaStream_t stream = 0);
+void updateGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode = StatsMode::Default, cudaStream_t stream = 0);
 
 //================================================================================================
 
 /// @brief Allows for the construction of NanoVDB grids without any dependecy
 template<typename BuildT, typename StatsT = Stats<typename NanoGrid<BuildT>::ValueType>>
-class CudaGridStats
+class GridStats
 {
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = typename GridT::TreeType;
@@ -41,16 +43,16 @@ class CudaGridStats
     using Node1  = typename TreeT::Node1; // lower
     using Node2  = typename TreeT::Node2; // upper
     using RootT  = typename TreeT::Node3; // root
-    static_assert(is_same<ValueT, typename StatsT::ValueType>::value, "Mismatching type");
+    static_assert(util::is_same<ValueT, typename StatsT::ValueType>::value, "Mismatching type");
 
     ValueT mDelta; // skip rendering of node if: node.max < -mDelta || node.min > mDelta
 
 public:
-    CudaGridStats(ValueT delta = ValueT(0)) : mDelta(delta) {}
+    GridStats(ValueT delta = ValueT(0)) : mDelta(delta) {}
 
-    void operator()(GridT *d_grid, cudaStream_t stream = 0);
+    void update(GridT *d_grid, cudaStream_t stream = 0);
 
-}; // CudaGridStats
+}; // cuda::GridStats
 
 //================================================================================================
 
@@ -158,30 +160,18 @@ __global__ void processRootAndGrid(NodeManager<BuildT> *d_nodeMgr, StatsT *d_sta
     auto& grid = d_nodeMgr->grid();
     const auto& indexBBox = root.bbox();
     if (indexBBox.empty()) {
-        grid.mWorldBBox = BBox<Vec3d>();
+        grid.mWorldBBox = Vec3dBBox();
         grid.setBBoxOn(false);
     } else {
         // Note that below max is offset by one since CoordBBox.max is inclusive
         // while bbox<Vec3d>.max is exclusive. However, min is inclusive in both
-        // CoordBBox and BBox<Vec3d>. This also guarantees that a grid with a single
+        // CoordBBox and Vec3dBBox. This also guarantees that a grid with a single
         // active voxel, does not have an empty world bbox! E.g. if a grid with a
         // unit index-to-world transformation only contains the active voxel (0,0,0)
         // then indeBBox = (0,0,0) -> (0,0,0) and then worldBBox = (0.0, 0.0, 0.0)
         // -> (1.0, 1.0, 1.0). This is a consequence of the different definitions
         // of index and world bounding boxes inherited from OpenVDB!
-        const Coord min = indexBBox[0];
-        const Coord max = indexBBox[1] + Coord(1);
-
-        auto& wBBox = grid.mWorldBBox;
-        const auto& map = grid.map();
-        wBBox[0] = wBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
-        wBBox.expand(map.applyMap(Vec3d(min[0], min[1], max[2])));
-        wBBox.expand(map.applyMap(Vec3d(min[0], max[1], min[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], min[1], min[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], max[1], min[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], min[1], max[2])));
-        wBBox.expand(map.applyMap(Vec3d(min[0], max[1], max[2])));
-        wBBox.expand(map.applyMap(Vec3d(max[0], max[1], max[2])));
+        grid.mWorldBBox = CoordBBox(indexBBox[0], indexBBox[1].offsetBy(1)).transform(grid.map());
         grid.setBBoxOn(true);
     }
 
@@ -196,21 +186,21 @@ __global__ void processRootAndGrid(NodeManager<BuildT> *d_nodeMgr, StatsT *d_sta
 //================================================================================================
 
 template<typename BuildT, typename StatsT>
-void CudaGridStats<BuildT, StatsT>::operator()(NanoGrid<BuildT> *d_grid, cudaStream_t stream)
+void GridStats<BuildT, StatsT>::update(NanoGrid<BuildT> *d_grid, cudaStream_t stream)
 {
     static const uint32_t threadsPerBlock = 128;
     auto blocksPerGrid = [&](uint32_t count)->uint32_t{return (count + (threadsPerBlock - 1)) / threadsPerBlock;};
 
-    auto nodeMgrHandle = cudaCreateNodeManager(d_grid, CudaDeviceBuffer(), stream);
+    auto nodeMgrHandle = nanovdb::cuda::createNodeManager(d_grid, CudaDeviceBuffer(), stream);
     auto *d_nodeMgr = nodeMgrHandle.template deviceMgr<BuildT>();
 
     uint32_t nodeCount[3];// {leaf, lower, upper}
     cudaCheck(cudaMemcpyAsync(nodeCount, (char*)d_grid + sizeof(GridData) + 4*sizeof(uint64_t), 3*sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
-    cudaStreamSynchronize(stream);// finish all device tasks in stream
+    //cudaStreamSynchronize(stream);// finish all device tasks in stream
 
     StatsT *d_stats = nullptr;
 
-    if constexpr(StatsT::hasAverage()) cudaCheck(cudaMallocAsync((void**)&d_stats, nodeCount[0]*sizeof(StatsT), stream));
+    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::mallocAsync((void**)&d_stats, nodeCount[0]*sizeof(StatsT), stream));
 
     processLeaf<BuildT><<<blocksPerGrid(nodeCount[0]), threadsPerBlock, 0, stream>>>(d_nodeMgr, d_stats);
 
@@ -220,31 +210,40 @@ void CudaGridStats<BuildT, StatsT>::operator()(NanoGrid<BuildT> *d_grid, cudaStr
 
     processRootAndGrid<BuildT><<<1, 1, 0, stream>>>(d_nodeMgr, d_stats);
 
-    if constexpr(StatsT::hasAverage()) cudaCheck(cudaFreeAsync(d_stats, stream));
+    if constexpr(StatsT::hasAverage()) cudaCheck(util::cuda::freeAsync(d_stats, stream));
 
-} // CudaGridStats::operator()( Grid )
+} // cuda::GridStats::update( Grid )
 
 //================================================================================================
 
 template<typename BuildT>
-void cudaGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode, cudaStream_t stream)
+void updateGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode, cudaStream_t stream)
 {
     if (d_grid == nullptr && mode == StatsMode::Disable) {
         return;
-    } else if (mode == StatsMode::BBox || is_same<bool, BuildT>::value) {
-        CudaGridStats<BuildT, NoopStats<BuildT> > stats;
-        stats(d_grid, stream);
+    } else if (mode == StatsMode::BBox || util::is_same<bool, BuildT>::value) {
+        GridStats<BuildT, NoopStats<BuildT> > stats;
+        stats.update(d_grid, stream);
     } else if (mode == StatsMode::MinMax) {
-        CudaGridStats<BuildT, Extrema<BuildT> > stats;
-        stats(d_grid, stream);
+        GridStats<BuildT, Extrema<BuildT> > stats;
+        stats.update(d_grid, stream);
     } else if (mode == StatsMode::All) {
-        CudaGridStats<BuildT, Stats<BuildT> > stats;
-        stats(d_grid, stream);
+        GridStats<BuildT, Stats<BuildT> > stats;
+        stats.update(d_grid, stream);
     } else {
-        throw std::runtime_error("cudaGridStats: Unsupported statistics mode.");
+        throw std::runtime_error("GridStats: Unsupported statistics mode.");
     }
-}// cudaGridStats
+}// cuda::updateGridStats
+
+}// namespace tools::cuda
+
+template<typename BuildT>
+[[deprecated("Use nanovdb::cuda::updateGridStats instead")]]
+void cudaGridStats(NanoGrid<BuildT> *d_grid, tools::StatsMode mode = tools::StatsMode::Default, cudaStream_t stream = 0)
+{
+    tools::cuda::updateGridStats<BuildT>(d_grid, mode, stream);
+}
 
 } // namespace nanovdb
 
-#endif // NANOVDB_CUDAGRIDSTATS_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_GRIDSTATS_CUH_HAS_BEEN_INCLUDED
