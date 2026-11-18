@@ -7,7 +7,7 @@ if(EXISTS "${manifest}")
 endif()
 
 set(package_files)
-foreach(dependency jsoncpp glfw)
+foreach(dependency jsoncpp glfw zlib Imath openexr)
     set(stage "${NUPARU_STAGE_DIR}/${dependency}")
     file(GLOB_RECURSE stage_files LIST_DIRECTORIES FALSE RELATIVE "${stage}" "${stage}/*")
     if(NOT stage_files)

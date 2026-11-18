@@ -5,6 +5,8 @@ v0.10.25.26
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
+For the experimental source-build recipe and combined dependency package pilot, see [DEPENDENCY-BUILD.md](DEPENDENCY-BUILD.md). The existing prebuilt packages remain the standard dependency set.
+
 Nuparu currently consists of:
 
 * [GLM](http://glm.g-truc.net) 1.0.1 (Src)
@@ -47,7 +49,7 @@ Notes:
 * On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64 for Mac/Linux, Embree is built with NEON 2X support. On arm64 for Windows, Embree is built with NEON 1X support and without ispc.
 * Embree is built with a max nested instancing depth of 16.
 * Embree currently is built without SYCL support; this will be added later.
-* OpenEXR is built without version numbers in namespaces.
+* The checked-in OpenEXR headers use versioned internal namespaces (for example, `Imf_3_3`); the prior note that namespaces were unversioned does not match those headers.
 * OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
     * CUDA is supported on Windows x86-64, Fedora 41 x86-64, L4T, and RHEL 9.x
     * Metal is supported on macOS

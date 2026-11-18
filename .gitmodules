@@ -4,3 +4,15 @@
 [submodule "deps/glfw"]
 	path = deps/glfw
 	url = https://github.com/glfw/glfw.git
+[submodule "deps/zlib"]
+	path = deps/zlib
+	url = https://github.com/madler/zlib.git
+[submodule "deps/Imath"]
+	path = deps/Imath
+	url = https://github.com/AcademySoftwareFoundation/Imath.git
+[submodule "deps/openexr"]
+	path = deps/openexr
+	url = https://github.com/AcademySoftwareFoundation/openexr.git
+[submodule "deps/libdeflate"]
+	path = deps/libdeflate
+	url = https://github.com/ebiggers/libdeflate.git
