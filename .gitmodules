@@ -16,3 +16,6 @@
 [submodule "deps/libdeflate"]
 	path = deps/libdeflate
 	url = https://github.com/ebiggers/libdeflate.git
+[submodule "deps/embree"]
+	path = deps/embree
+	url = https://github.com/RenderKit/embree.git
