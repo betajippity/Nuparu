@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.20)
+file(STRINGS "${OPENEXR_CACHE}" imath_entry REGEX "^Imath_DIR:[^=]*=")
+string(REGEX REPLACE "^Imath_DIR:[^=]*=" "" found_imath_dir "${imath_entry}")
+if(NOT found_imath_dir STREQUAL EXPECTED_IMATH_DIR)
+    message(FATAL_ERROR "OpenEXR selected Imath at '${found_imath_dir}'; expected '${EXPECTED_IMATH_DIR}'")
+endif()
