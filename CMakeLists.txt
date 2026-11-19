@@ -3,8 +3,8 @@ project(NuparuDependencies LANGUAGES C CXX)
 
 include(ExternalProject)
 
-if(NOT APPLE)
-    message(FATAL_ERROR "The dependency pilot currently supports macOS only")
+if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "The dependency pilot currently supports macOS and Linux only")
 endif()
 if(CMAKE_CONFIGURATION_TYPES)
     message(FATAL_ERROR "The jsoncpp pilot requires a single-configuration generator such as Ninja")
@@ -15,7 +15,9 @@ endif()
 if(NOT CMAKE_BUILD_TYPE)
     message(FATAL_ERROR "Set CMAKE_BUILD_TYPE explicitly for the Nuparu pilot")
 endif()
-string(REPLACE ";" "|" NUPARU_OSX_ARCHITECTURES "${CMAKE_OSX_ARCHITECTURES}")
+if(APPLE)
+    string(REPLACE ";" "|" NUPARU_OSX_ARCHITECTURES "${CMAKE_OSX_ARCHITECTURES}")
+endif()
 
 set(NUPARU_JSONCPP_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/deps/jsoncpp")
 set(NUPARU_GLFW_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/deps/glfw")
@@ -39,10 +41,17 @@ endforeach()
 set(NUPARU_COMMON_ARGS
     -DCMAKE_INSTALL_LIBDIR:STRING=lib
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
-    -DCMAKE_OSX_ARCHITECTURES:STRING=${NUPARU_OSX_ARCHITECTURES}
-    -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}
-    -DCMAKE_OSX_SYSROOT:STRING=${CMAKE_OSX_SYSROOT}
     -DBUILD_SHARED_LIBS:BOOL=OFF)
+if(APPLE)
+    list(APPEND NUPARU_COMMON_ARGS
+        -DCMAKE_OSX_ARCHITECTURES:STRING=${NUPARU_OSX_ARCHITECTURES}
+        -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}
+        -DCMAKE_OSX_SYSROOT:STRING=${CMAKE_OSX_SYSROOT})
+endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Takua's current Linux viewer and link settings use X11.
+    set(NUPARU_GLFW_PLATFORM_ARGS -DGLFW_BUILD_X11:BOOL=ON -DGLFW_BUILD_WAYLAND:BOOL=OFF)
+endif()
 
 ExternalProject_Add(nuparu-jsoncpp
     SOURCE_DIR "${NUPARU_JSONCPP_SOURCE}"
@@ -80,6 +89,7 @@ ExternalProject_Add(nuparu-glfw
         -DGLFW_BUILD_TESTS:BOOL=OFF
         -DGLFW_BUILD_DOCS:BOOL=OFF
         -DGLFW_INSTALL:BOOL=ON
+        ${NUPARU_GLFW_PLATFORM_ARGS}
     LIST_SEPARATOR |
 )
 ExternalProject_Add_Step(nuparu-glfw install-license
