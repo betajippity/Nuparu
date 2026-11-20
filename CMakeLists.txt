@@ -4,7 +4,10 @@ project(NuparuDependencies LANGUAGES C CXX)
 include(ExternalProject)
 option(NUPARU_BUILD_EMBREE "Build the experimental native Embree package" OFF)
 set(NUPARU_TBB_ROOT "" CACHE PATH "Legacy Nuparu platform prefix supplying TBB")
-set(NUPARU_ISPC_EXECUTABLE "" CACHE FILEPATH "ISPC compiler for the Embree pilot")
+set(NUPARU_ISPC_EXECUTABLE "" CACHE FILEPATH "Optional override for the ISPC compiler")
+set(NUPARU_ISPC_ARCHIVE "" CACHE FILEPATH "Optional local ISPC 1.32.0 release archive")
+set(NUPARU_ISPC_CACHE_DIR "${CMAKE_BINARY_DIR}/ispc-cache" CACHE PATH "Cache for downloaded ISPC tools")
+option(NUPARU_ISPC_AUTO_DOWNLOAD "Download the pinned ISPC tool when Embree is enabled" ON)
 
 if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(FATAL_ERROR "The dependency pilot currently supports macOS and Linux only")
@@ -189,17 +192,26 @@ if(NUPARU_BUILD_EMBREE)
     if(NOT NUPARU_TBB_ROOT OR NOT EXISTS "${NUPARU_TBB_ROOT}/include/oneapi/tbb/version.h")
         message(FATAL_ERROR "Set NUPARU_TBB_ROOT to the legacy Nuparu platform prefix containing TBB")
     endif()
-    if(NOT NUPARU_ISPC_EXECUTABLE OR NOT EXISTS "${NUPARU_ISPC_EXECUTABLE}")
-        message(FATAL_ERROR "Set NUPARU_ISPC_EXECUTABLE to a compatible ISPC compiler")
+    if(NUPARU_ISPC_EXECUTABLE)
+        set(nuparu_ispc_executable "${NUPARU_ISPC_EXECUTABLE}")
+    else()
+        include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/ISPC.cmake")
+        nuparu_resolve_ispc(nuparu_ispc_executable)
     endif()
-    execute_process(COMMAND "${NUPARU_ISPC_EXECUTABLE}" --version
+    if(NOT EXISTS "${nuparu_ispc_executable}")
+        message(FATAL_ERROR "ISPC executable does not exist: ${nuparu_ispc_executable}")
+    endif()
+    execute_process(COMMAND "${nuparu_ispc_executable}" --version
         RESULT_VARIABLE ispc_result OUTPUT_VARIABLE ispc_version_output ERROR_VARIABLE ispc_error)
     if(NOT ispc_result EQUAL 0)
-        message(FATAL_ERROR "Cannot run ISPC ${NUPARU_ISPC_EXECUTABLE}: ${ispc_error}")
+        message(FATAL_ERROR "Cannot run ISPC ${nuparu_ispc_executable}: ${ispc_error}")
     endif()
     string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" ispc_version "${ispc_version_output}")
     if(NOT ispc_version)
         message(FATAL_ERROR "Could not determine ISPC version from: ${ispc_version_output}")
+    endif()
+    if(NOT NUPARU_ISPC_EXECUTABLE AND NOT ispc_version VERSION_EQUAL "1.32.0")
+        message(FATAL_ERROR "Expected downloaded ISPC 1.32.0, found ${ispc_version}")
     endif()
     foreach(part MAJOR MINOR PATCH)
         file(STRINGS "${NUPARU_TBB_ROOT}/include/oneapi/tbb/version.h" tbb_version_line
@@ -224,7 +236,7 @@ if(NUPARU_BUILD_EMBREE)
             ${NUPARU_COMMON_ARGS}
             -DEMBREE_STATIC_LIB:BOOL=ON -DEMBREE_TUTORIALS:BOOL=OFF
             -DEMBREE_SYCL_SUPPORT:BOOL=OFF -DEMBREE_ISPC_SUPPORT:BOOL=ON
-            -DEMBREE_ISPC_EXECUTABLE:FILEPATH=${NUPARU_ISPC_EXECUTABLE}
+            -DEMBREE_ISPC_EXECUTABLE:FILEPATH=${nuparu_ispc_executable}
             -DEMBREE_MAX_INSTANCE_LEVEL_COUNT:STRING=16 -DEMBREE_MAX_ISA:STRING=NONE
             ${embree_isa_args}
             -DEMBREE_TASKING_SYSTEM:STRING=TBB -DEMBREE_INSTALL_DEPENDENCIES:BOOL=OFF
@@ -253,6 +265,10 @@ add_custom_target(nuparu-package ALL
 )
 
 enable_testing()
+add_test(NAME ispc-release-selection
+    COMMAND ${CMAKE_COMMAND} "-DISPC_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/ISPC.cmake"
+        "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-ispc"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/ispc.cmake")
 add_test(NAME embree-isa-selection
     COMMAND ${CMAKE_COMMAND} "-DISA_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbreeISA.cmake"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/embree-isa.cmake")
