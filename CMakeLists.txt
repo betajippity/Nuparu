@@ -8,9 +8,10 @@ set(NUPARU_ISPC_EXECUTABLE "" CACHE FILEPATH "Optional override for the ISPC com
 set(NUPARU_ISPC_ARCHIVE "" CACHE FILEPATH "Optional local ISPC 1.32.0 release archive")
 set(NUPARU_ISPC_CACHE_DIR "${CMAKE_BINARY_DIR}/ispc-cache" CACHE PATH "Cache for downloaded ISPC tools")
 option(NUPARU_ISPC_AUTO_DOWNLOAD "Download the pinned ISPC tool when Embree is enabled" ON)
+set(NUPARU_EMBREE_CLANG_CL "" CACHE FILEPATH "Windows ARM64 clang-cl executable for Embree")
 
-if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    message(FATAL_ERROR "The dependency pilot currently supports macOS and Linux only")
+if(NOT APPLE AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT WIN32)
+    message(FATAL_ERROR "The dependency pilot supports macOS, Linux and Windows")
 endif()
 if(CMAKE_CONFIGURATION_TYPES)
     message(FATAL_ERROR "The jsoncpp pilot requires a single-configuration generator such as Ninja")
@@ -20,6 +21,21 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 if(NOT CMAKE_BUILD_TYPE)
     message(FATAL_ERROR "Set CMAKE_BUILD_TYPE explicitly for the Nuparu pilot")
+endif()
+if(WIN32)
+    if(NOT MSVC OR NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+        message(FATAL_ERROR "The Windows Nuparu package requires the MSVC compiler; clang-cl is used separately for ARM64 Embree")
+    endif()
+    if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
+        message(FATAL_ERROR "The Windows Nuparu pilot currently supports Release builds only")
+    endif()
+    if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
+        message(FATAL_ERROR "The Windows Nuparu pilot supports x86-64 and ARM64 only")
+    endif()
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64)$" AND
+       CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "^(x64|X64|AMD64|x86_64)$")
+        message(FATAL_ERROR "Use an ARM64 native tools prompt for a Windows ARM64 package")
+    endif()
 endif()
 if(APPLE)
     string(REPLACE ";" "|" NUPARU_OSX_ARCHITECTURES "${CMAKE_OSX_ARCHITECTURES}")
@@ -51,6 +67,20 @@ set(NUPARU_COMMON_ARGS
     -DCMAKE_INSTALL_LIBDIR:STRING=lib
     -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
     -DBUILD_SHARED_LIBS:BOOL=OFF)
+if(WIN32)
+    # Several upstream projects set their minimum CMake version below 3.15.
+    # Make the runtime-library setting effective before their project() calls.
+    list(APPEND NUPARU_COMMON_ARGS -DCMAKE_POLICY_DEFAULT_CMP0091:STRING=NEW
+        -DCMAKE_MSVC_RUNTIME_LIBRARY:STRING=MultiThreaded)
+    set(nuparu_jsoncpp_windows_args -DJSONCPP_STATIC_WINDOWS_RUNTIME:BOOL=ON)
+    set(nuparu_glfw_windows_args -DUSE_MSVC_RUNTIME_LIBRARY_DLL:BOOL=OFF)
+    set(nuparu_embree_windows_args -DEMBREE_STATIC_RUNTIME:BOOL=ON)
+    set(nuparu_zlib_build_name zlibstatic.lib)
+    set(nuparu_zlib_package_name z.lib)
+else()
+    set(nuparu_zlib_build_name libz.a)
+    set(nuparu_zlib_package_name libz.a)
+endif()
 if(APPLE)
     list(APPEND NUPARU_COMMON_ARGS
         -DCMAKE_OSX_ARCHITECTURES:STRING=${NUPARU_OSX_ARCHITECTURES}
@@ -75,6 +105,7 @@ ExternalProject_Add(nuparu-jsoncpp
         -DJSONCPP_WITH_TESTS:BOOL=OFF
         -DJSONCPP_WITH_PKGCONFIG_SUPPORT:BOOL=OFF
         -DJSONCPP_WITH_CMAKE_PACKAGE:BOOL=ON
+        ${nuparu_jsoncpp_windows_args}
         -DBUILD_STATIC_LIBS:BOOL=ON
         -DBUILD_OBJECT_LIBS:BOOL=OFF
     LIST_SEPARATOR |
@@ -98,6 +129,7 @@ ExternalProject_Add(nuparu-glfw
         -DGLFW_BUILD_TESTS:BOOL=OFF
         -DGLFW_BUILD_DOCS:BOOL=OFF
         -DGLFW_INSTALL:BOOL=ON
+        ${nuparu_glfw_windows_args}
         ${NUPARU_GLFW_PLATFORM_ARGS}
     LIST_SEPARATOR |
 )
@@ -118,7 +150,7 @@ ExternalProject_Add(nuparu-zlib
     BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target zlibstatic
     INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/zlib/include ${NUPARU_STAGE_DIR}/zlib/lib ${NUPARU_STAGE_DIR}/zlib/share/licenses/zlib
     COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/zlib.h <BINARY_DIR>/zconf.h ${NUPARU_STAGE_DIR}/zlib/include
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/libz.a ${NUPARU_STAGE_DIR}/zlib/lib/libz.a
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different <BINARY_DIR>/${nuparu_zlib_build_name} ${NUPARU_STAGE_DIR}/zlib/lib/${nuparu_zlib_package_name}
     COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/zlib/share/licenses/zlib/LICENSE
     LIST_SEPARATOR |
 )
@@ -184,11 +216,16 @@ if(NUPARU_BUILD_EMBREE)
             message(FATAL_ERROR "The Embree pilot requires one macOS architecture per build; universal assembly is not implemented")
         endif()
         set(embree_arch "${CMAKE_OSX_ARCHITECTURES}")
+    elseif(WIN32 AND CMAKE_CXX_COMPILER_ARCHITECTURE_ID MATCHES "^(ARM64|arm64)$")
+        set(embree_arch ARM64)
+        if(NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "ARM64")
+            message(FATAL_ERROR "Windows ARM64 Embree requires an ARM64 native developer environment (CMAKE_SYSTEM_PROCESSOR must be ARM64)")
+        endif()
     else()
         set(embree_arch "${CMAKE_SYSTEM_PROCESSOR}")
     endif()
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbreeISA.cmake")
-    nuparu_embree_isa("${embree_arch}" "${APPLE}" embree_isa_args)
+    nuparu_embree_isa("${embree_arch}" "${APPLE}" "${WIN32}" embree_isa_args)
     if(NOT NUPARU_TBB_ROOT OR NOT EXISTS "${NUPARU_TBB_ROOT}/include/oneapi/tbb/version.h")
         message(FATAL_ERROR "Set NUPARU_TBB_ROOT to the legacy Nuparu platform prefix containing TBB")
     endif()
@@ -226,15 +263,42 @@ if(NUPARU_BUILD_EMBREE)
         file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/deps/embree/"
             DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/sources/embree" PATTERN ".git" EXCLUDE)
     endif()
+    set(embree_compiler_args
+        -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+        -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER})
+    if(WIN32 AND embree_arch STREQUAL "ARM64")
+        if(NUPARU_EMBREE_CLANG_CL)
+            set(embree_clang_cl "${NUPARU_EMBREE_CLANG_CL}")
+        else()
+            find_program(embree_clang_cl NAMES clang-cl REQUIRED)
+        endif()
+        set(embree_compiler_args
+            -DCMAKE_C_COMPILER:FILEPATH=${embree_clang_cl}
+            -DCMAKE_CXX_COMPILER:FILEPATH=${embree_clang_cl}
+            -DCMAKE_C_FLAGS_INIT:STRING=--target=arm64-pc-windows-msvc
+            -DCMAKE_CXX_FLAGS_INIT:STRING=--target=arm64-pc-windows-msvc)
+        # Embree detects ARM64 but its ISPC helper only matches lowercase names.
+        # Patch the build-local source copy, leaving the submodule untouched.
+        set(ispc_cmake "${CMAKE_CURRENT_BINARY_DIR}/sources/embree/common/cmake/ispc.cmake")
+        file(READ "${ispc_cmake}" ispc_cmake_contents)
+        string(REPLACE "MATCHES \"arm64|aarch64\"" "MATCHES \"arm64|aarch64|ARM64\"" patched_ispc_cmake "${ispc_cmake_contents}")
+        if(NOT patched_ispc_cmake MATCHES "arm64\\|aarch64\\|ARM64")
+            message(FATAL_ERROR "Cannot patch Embree's ISPC architecture detection; check the Embree revision")
+        endif()
+        if(NOT patched_ispc_cmake STREQUAL ispc_cmake_contents)
+            file(WRITE "${ispc_cmake}" "${patched_ispc_cmake}")
+        endif()
+        include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/PatchEmbreeWinArm64.cmake")
+        nuparu_patch_embree_win_arm64("${CMAKE_CURRENT_BINARY_DIR}/sources/embree/common/simd/arm/sse2neon.h")
+    endif()
     ExternalProject_Add(nuparu-embree
         SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/sources/embree"
         DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/embree
-            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
-            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+            ${embree_compiler_args}
             ${NUPARU_COMMON_ARGS}
-            -DEMBREE_STATIC_LIB:BOOL=ON -DEMBREE_TUTORIALS:BOOL=OFF
+            -DEMBREE_STATIC_LIB:BOOL=ON -DEMBREE_TUTORIALS:BOOL=OFF ${nuparu_embree_windows_args}
             -DEMBREE_SYCL_SUPPORT:BOOL=OFF -DEMBREE_ISPC_SUPPORT:BOOL=ON
             -DEMBREE_ISPC_EXECUTABLE:FILEPATH=${nuparu_ispc_executable}
             -DEMBREE_MAX_INSTANCE_LEVEL_COUNT:STRING=16 -DEMBREE_MAX_ISA:STRING=NONE
@@ -272,6 +336,22 @@ add_test(NAME ispc-release-selection
 add_test(NAME embree-isa-selection
     COMMAND ${CMAKE_COMMAND} "-DISA_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbreeISA.cmake"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/embree-isa.cmake")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/embree/common/simd/arm/sse2neon.h")
+    add_test(NAME embree-win-arm64-patch
+        COMMAND ${CMAKE_COMMAND}
+            "-DPATCH_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/PatchEmbreeWinArm64.cmake"
+            "-DEMBREE_HEADER=${CMAKE_CURRENT_SOURCE_DIR}/deps/embree/common/simd/arm/sse2neon.h"
+            "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-embree-win-arm64-patch"
+            "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/embree-win-arm64-patch.cmake")
+endif()
+add_test(NAME tbb-windows-adapter
+    COMMAND ${CMAKE_COMMAND}
+        "-DTBB_CONFIG=${CMAKE_CURRENT_SOURCE_DIR}/cmake/NuparuTBB/TBBConfig.cmake"
+        "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-tbb-windows"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/tbb-windows.cmake")
 add_test(NAME package-assembly
     COMMAND ${CMAKE_COMMAND}
         "-DASSEMBLER=${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
@@ -283,6 +363,7 @@ add_test(NAME package-consumer
         "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-package-consumer"
         "-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/package-consumer"
         "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+        "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/package-consumer.cmake")
 if(NUPARU_BUILD_EMBREE)
     add_test(NAME embree-consumer
@@ -291,6 +372,7 @@ if(NUPARU_BUILD_EMBREE)
             "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-embree-consumer"
             "-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/embree-consumer"
             "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
             "-DNUPARU_TBB_ROOT=${NUPARU_TBB_ROOT}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/embree-consumer.cmake")
 endif()
