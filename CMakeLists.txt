@@ -3,6 +3,7 @@ project(NuparuDependencies LANGUAGES C CXX)
 
 include(ExternalProject)
 option(NUPARU_BUILD_EMBREE "Build the experimental native Embree package" OFF)
+option(NUPARU_BUILD_TBB "Build and package shared oneTBB" OFF)
 set(NUPARU_TBB_ROOT "" CACHE PATH "Legacy Nuparu platform prefix supplying TBB")
 set(NUPARU_ISPC_EXECUTABLE "" CACHE FILEPATH "Optional override for the ISPC compiler")
 set(NUPARU_ISPC_ARCHIVE "" CACHE FILEPATH "Optional local ISPC 1.32.0 release archive")
@@ -51,6 +52,9 @@ endforeach()
 if(NUPARU_BUILD_EMBREE AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/embree/CMakeLists.txt")
     message(FATAL_ERROR "Embree submodule is missing. Run: git submodule update --init --recursive")
 endif()
+if(NUPARU_BUILD_TBB AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/onetbb/CMakeLists.txt")
+    message(FATAL_ERROR "oneTBB submodule is missing. Run: git submodule update --init --recursive")
+endif()
 
 set(NUPARU_STAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/stage")
 # OpenEXR adjusts libdeflate's symbol visibility in its source tree. Use a
@@ -90,6 +94,26 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Takua's current Linux viewer and link settings use X11.
     set(NUPARU_GLFW_PLATFORM_ARGS -DGLFW_BUILD_X11:BOOL=ON -DGLFW_BUILD_WAYLAND:BOOL=OFF)
+endif()
+
+if(NUPARU_BUILD_TBB)
+    ExternalProject_Add(nuparu-tbb
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/onetbb"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/tbb
+            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+            ${NUPARU_COMMON_ARGS} -DBUILD_SHARED_LIBS:BOOL=ON
+            -DTBB_TEST:BOOL=OFF -DTBB_EXAMPLES:BOOL=OFF -DTBB_STRICT:BOOL=OFF
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-tbb install-license
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/tbb/share/licenses/onetbb
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE.txt ${NUPARU_STAGE_DIR}/tbb/share/licenses/onetbb/LICENSE.txt
+        DEPENDEES install
+    )
+    set(nuparu_tbb_dependency nuparu-tbb)
 endif()
 
 ExternalProject_Add(nuparu-jsoncpp
@@ -226,8 +250,16 @@ if(NUPARU_BUILD_EMBREE)
     endif()
     include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/EmbreeISA.cmake")
     nuparu_embree_isa("${embree_arch}" "${APPLE}" "${WIN32}" embree_isa_args)
-    if(NOT NUPARU_TBB_ROOT OR NOT EXISTS "${NUPARU_TBB_ROOT}/include/oneapi/tbb/version.h")
+    if(NUPARU_BUILD_TBB)
+        set(embree_tbb_version_header "${CMAKE_CURRENT_SOURCE_DIR}/deps/onetbb/include/oneapi/tbb/version.h")
+        set(embree_tbb_dir "${NUPARU_STAGE_DIR}/tbb/lib/cmake/TBB")
+        set(embree_tbb_kind package)
+    elseif(NOT NUPARU_TBB_ROOT OR NOT EXISTS "${NUPARU_TBB_ROOT}/include/oneapi/tbb/version.h")
         message(FATAL_ERROR "Set NUPARU_TBB_ROOT to the legacy Nuparu platform prefix containing TBB")
+    else()
+        set(embree_tbb_version_header "${NUPARU_TBB_ROOT}/include/oneapi/tbb/version.h")
+        set(embree_tbb_dir "${CMAKE_CURRENT_SOURCE_DIR}/cmake/NuparuTBB")
+        set(embree_tbb_kind legacy)
     endif()
     if(NUPARU_ISPC_EXECUTABLE)
         set(nuparu_ispc_executable "${NUPARU_ISPC_EXECUTABLE}")
@@ -251,17 +283,30 @@ if(NUPARU_BUILD_EMBREE)
         message(FATAL_ERROR "Expected downloaded ISPC 1.32.0, found ${ispc_version}")
     endif()
     foreach(part MAJOR MINOR PATCH)
-        file(STRINGS "${NUPARU_TBB_ROOT}/include/oneapi/tbb/version.h" tbb_version_line
+        file(STRINGS "${embree_tbb_version_header}" tbb_version_line
             REGEX "^#define TBB_VERSION_${part} +[0-9]+")
         string(REGEX REPLACE ".* +([0-9]+).*" "\\1" tbb_version_${part} "${tbb_version_line}")
     endforeach()
     set(embree_tbb_version "${tbb_version_MAJOR}.${tbb_version_MINOR}.${tbb_version_PATCH}")
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/NuparuTBBExpected.cmake"
-        "set(NUPARU_EMBREE_TBB_VERSION \"${embree_tbb_version}\")\nset(NUPARU_EMBREE_ISPC_VERSION \"${ispc_version}\")\n")
-    message(STATUS "Embree pilot: ${embree_arch}, ISPC ${ispc_version}, legacy TBB ${embree_tbb_version}")
+        "set(NUPARU_EMBREE_TBB_VERSION \"${embree_tbb_version}\")\nset(NUPARU_EMBREE_ISPC_VERSION \"${ispc_version}\")\nset(NUPARU_EMBREE_TBB_KIND \"${embree_tbb_kind}\")\n")
+    message(STATUS "Embree pilot: ${embree_arch}, ISPC ${ispc_version}, ${embree_tbb_kind} TBB ${embree_tbb_version}")
     if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/sources/embree/CMakeLists.txt")
         file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/deps/embree/"
             DESTINATION "${CMAKE_CURRENT_BINARY_DIR}/sources/embree" PATTERN ".git" EXCLUDE)
+    endif()
+    if(NUPARU_BUILD_TBB)
+        # Upstream's dependency lookup otherwise requires tbbmalloc_proxy,
+        # which oneTBB does not build on Windows ARM64.
+        set(embree_config_template "${CMAKE_CURRENT_BINARY_DIR}/sources/embree/common/cmake/embree-config.cmake")
+        file(READ "${embree_config_template}" embree_config_contents)
+        string(REPLACE "FIND_DEPENDENCY(TBB)" "FIND_DEPENDENCY(TBB COMPONENTS tbb)" patched_embree_config "${embree_config_contents}")
+        if(NOT patched_embree_config MATCHES "FIND_DEPENDENCY\\(TBB COMPONENTS tbb\\)")
+            message(FATAL_ERROR "Cannot patch Embree's TBB dependency; check the Embree revision")
+        endif()
+        if(NOT patched_embree_config STREQUAL embree_config_contents)
+            file(WRITE "${embree_config_template}" "${patched_embree_config}")
+        endif()
     endif()
     set(embree_compiler_args
         -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
@@ -294,6 +339,7 @@ if(NUPARU_BUILD_EMBREE)
     ExternalProject_Add(nuparu-embree
         SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/sources/embree"
         DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        DEPENDS ${nuparu_tbb_dependency}
         CMAKE_ARGS
             -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/embree
             ${embree_compiler_args}
@@ -305,7 +351,7 @@ if(NUPARU_BUILD_EMBREE)
             ${embree_isa_args}
             -DEMBREE_TASKING_SYSTEM:STRING=TBB -DEMBREE_INSTALL_DEPENDENCIES:BOOL=OFF
             -DNUPARU_TBB_ROOT:PATH=${NUPARU_TBB_ROOT}
-            -DTBB_DIR:PATH=${CMAKE_CURRENT_SOURCE_DIR}/cmake/NuparuTBB
+            -DTBB_DIR:PATH=${embree_tbb_dir}
         LIST_SEPARATOR |
     )
     ExternalProject_Add_Step(nuparu-embree install-adapter
@@ -323,12 +369,23 @@ add_custom_target(nuparu-package ALL
         "-DNUPARU_STAGE_DIR=${NUPARU_STAGE_DIR}"
         "-DNUPARU_PACKAGE_DIR=${CMAKE_INSTALL_PREFIX}"
         "-DNUPARU_INCLUDE_EMBREE=${NUPARU_BUILD_EMBREE}"
+        "-DNUPARU_INCLUDE_TBB=${NUPARU_BUILD_TBB}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
-    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_embree_dependency}
+    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency}
     VERBATIM
 )
 
 enable_testing()
+if(NUPARU_BUILD_TBB)
+    add_test(NAME tbb-consumer
+        COMMAND ${CMAKE_COMMAND}
+            "-DPACKAGE_DIR=${CMAKE_INSTALL_PREFIX}"
+            "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-tbb-consumer"
+            "-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/tbb-consumer"
+            "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/tbb-consumer.cmake")
+endif()
 add_test(NAME ispc-release-selection
     COMMAND ${CMAKE_COMMAND} "-DISPC_SCRIPT=${CMAKE_CURRENT_SOURCE_DIR}/cmake/ISPC.cmake"
         "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-ispc"
@@ -374,5 +431,6 @@ if(NUPARU_BUILD_EMBREE)
             "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
             "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
             "-DNUPARU_TBB_ROOT=${NUPARU_TBB_ROOT}"
+            "-DNUPARU_BUILD_TBB=${NUPARU_BUILD_TBB}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/embree-consumer.cmake")
 endif()

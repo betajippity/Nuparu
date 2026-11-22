@@ -19,3 +19,6 @@
 [submodule "deps/embree"]
 	path = deps/embree
 	url = https://github.com/RenderKit/embree.git
+[submodule "deps/onetbb"]
+	path = deps/onetbb
+	url = https://github.com/uxlfoundation/oneTBB.git
