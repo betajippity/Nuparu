@@ -22,3 +22,6 @@
 [submodule "deps/onetbb"]
 	path = deps/onetbb
 	url = https://github.com/uxlfoundation/oneTBB.git
+[submodule "deps/boost"]
+	path = deps/boost
+	url = https://github.com/boostorg/boost.git

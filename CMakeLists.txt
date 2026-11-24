@@ -4,6 +4,8 @@ project(NuparuDependencies LANGUAGES C CXX)
 include(ExternalProject)
 option(NUPARU_BUILD_EMBREE "Build the experimental native Embree package" OFF)
 option(NUPARU_BUILD_TBB "Build and package shared oneTBB" OFF)
+option(NUPARU_BUILD_BOOST "Build the Boost subset used by Takua and legacy OpenVDB" OFF)
+set(NUPARU_BOOST_LEGACY_OPENVDB_ROOT "" CACHE PATH "Optional legacy Nuparu prefix for testing OpenVDB with packaged Boost")
 set(NUPARU_TBB_ROOT "" CACHE PATH "Legacy Nuparu platform prefix supplying TBB")
 set(NUPARU_ISPC_EXECUTABLE "" CACHE FILEPATH "Optional override for the ISPC compiler")
 set(NUPARU_ISPC_ARCHIVE "" CACHE FILEPATH "Optional local ISPC 1.32.0 release archive")
@@ -54,6 +56,13 @@ if(NUPARU_BUILD_EMBREE AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/embree/C
 endif()
 if(NUPARU_BUILD_TBB AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/onetbb/CMakeLists.txt")
     message(FATAL_ERROR "oneTBB submodule is missing. Run: git submodule update --init --recursive")
+endif()
+if(NUPARU_BUILD_BOOST)
+    foreach(boost_file CMakeLists.txt tools/cmake/include/BoostRoot.cmake libs/headers/CMakeLists.txt libs/filesystem/CMakeLists.txt libs/random/CMakeLists.txt libs/iostreams/CMakeLists.txt)
+        if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/boost/${boost_file}")
+            message(FATAL_ERROR "Boost sources are incomplete (${boost_file}). Run: git submodule update --init --recursive")
+        endif()
+    endforeach()
 endif()
 
 set(NUPARU_STAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/stage")
@@ -114,6 +123,31 @@ if(NUPARU_BUILD_TBB)
         DEPENDEES install
     )
     set(nuparu_tbb_dependency nuparu-tbb)
+endif()
+
+if(NUPARU_BUILD_BOOST)
+    ExternalProject_Add(nuparu-boost
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/boost"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/boost
+            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+            ${NUPARU_COMMON_ARGS}
+            -DBOOST_INCLUDE_LIBRARIES:STRING=filesystem|random|iostreams
+            -DBOOST_ENABLE_PYTHON:BOOL=OFF -DBOOST_ENABLE_MPI:BOOL=OFF
+            -DBOOST_RANDOM_ENABLE_RANDOM_DEVICE:BOOL=OFF
+            -DBOOST_IOSTREAMS_ENABLE_ZLIB:BOOL=OFF -DBOOST_IOSTREAMS_ENABLE_BZIP2:BOOL=OFF
+            -DBOOST_IOSTREAMS_ENABLE_LZMA:BOOL=OFF -DBOOST_IOSTREAMS_ENABLE_ZSTD:BOOL=OFF
+            -DCMAKE_DISABLE_FIND_PACKAGE_ICU:BOOL=ON
+            -DBOOST_INSTALL_LAYOUT:STRING=system -DBUILD_TESTING:BOOL=OFF
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-boost install-license
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/boost/share/licenses/boost
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE_1_0.txt ${NUPARU_STAGE_DIR}/boost/share/licenses/boost/LICENSE_1_0.txt
+        DEPENDEES install
+    )
+    set(nuparu_boost_dependency nuparu-boost)
 endif()
 
 ExternalProject_Add(nuparu-jsoncpp
@@ -370,12 +404,39 @@ add_custom_target(nuparu-package ALL
         "-DNUPARU_PACKAGE_DIR=${CMAKE_INSTALL_PREFIX}"
         "-DNUPARU_INCLUDE_EMBREE=${NUPARU_BUILD_EMBREE}"
         "-DNUPARU_INCLUDE_TBB=${NUPARU_BUILD_TBB}"
+        "-DNUPARU_INCLUDE_BOOST=${NUPARU_BUILD_BOOST}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
-    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency}
+    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency}
     VERBATIM
 )
 
 enable_testing()
+if(NUPARU_BUILD_BOOST)
+    add_test(NAME boost-consumer
+        COMMAND ${CMAKE_COMMAND}
+            "-DPACKAGE_DIR=${CMAKE_INSTALL_PREFIX}"
+            "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-boost-consumer"
+            "-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/boost-consumer"
+            "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/boost-consumer.cmake")
+    if(NUPARU_BOOST_LEGACY_OPENVDB_ROOT)
+        if(NOT NUPARU_BUILD_TBB)
+            message(FATAL_ERROR "Legacy OpenVDB / Boost test requires NUPARU_BUILD_TBB=ON")
+        endif()
+        add_test(NAME legacy-openvdb-boost
+            COMMAND ${CMAKE_COMMAND}
+                "-DPACKAGE_DIR=${CMAKE_INSTALL_PREFIX}"
+                "-DLEGACY_ROOT=${NUPARU_BOOST_LEGACY_OPENVDB_ROOT}"
+                "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-legacy-openvdb-boost"
+                "-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/legacy-openvdb-boost"
+                "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+                "-DTEST_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+                "-DTEST_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}"
+                "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/legacy-openvdb-boost.cmake")
+    endif()
+endif()
 if(NUPARU_BUILD_TBB)
     add_test(NAME tbb-consumer
         COMMAND ${CMAKE_COMMAND}
