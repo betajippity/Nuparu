@@ -25,3 +25,9 @@
 [submodule "deps/boost"]
 	path = deps/boost
 	url = https://github.com/boostorg/boost.git
+[submodule "deps/opensubdiv"]
+	path = deps/opensubdiv
+	url = https://github.com/PixarAnimationStudios/OpenSubdiv.git
+[submodule "deps/ptex"]
+	path = deps/ptex
+	url = https://github.com/wdas/ptex.git

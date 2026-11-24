@@ -5,6 +5,18 @@ include(ExternalProject)
 option(NUPARU_BUILD_EMBREE "Build the experimental native Embree package" OFF)
 option(NUPARU_BUILD_TBB "Build and package shared oneTBB" OFF)
 option(NUPARU_BUILD_BOOST "Build the Boost subset used by Takua and legacy OpenVDB" OFF)
+option(NUPARU_BUILD_PTEX "Build the Ptex pilot" OFF)
+option(NUPARU_BUILD_OPENSUBDIV "Build the OpenSubdiv pilot" OFF)
+option(NUPARU_OPENSUBDIV_GPU "Enable the selected OpenSubdiv GPU backends" ON)
+set(_nuparu_osd_cuda_default OFF)
+if((WIN32 OR CMAKE_SYSTEM_NAME STREQUAL "Linux") AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND
+   CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|amd64|x86_64)$")
+    set(_nuparu_osd_cuda_default ON)
+endif()
+option(NUPARU_OPENSUBDIV_CUDA "Build the OpenSubdiv CUDA backend" ${_nuparu_osd_cuda_default})
+option(NUPARU_OPENSUBDIV_OPENGL "Build the OpenSubdiv OpenGL backend" ON)
+option(NUPARU_OPENSUBDIV_METAL "Build the OpenSubdiv Metal backend on macOS" ${APPLE})
+set(NUPARU_OPENSUBDIV_CUDA_ARCHITECTURES "52" CACHE STRING "CUDA architectures for OpenSubdiv")
 set(NUPARU_BOOST_LEGACY_OPENVDB_ROOT "" CACHE PATH "Optional legacy Nuparu prefix for testing OpenVDB with packaged Boost")
 set(NUPARU_TBB_ROOT "" CACHE PATH "Legacy Nuparu platform prefix supplying TBB")
 set(NUPARU_ISPC_EXECUTABLE "" CACHE FILEPATH "Optional override for the ISPC compiler")
@@ -57,6 +69,17 @@ endif()
 if(NUPARU_BUILD_TBB AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/onetbb/CMakeLists.txt")
     message(FATAL_ERROR "oneTBB submodule is missing. Run: git submodule update --init --recursive")
 endif()
+if(NUPARU_BUILD_PTEX AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/ptex/CMakeLists.txt")
+    message(FATAL_ERROR "Ptex submodule is missing. Run: git submodule update --init --recursive")
+endif()
+if(NUPARU_BUILD_OPENSUBDIV)
+    if(NOT NUPARU_BUILD_PTEX OR NOT NUPARU_BUILD_TBB)
+        message(FATAL_ERROR "OpenSubdiv requires NUPARU_BUILD_PTEX=ON and NUPARU_BUILD_TBB=ON")
+    endif()
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/opensubdiv/CMakeLists.txt")
+        message(FATAL_ERROR "OpenSubdiv submodule is missing. Run: git submodule update --init --recursive")
+    endif()
+endif()
 if(NUPARU_BUILD_BOOST)
     foreach(boost_file CMakeLists.txt tools/cmake/include/BoostRoot.cmake libs/headers/CMakeLists.txt libs/filesystem/CMakeLists.txt libs/random/CMakeLists.txt libs/iostreams/CMakeLists.txt)
         if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/boost/${boost_file}")
@@ -68,7 +91,11 @@ endif()
 set(NUPARU_STAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/stage")
 # OpenEXR adjusts libdeflate's symbol visibility in its source tree. Use a
 # build-local copy so configuring it cannot modify the pinned submodule.
-foreach(dependency libdeflate zlib)
+set(nuparu_copied_sources libdeflate zlib)
+if(NUPARU_BUILD_PTEX)
+    list(APPEND nuparu_copied_sources ptex)
+endif()
+foreach(dependency IN LISTS nuparu_copied_sources)
     # A fresh build directory is required when changing either source revision.
     if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/sources/${dependency}/CMakeLists.txt")
         file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/deps/${dependency}/"
@@ -212,6 +239,117 @@ ExternalProject_Add(nuparu-zlib
     COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/zlib/share/licenses/zlib/LICENSE
     LIST_SEPARATOR |
 )
+
+if(NUPARU_BUILD_PTEX)
+    ExternalProject_Add(nuparu-ptex
+        SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/sources/ptex"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        DEPENDS nuparu-zlib
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/ptex
+            -DCMAKE_INSTALL_INCLUDEDIR:STRING=include/ptex
+            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+            ${NUPARU_COMMON_ARGS}
+            -DCMAKE_CXX_STANDARD:STRING=17 -DPTEX_VER:STRING=v2.4.3
+            -DPTEX_SHA:STRING=4aa2c35 -DPTEX_BUILD_STATIC_LIBS:BOOL=ON
+            -DPTEX_BUILD_SHARED_LIBS:BOOL=OFF -DPTEX_BUILD_DOCS:BOOL=OFF
+            -DZLIB_INCLUDE_DIR:PATH=${NUPARU_STAGE_DIR}/zlib/include
+            -DZLIB_LIBRARY:FILEPATH=${NUPARU_STAGE_DIR}/zlib/lib/${nuparu_zlib_package_name}
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-ptex install-license
+        COMMAND ${CMAKE_COMMAND} "-DPTEX_ROOT=${NUPARU_STAGE_DIR}/ptex" "-DPTEX_CACHE=<BINARY_DIR>/CMakeCache.txt"
+            "-DEXPECTED_ZLIB_INCLUDE=${NUPARU_STAGE_DIR}/zlib/include"
+            "-DEXPECTED_ZLIB_LIBRARY=${NUPARU_STAGE_DIR}/zlib/lib/${nuparu_zlib_package_name}"
+            "-DPTEX_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/prepare-ptex.cmake"
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/ptex/share/licenses/ptex
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/ptex/share/licenses/ptex/LICENSE
+        DEPENDEES install
+    )
+    set(nuparu_ptex_dependency nuparu-ptex)
+endif()
+
+if(NUPARU_BUILD_OPENSUBDIV)
+    if(WIN32)
+        set(nuparu_ptex_library "${NUPARU_STAGE_DIR}/ptex/lib/Ptex.lib")
+    else()
+        set(nuparu_ptex_library "${NUPARU_STAGE_DIR}/ptex/lib/libPtex.a")
+    endif()
+    foreach(backend CUDA OPENGL METAL)
+        if(NUPARU_OPENSUBDIV_GPU AND NUPARU_OPENSUBDIV_${backend})
+            set(nuparu_osd_${backend} ON)
+            set(nuparu_osd_no_${backend} OFF)
+        else()
+            set(nuparu_osd_${backend} OFF)
+            set(nuparu_osd_no_${backend} ON)
+        endif()
+    endforeach()
+    if(nuparu_osd_METAL AND NOT APPLE)
+        message(FATAL_ERROR "The OpenSubdiv Metal backend requires macOS")
+    endif()
+    if(nuparu_osd_CUDA AND NOT NUPARU_OPENSUBDIV_CUDA_ARCHITECTURES)
+        message(FATAL_ERROR "Set NUPARU_OPENSUBDIV_CUDA_ARCHITECTURES when enabling CUDA")
+    endif()
+    string(REPLACE ";" "|" nuparu_cuda_architectures "${NUPARU_OPENSUBDIV_CUDA_ARCHITECTURES}")
+    set(nuparu_osd_cuda_args)
+    if(nuparu_osd_CUDA)
+        list(APPEND nuparu_osd_cuda_args -DCMAKE_CUDA_ARCHITECTURES:STRING=${nuparu_cuda_architectures})
+        foreach(variable CMAKE_CUDA_COMPILER CMAKE_CUDA_HOST_COMPILER CUDAToolkit_ROOT)
+            if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "")
+                if(variable STREQUAL "CUDAToolkit_ROOT")
+                    set(nuparu_cuda_variable_type PATH)
+                else()
+                    set(nuparu_cuda_variable_type FILEPATH)
+                endif()
+                list(APPEND nuparu_osd_cuda_args "-D${variable}:${nuparu_cuda_variable_type}=${${variable}}")
+            endif()
+        endforeach()
+        if(DEFINED CMAKE_CUDA_FLAGS AND NOT CMAKE_CUDA_FLAGS STREQUAL "")
+            list(APPEND nuparu_osd_cuda_args "-DCMAKE_CUDA_FLAGS:STRING=${CMAKE_CUDA_FLAGS}")
+        endif()
+    endif()
+    if(WIN32)
+        set(nuparu_osd_windows_args -DMSVC_STATIC_CRT:BOOL=ON)
+    endif()
+    ExternalProject_Add(nuparu-opensubdiv
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/opensubdiv"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        DEPENDS nuparu-ptex nuparu-tbb
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/opensubdiv
+            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+            ${NUPARU_COMMON_ARGS} -DCMAKE_CXX_STANDARD:STRING=17
+            -DTBB_DIR:PATH=${NUPARU_STAGE_DIR}/tbb/lib/cmake/TBB
+            -DPTEX_INCLUDE_DIR:PATH=${NUPARU_STAGE_DIR}/ptex/include/ptex
+            -DPTEX_LIBRARY:FILEPATH=${nuparu_ptex_library}
+            -DZLIB_INCLUDE_DIR:PATH=${NUPARU_STAGE_DIR}/zlib/include
+            -DZLIB_LIBRARY:FILEPATH=${NUPARU_STAGE_DIR}/zlib/lib/${nuparu_zlib_package_name}
+            -DNO_PTEX:BOOL=OFF -DNO_TBB:BOOL=OFF
+            -DNO_CUDA:BOOL=${nuparu_osd_no_CUDA} ${nuparu_osd_cuda_args}
+            -DNO_OPENGL:BOOL=${nuparu_osd_no_OPENGL} -DNO_METAL:BOOL=${nuparu_osd_no_METAL}
+            -DNO_EXAMPLES:BOOL=ON -DNO_TUTORIALS:BOOL=ON -DNO_REGRESSION:BOOL=ON
+            -DNO_TESTS:BOOL=ON -DNO_DOC:BOOL=ON -DNO_OMP:BOOL=ON
+            -DNO_OPENCL:BOOL=ON -DNO_DX:BOOL=ON -DNO_GLFW:BOOL=ON
+            -DNO_MACOS_FRAMEWORK:BOOL=ON ${nuparu_osd_windows_args}
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-opensubdiv verify-and-license
+        COMMAND ${CMAKE_COMMAND}
+            "-DOSD_ROOT=${NUPARU_STAGE_DIR}/opensubdiv" "-DOSD_CACHE=<BINARY_DIR>/CMakeCache.txt"
+            "-DEXPECTED_TBB_DIR=${NUPARU_STAGE_DIR}/tbb/lib/cmake/TBB"
+            "-DEXPECTED_PTEX_DIR=${NUPARU_STAGE_DIR}/ptex/include/ptex"
+            "-DEXPECTED_PTEX_LIBRARY=${nuparu_ptex_library}"
+            "-DEXPECT_OPENGL=${nuparu_osd_OPENGL}"
+            "-DEXPECT_CUDA=${nuparu_osd_CUDA}" "-DEXPECT_METAL=${nuparu_osd_METAL}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/verify-opensubdiv.cmake"
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/opensubdiv/share/licenses/opensubdiv
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE.txt <SOURCE_DIR>/NOTICE.txt ${NUPARU_STAGE_DIR}/opensubdiv/share/licenses/opensubdiv
+        DEPENDEES install
+    )
+    set(nuparu_osd_dependency nuparu-opensubdiv)
+endif()
 
 ExternalProject_Add(nuparu-Imath
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/Imath"
@@ -405,12 +543,29 @@ add_custom_target(nuparu-package ALL
         "-DNUPARU_INCLUDE_EMBREE=${NUPARU_BUILD_EMBREE}"
         "-DNUPARU_INCLUDE_TBB=${NUPARU_BUILD_TBB}"
         "-DNUPARU_INCLUDE_BOOST=${NUPARU_BUILD_BOOST}"
+        "-DNUPARU_INCLUDE_PTEX=${NUPARU_BUILD_PTEX}"
+        "-DNUPARU_INCLUDE_OPENSUBDIV=${NUPARU_BUILD_OPENSUBDIV}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
-    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency}
+    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_osd_dependency}
     VERBATIM
 )
 
 enable_testing()
+foreach(dependency ptex opensubdiv)
+    string(TOUPPER "${dependency}" dependency_upper)
+    if(NUPARU_BUILD_${dependency_upper})
+        add_test(NAME ${dependency}-consumer
+            COMMAND ${CMAKE_COMMAND}
+                "-DPACKAGE_DIR=${CMAKE_INSTALL_PREFIX}"
+                "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-${dependency}-consumer"
+                "-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/${dependency}-consumer"
+                "-DTEST_GENERATOR=${CMAKE_GENERATOR}" "-DTEST_NAME=${dependency}"
+                "-DZLIB_NAME=${nuparu_zlib_package_name}"
+                "-DEXPECT_CUDA=${nuparu_osd_CUDA}"
+                "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/graphics-dependency-consumer.cmake")
+    endif()
+endforeach()
 if(NUPARU_BUILD_BOOST)
     add_test(NAME boost-consumer
         COMMAND ${CMAKE_COMMAND}
