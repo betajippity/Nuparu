@@ -95,6 +95,9 @@ set(nuparu_copied_sources libdeflate zlib)
 if(NUPARU_BUILD_PTEX)
     list(APPEND nuparu_copied_sources ptex)
 endif()
+if(WIN32 AND NUPARU_BUILD_OPENSUBDIV)
+    list(APPEND nuparu_copied_sources opensubdiv)
+endif()
 foreach(dependency IN LISTS nuparu_copied_sources)
     # A fresh build directory is required when changing either source revision.
     if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/sources/${dependency}/CMakeLists.txt")
@@ -310,10 +313,18 @@ if(NUPARU_BUILD_OPENSUBDIV)
         endif()
     endif()
     if(WIN32)
+        # Keep OpenSubdiv's static CRT branch, but remove its unqualified /MT
+        # options from a build-local source copy. CMake selects /MT itself and
+        # forwards it correctly through nvcc; the OFF branch suppresses libcmt.
+        include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/PatchOpenSubdivWindows.cmake")
+        set(nuparu_osd_source "${CMAKE_CURRENT_BINARY_DIR}/sources/opensubdiv")
+        nuparu_patch_opensubdiv_windows("${nuparu_osd_source}/CMakeLists.txt")
         set(nuparu_osd_windows_args -DMSVC_STATIC_CRT:BOOL=ON)
+    else()
+        set(nuparu_osd_source "${CMAKE_CURRENT_SOURCE_DIR}/deps/opensubdiv")
     endif()
     ExternalProject_Add(nuparu-opensubdiv
-        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/opensubdiv"
+        SOURCE_DIR "${nuparu_osd_source}"
         DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
         DEPENDS nuparu-ptex nuparu-tbb
         CMAKE_ARGS
