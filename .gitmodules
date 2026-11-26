@@ -34,3 +34,9 @@
 [submodule "deps/partio"]
 	path = deps/partio
 	url = https://github.com/wdas/partio.git
+[submodule "deps/blosc"]
+	path = deps/blosc
+	url = https://github.com/Blosc/c-blosc.git
+[submodule "deps/openvdb"]
+	path = deps/openvdb
+	url = https://github.com/AcademySoftwareFoundation/openvdb.git

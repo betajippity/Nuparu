@@ -8,6 +8,12 @@ endif()
 
 set(package_files)
 set(dependencies jsoncpp glfw zlib Imath openexr)
+if(NUPARU_INCLUDE_BLOSC)
+    list(APPEND dependencies blosc)
+endif()
+if(NUPARU_INCLUDE_OPENVDB)
+    list(APPEND dependencies openvdb)
+endif()
 if(NUPARU_INCLUDE_PARTIO)
     list(APPEND dependencies partio)
 endif()
@@ -34,6 +40,20 @@ foreach(dependency IN LISTS dependencies)
     endif()
     foreach(path IN LISTS stage_files)
         if(path IN_LIST package_files)
+            # Several upstream installers include the MSVC redistributable.
+            # Keep one copy only when the actual files match; differing CRT
+            # versions or architectures must not be silently combined.
+            string(TOLOWER "${path}" lower_path)
+            if(lower_path MATCHES "^bin/(msvcp|vcruntime)[0-9]+(_[0-9]+)?\\.dll$" AND
+               NOT IS_SYMLINK "${stage}/${path}" AND
+               NOT IS_SYMLINK "${NUPARU_STAGE_DIR}/${owner_${path}}/${path}")
+                file(SHA256 "${stage}/${path}" incoming_hash)
+                file(SHA256 "${NUPARU_STAGE_DIR}/${owner_${path}}/${path}" existing_hash)
+                if(incoming_hash STREQUAL existing_hash)
+                    continue()
+                endif()
+                message(FATAL_ERROR "Dependency package collision at ${path}: ${owner_${path}} and ${dependency} provide different MSVC runtime DLLs")
+            endif()
             message(FATAL_ERROR "Dependency package collision at ${path} (including ${dependency})")
         endif()
         if(path STREQUAL "share/nuparu/files.txt")

@@ -7,6 +7,9 @@ option(NUPARU_BUILD_TBB "Build and package shared oneTBB" OFF)
 option(NUPARU_BUILD_BOOST "Build the Boost subset used by Takua and legacy OpenVDB" OFF)
 option(NUPARU_BUILD_PTEX "Build the Ptex pilot" OFF)
 option(NUPARU_BUILD_PARTIO "Build the Partio pilot" OFF)
+option(NUPARU_BUILD_BLOSC "Build static Blosc" OFF)
+option(NUPARU_BUILD_OPENVDB "Build OpenVDB and NanoVDB" OFF)
+option(NUPARU_NANOVDB_CUDA "Enable CUDA support in the NanoVDB build" OFF)
 option(NUPARU_BUILD_OPENSUBDIV "Build the OpenSubdiv pilot" OFF)
 option(NUPARU_OPENSUBDIV_GPU "Enable the selected OpenSubdiv GPU backends" ON)
 set(_nuparu_osd_cuda_default OFF)
@@ -76,6 +79,17 @@ endif()
 if(NUPARU_BUILD_PARTIO AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/partio/src/lib/Partio.h")
     message(FATAL_ERROR "Partio submodule is missing. Run: git submodule update --init --recursive")
 endif()
+if(NUPARU_BUILD_BLOSC AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/blosc/CMakeLists.txt")
+    message(FATAL_ERROR "Blosc submodule is missing. Run: git submodule update --init --recursive")
+endif()
+if(NUPARU_BUILD_OPENVDB)
+    if(NOT NUPARU_BUILD_BLOSC OR NOT NUPARU_BUILD_TBB OR NOT NUPARU_BUILD_BOOST)
+        message(FATAL_ERROR "OpenVDB requires NUPARU_BUILD_BLOSC=ON, NUPARU_BUILD_TBB=ON and NUPARU_BUILD_BOOST=ON")
+    endif()
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/openvdb/CMakeLists.txt")
+        message(FATAL_ERROR "OpenVDB submodule is missing. Run: git submodule update --init --recursive")
+    endif()
+endif()
 if(NUPARU_BUILD_OPENSUBDIV)
     if(NOT NUPARU_BUILD_PTEX OR NOT NUPARU_BUILD_TBB)
         message(FATAL_ERROR "OpenSubdiv requires NUPARU_BUILD_PTEX=ON and NUPARU_BUILD_TBB=ON")
@@ -90,6 +104,13 @@ if(NUPARU_BUILD_BOOST)
             message(FATAL_ERROR "Boost sources are incomplete (${boost_file}). Run: git submodule update --init --recursive")
         endif()
     endforeach()
+    if(NUPARU_BUILD_OPENVDB)
+        foreach(boost_module interprocess container intrusive move)
+            if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/boost/libs/${boost_module}/CMakeLists.txt")
+                message(FATAL_ERROR "Boost ${boost_module} is required for OpenVDB. Run: git submodule update --init --recursive")
+            endif()
+        endforeach()
+    endif()
 endif()
 
 set(NUPARU_STAGE_DIR "${CMAKE_CURRENT_BINARY_DIR}/stage")
@@ -160,6 +181,10 @@ if(NUPARU_BUILD_TBB)
 endif()
 
 if(NUPARU_BUILD_BOOST)
+    set(nuparu_boost_libraries "filesystem|random|iostreams")
+    if(NUPARU_BUILD_OPENVDB)
+        string(APPEND nuparu_boost_libraries "|interprocess")
+    endif()
     ExternalProject_Add(nuparu-boost
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/boost"
         DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
@@ -167,7 +192,7 @@ if(NUPARU_BUILD_BOOST)
             -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/boost
             -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
             ${NUPARU_COMMON_ARGS}
-            -DBOOST_INCLUDE_LIBRARIES:STRING=filesystem|random|iostreams
+            -DBOOST_INCLUDE_LIBRARIES:STRING=${nuparu_boost_libraries}
             -DBOOST_ENABLE_PYTHON:BOOL=OFF -DBOOST_ENABLE_MPI:BOOL=OFF
             -DBOOST_RANDOM_ENABLE_RANDOM_DEVICE:BOOL=OFF
             -DBOOST_IOSTREAMS_ENABLE_ZLIB:BOOL=OFF -DBOOST_IOSTREAMS_ENABLE_BZIP2:BOOL=OFF
@@ -246,6 +271,40 @@ ExternalProject_Add(nuparu-zlib
     COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/zlib/share/licenses/zlib/LICENSE
     LIST_SEPARATOR |
 )
+
+if(NUPARU_BUILD_BLOSC)
+    ExternalProject_Add(nuparu-blosc
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/blosc"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        DEPENDS nuparu-zlib
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/blosc
+            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+            ${NUPARU_COMMON_ARGS}
+            -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5
+            -DBUILD_STATIC:BOOL=ON -DBUILD_SHARED:BOOL=OFF -DBUILD_TESTS:BOOL=OFF
+            -DBUILD_FUZZERS:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF
+            -DDEACTIVATE_AVX2:BOOL=ON -DDEACTIVATE_SNAPPY:BOOL=ON
+            -DPREFER_EXTERNAL_ZLIB:BOOL=ON
+            -DZLIB_INCLUDE_DIR:PATH=${NUPARU_STAGE_DIR}/zlib/include
+            -DZLIB_LIBRARY:FILEPATH=${NUPARU_STAGE_DIR}/zlib/lib/${nuparu_zlib_package_name}
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-blosc install-license
+        COMMAND ${CMAKE_COMMAND} "-DBLOSC_CACHE=<BINARY_DIR>/CMakeCache.txt"
+            "-DBLOSC_STAGE=${NUPARU_STAGE_DIR}/blosc" "-DSTAGE_DIR=${NUPARU_STAGE_DIR}"
+            "-DZLIB_NAME=${nuparu_zlib_package_name}" "-DSYSTEM_NAME=${CMAKE_SYSTEM_NAME}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/prepare-blosc.cmake"
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/blosc/share/licenses/blosc
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/blosc/lib/cmake/NuparuBlosc
+        COMMAND ${CMAKE_COMMAND} -E copy_directory <SOURCE_DIR>/LICENSES ${NUPARU_STAGE_DIR}/blosc/share/licenses/blosc
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE.txt ${NUPARU_STAGE_DIR}/blosc/share/licenses/blosc/LICENSE.txt
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cmake/licenses/zstd-1.5.6-LICENSE ${NUPARU_STAGE_DIR}/blosc/share/licenses/blosc/ZSTD.txt
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/cmake/NuparuBloscConfig.cmake ${NUPARU_STAGE_DIR}/blosc/lib/cmake/NuparuBlosc/NuparuBloscConfig.cmake
+        DEPENDEES install
+    )
+    set(nuparu_blosc_dependency nuparu-blosc)
+endif()
 
 if(NUPARU_BUILD_PARTIO)
     ExternalProject_Add(nuparu-partio
@@ -568,6 +627,66 @@ if(NUPARU_BUILD_EMBREE)
     set(nuparu_embree_dependency nuparu-embree)
 endif()
 
+if(NUPARU_BUILD_OPENVDB)
+    set(nuparu_nanovdb_cuda_args)
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/NuparuVDBConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/NuparuVDBConfig.cmake" @ONLY)
+    if(WIN32)
+        set(nuparu_blosc_archive "${NUPARU_STAGE_DIR}/blosc/lib/libblosc.lib")
+    else()
+        set(nuparu_blosc_archive "${NUPARU_STAGE_DIR}/blosc/lib/libblosc.a")
+    endif()
+    if(NUPARU_NANOVDB_CUDA)
+        foreach(variable CMAKE_CUDA_COMPILER CMAKE_CUDA_HOST_COMPILER CUDAToolkit_ROOT CMAKE_CUDA_ARCHITECTURES CMAKE_CUDA_FLAGS)
+            if(DEFINED ${variable} AND NOT "${${variable}}" STREQUAL "")
+                string(REPLACE ";" "|" nuparu_cuda_value "${${variable}}")
+                list(APPEND nuparu_nanovdb_cuda_args "-D${variable}:STRING=${nuparu_cuda_value}")
+            endif()
+        endforeach()
+    endif()
+    ExternalProject_Add(nuparu-openvdb
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/openvdb"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        DEPENDS nuparu-blosc nuparu-zlib nuparu-Imath nuparu-boost nuparu-tbb
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/openvdb
+            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+            ${NUPARU_COMMON_ARGS}
+            -DCMAKE_CXX_STANDARD:STRING=17
+            -DBoost_DIR:PATH=${NUPARU_STAGE_DIR}/boost/lib/cmake/Boost-1.92.0
+            -DTBB_DIR:PATH=${NUPARU_STAGE_DIR}/tbb/lib/cmake/TBB
+            -DTBB_ROOT:PATH=${NUPARU_STAGE_DIR}/tbb
+            -DImath_DIR:PATH=${NUPARU_STAGE_DIR}/Imath/lib/cmake/Imath
+            -DBlosc_ROOT:PATH=${NUPARU_STAGE_DIR}/blosc
+            -DBlosc_LIBRARY_RELEASE:FILEPATH=${nuparu_blosc_archive}
+            -DZLIB_INCLUDE_DIR:PATH=${NUPARU_STAGE_DIR}/zlib/include
+            -DZLIB_LIBRARY:FILEPATH=${NUPARU_STAGE_DIR}/zlib/lib/${nuparu_zlib_package_name}
+            -DUSE_PKGCONFIG:BOOL=OFF -DUSE_STATIC_DEPENDENCIES:BOOL=OFF
+            -DBLOSC_USE_STATIC_LIBS:BOOL=ON -DBoost_USE_STATIC_LIBS:BOOL=ON
+            -DOPENVDB_CORE_SHARED:BOOL=OFF -DOPENVDB_CORE_STATIC:BOOL=ON
+            -DOPENVDB_BUILD_BINARIES:BOOL=OFF -DOPENVDB_BUILD_UNITTESTS:BOOL=OFF
+            -DOPENVDB_BUILD_PYTHON_MODULE:BOOL=OFF -DOPENVDB_INSTALL_CMAKE_MODULES:BOOL=OFF
+            -DOPENVDB_BUILD_NANOVDB:BOOL=ON -DNANOVDB_BUILD_TOOLS:BOOL=OFF
+            -DNANOVDB_BUILD_EXAMPLES:BOOL=OFF -DNANOVDB_BUILD_UNITTESTS:BOOL=OFF
+            -DNANOVDB_USE_CUDA:BOOL=${NUPARU_NANOVDB_CUDA} ${nuparu_nanovdb_cuda_args}
+            -DUSE_EXPLICIT_INSTANTIATION:BOOL=OFF -DOPENVDB_USE_DELAYED_LOADING:BOOL=ON
+            -DUSE_BLOSC:BOOL=ON -DUSE_ZLIB:BOOL=ON -DUSE_IMATH_HALF:BOOL=ON
+            -DUSE_EXR:BOOL=OFF -DUSE_CCACHE:BOOL=OFF -DOPENVDB_ENABLE_UNINSTALL:BOOL=OFF
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-openvdb install-license
+        COMMAND ${CMAKE_COMMAND} "-DVDB_CACHE=<BINARY_DIR>/CMakeCache.txt" "-DSTAGE_DIR=${NUPARU_STAGE_DIR}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/verify-openvdb.cmake"
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/openvdb/share/licenses/openvdb
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/openvdb/lib/cmake/NuparuVDB
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/openvdb/share/licenses/openvdb/LICENSE
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_BINARY_DIR}/NuparuVDBConfig.cmake ${NUPARU_STAGE_DIR}/openvdb/lib/cmake/NuparuVDB/NuparuVDBConfig.cmake
+        DEPENDEES install
+    )
+    set(nuparu_openvdb_dependency nuparu-openvdb)
+endif()
+
 add_custom_target(nuparu-package ALL
     COMMAND ${CMAKE_COMMAND}
         "-DNUPARU_STAGE_DIR=${NUPARU_STAGE_DIR}"
@@ -577,14 +696,16 @@ add_custom_target(nuparu-package ALL
         "-DNUPARU_INCLUDE_BOOST=${NUPARU_BUILD_BOOST}"
         "-DNUPARU_INCLUDE_PTEX=${NUPARU_BUILD_PTEX}"
         "-DNUPARU_INCLUDE_PARTIO=${NUPARU_BUILD_PARTIO}"
+        "-DNUPARU_INCLUDE_BLOSC=${NUPARU_BUILD_BLOSC}"
+        "-DNUPARU_INCLUDE_OPENVDB=${NUPARU_BUILD_OPENVDB}"
         "-DNUPARU_INCLUDE_OPENSUBDIV=${NUPARU_BUILD_OPENSUBDIV}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
-    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_partio_dependency} ${nuparu_osd_dependency}
+    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_partio_dependency} ${nuparu_osd_dependency} ${nuparu_blosc_dependency} ${nuparu_openvdb_dependency}
     VERBATIM
 )
 
 enable_testing()
-foreach(dependency ptex opensubdiv partio)
+foreach(dependency ptex opensubdiv partio blosc openvdb)
     string(TOUPPER "${dependency}" dependency_upper)
     if(NUPARU_BUILD_${dependency_upper})
         add_test(NAME ${dependency}-consumer
