@@ -281,6 +281,9 @@ if(NUPARU_BUILD_BLOSC)
             -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/blosc
             -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
             ${NUPARU_COMMON_ARGS}
+            # Blosc 1.21.6 typedefs bool, which is a keyword in C23. GCC 16
+            # defaults to C23, so keep the library in the earlier C dialect.
+            -DCMAKE_C_STANDARD:STRING=11 -DCMAKE_C_STANDARD_REQUIRED:BOOL=ON
             -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5
             -DBUILD_STATIC:BOOL=ON -DBUILD_SHARED:BOOL=OFF -DBUILD_TESTS:BOOL=OFF
             -DBUILD_FUZZERS:BOOL=OFF -DBUILD_BENCHMARKS:BOOL=OFF
