@@ -6,6 +6,7 @@ option(NUPARU_BUILD_EMBREE "Build the experimental native Embree package" OFF)
 option(NUPARU_BUILD_TBB "Build and package shared oneTBB" OFF)
 option(NUPARU_BUILD_BOOST "Build the Boost subset used by Takua and legacy OpenVDB" OFF)
 option(NUPARU_BUILD_PTEX "Build the Ptex pilot" OFF)
+option(NUPARU_BUILD_PARTIO "Build the Partio pilot" OFF)
 option(NUPARU_BUILD_OPENSUBDIV "Build the OpenSubdiv pilot" OFF)
 option(NUPARU_OPENSUBDIV_GPU "Enable the selected OpenSubdiv GPU backends" ON)
 set(_nuparu_osd_cuda_default OFF)
@@ -71,6 +72,9 @@ if(NUPARU_BUILD_TBB AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/onetbb/CMak
 endif()
 if(NUPARU_BUILD_PTEX AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/ptex/CMakeLists.txt")
     message(FATAL_ERROR "Ptex submodule is missing. Run: git submodule update --init --recursive")
+endif()
+if(NUPARU_BUILD_PARTIO AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/partio/src/lib/Partio.h")
+    message(FATAL_ERROR "Partio submodule is missing. Run: git submodule update --init --recursive")
 endif()
 if(NUPARU_BUILD_OPENSUBDIV)
     if(NOT NUPARU_BUILD_PTEX OR NOT NUPARU_BUILD_TBB)
@@ -242,6 +246,23 @@ ExternalProject_Add(nuparu-zlib
     COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/zlib/share/licenses/zlib/LICENSE
     LIST_SEPARATOR |
 )
+
+if(NUPARU_BUILD_PARTIO)
+    ExternalProject_Add(nuparu-partio
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake/partio"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        DEPENDS nuparu-zlib
+        CMAKE_ARGS
+            -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/partio
+            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+            ${NUPARU_COMMON_ARGS}
+            -DPARTIO_SOURCE:PATH=${CMAKE_CURRENT_SOURCE_DIR}/deps/partio
+            -DZLIB_INCLUDE_DIR:PATH=${NUPARU_STAGE_DIR}/zlib/include
+            -DZLIB_LIBRARY:FILEPATH=${NUPARU_STAGE_DIR}/zlib/lib/${nuparu_zlib_package_name}
+        LIST_SEPARATOR |
+    )
+    set(nuparu_partio_dependency nuparu-partio)
+endif()
 
 if(NUPARU_BUILD_PTEX)
     ExternalProject_Add(nuparu-ptex
@@ -555,14 +576,15 @@ add_custom_target(nuparu-package ALL
         "-DNUPARU_INCLUDE_TBB=${NUPARU_BUILD_TBB}"
         "-DNUPARU_INCLUDE_BOOST=${NUPARU_BUILD_BOOST}"
         "-DNUPARU_INCLUDE_PTEX=${NUPARU_BUILD_PTEX}"
+        "-DNUPARU_INCLUDE_PARTIO=${NUPARU_BUILD_PARTIO}"
         "-DNUPARU_INCLUDE_OPENSUBDIV=${NUPARU_BUILD_OPENSUBDIV}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
-    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_osd_dependency}
+    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_partio_dependency} ${nuparu_osd_dependency}
     VERBATIM
 )
 
 enable_testing()
-foreach(dependency ptex opensubdiv)
+foreach(dependency ptex opensubdiv partio)
     string(TOUPPER "${dependency}" dependency_upper)
     if(NUPARU_BUILD_${dependency_upper})
         add_test(NAME ${dependency}-consumer

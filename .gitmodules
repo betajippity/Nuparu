@@ -31,3 +31,6 @@
 [submodule "deps/ptex"]
 	path = deps/ptex
 	url = https://github.com/wdas/ptex.git
+[submodule "deps/partio"]
+	path = deps/partio
+	url = https://github.com/wdas/partio.git
