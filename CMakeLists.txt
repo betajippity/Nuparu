@@ -1,12 +1,19 @@
 cmake_minimum_required(VERSION 3.20)
 project(NuparuDependencies LANGUAGES C CXX)
 
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
 include(ExternalProject)
 option(NUPARU_BUILD_EMBREE "Build the experimental native Embree package" OFF)
 option(NUPARU_BUILD_TBB "Build and package shared oneTBB" OFF)
 option(NUPARU_BUILD_BOOST "Build the Boost subset used by Takua and legacy OpenVDB" OFF)
 option(NUPARU_BUILD_PTEX "Build the Ptex pilot" OFF)
 option(NUPARU_BUILD_PARTIO "Build the Partio pilot" OFF)
+option(NUPARU_BUILD_GLEW "Build static GLEW" OFF)
+option(NUPARU_BUILD_CPUINFO "Build static cpuinfo" OFF)
+option(NUPARU_BUILD_ZMQ "Build static ZeroMQ and install cppzmq" OFF)
+set(NUPARU_GLEW_ARCHIVE "" CACHE FILEPATH "Optional local GLEW 2.2.0 release archive")
 option(NUPARU_BUILD_BLOSC "Build static Blosc" OFF)
 option(NUPARU_BUILD_OPENVDB "Build OpenVDB and NanoVDB" OFF)
 option(NUPARU_NANOVDB_CUDA "Enable CUDA support in the NanoVDB build" OFF)
@@ -79,6 +86,22 @@ endif()
 if(NUPARU_BUILD_PARTIO AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/partio/src/lib/Partio.h")
     message(FATAL_ERROR "Partio submodule is missing. Run: git submodule update --init --recursive")
 endif()
+foreach(dependency GLEW CPUINFO ZMQ)
+    if(NUPARU_BUILD_${dependency})
+        if(dependency STREQUAL "ZMQ")
+            set(nuparu_new_sources libzmq cppzmq)
+        else()
+            string(TOLOWER "${dependency}" nuparu_new_source)
+            set(nuparu_new_sources "${nuparu_new_source}")
+        endif()
+        foreach(source IN LISTS nuparu_new_sources)
+            if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/${source}/CMakeLists.txt" AND
+               NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/${source}/build/cmake/CMakeLists.txt")
+                message(FATAL_ERROR "${source} submodule is missing. Run: git submodule update --init --recursive")
+            endif()
+        endforeach()
+    endif()
+endforeach()
 if(NUPARU_BUILD_BLOSC AND NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/blosc/CMakeLists.txt")
     message(FATAL_ERROR "Blosc submodule is missing. Run: git submodule update --init --recursive")
 endif()
@@ -307,6 +330,99 @@ if(NUPARU_BUILD_BLOSC)
         DEPENDEES install
     )
     set(nuparu_blosc_dependency nuparu-blosc)
+endif()
+
+if(NUPARU_BUILD_GLEW)
+    if(NUPARU_GLEW_ARCHIVE)
+        set(nuparu_glew_url "${NUPARU_GLEW_ARCHIVE}")
+    else()
+        set(nuparu_glew_url "https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.tgz")
+    endif()
+    ExternalProject_Add(nuparu-glew
+        URL "${nuparu_glew_url}"
+        URL_HASH SHA256=d4fc82893cfb00109578d0a1a2337fb8ca335b3ceccf97b97e5cc7f08e4353e1
+        SOURCE_SUBDIR build/cmake
+        UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/glew
+            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER} ${NUPARU_COMMON_ARGS}
+            -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 -DBUILD_UTILS:BOOL=OFF
+        BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target glew_s
+        # Building the generated install target also builds all targets,
+        # including the unneeded shared GLEW DLL. Install the static build
+        # directly instead.
+        INSTALL_COMMAND ${CMAKE_COMMAND} --install <BINARY_DIR> --config ${CMAKE_BUILD_TYPE}
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-glew install-license
+        COMMAND ${CMAKE_COMMAND} "-DGLEW_STAGE=${NUPARU_STAGE_DIR}/glew" "-DSYSTEM_NAME=${CMAKE_SYSTEM_NAME}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/prepare-glew.cmake"
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/glew/share/licenses/glew
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/include/GL/eglew.h ${NUPARU_STAGE_DIR}/glew/include/GL/eglew.h
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE.txt ${NUPARU_STAGE_DIR}/glew/share/licenses/glew/LICENSE.txt
+        DEPENDEES install
+    )
+    set(nuparu_glew_dependency nuparu-glew)
+endif()
+
+if(NUPARU_BUILD_CPUINFO)
+    ExternalProject_Add(nuparu-cpuinfo
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/cpuinfo"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/cpuinfo
+            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER} ${NUPARU_COMMON_ARGS}
+            -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5
+            -DCPUINFO_LIBRARY_TYPE:STRING=static -DCPUINFO_BUILD_TOOLS:BOOL=OFF
+            -DCPUINFO_BUILD_UNIT_TESTS:BOOL=OFF -DCPUINFO_BUILD_MOCK_TESTS:BOOL=OFF
+            -DCPUINFO_BUILD_BENCHMARKS:BOOL=OFF
+        BUILD_COMMAND ${CMAKE_COMMAND} --build <BINARY_DIR> --target cpuinfo
+        LIST_SEPARATOR |
+    )
+    ExternalProject_Add_Step(nuparu-cpuinfo install-adapter
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/cpuinfo/include/cpuinfo ${NUPARU_STAGE_DIR}/cpuinfo/share/licenses/cpuinfo
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/include/cpuinfo.h ${NUPARU_STAGE_DIR}/cpuinfo/include/cpuinfo/cpuinfo.h
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/cpuinfo/share/licenses/cpuinfo/LICENSE
+        DEPENDEES install
+    )
+    set(nuparu_cpuinfo_dependency nuparu-cpuinfo)
+endif()
+
+if(NUPARU_BUILD_ZMQ)
+    set(nuparu_zmq_runtime_args)
+    if(WIN32)
+        list(APPEND nuparu_zmq_runtime_args
+            "-DCMAKE_PROJECT_INCLUDE_BEFORE:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZeroMQMSVCRuntime.cmake"
+            -DCMAKE_EXPORT_COMPILE_COMMANDS:BOOL=ON)
+    endif()
+    ExternalProject_Add(nuparu-zmq
+        SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/libzmq"
+        DOWNLOAD_COMMAND "" UPDATE_COMMAND "" BUILD_ALWAYS TRUE
+        CMAKE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${NUPARU_STAGE_DIR}/zmq
+            -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER} ${NUPARU_COMMON_ARGS}
+            -DCMAKE_POLICY_VERSION_MINIMUM:STRING=3.5 ${nuparu_zmq_runtime_args}
+            -DBUILD_SHARED:BOOL=OFF -DBUILD_STATIC:BOOL=ON
+            -DENABLE_DRAFTS:BOOL=ON -DENABLE_WS:BOOL=OFF -DWITH_TLS:BOOL=OFF
+            -DWITH_LIBBSD:BOOL=OFF -DENABLE_CURVE:BOOL=OFF -DWITH_LIBSODIUM:BOOL=OFF
+            -DBUILD_TESTS:BOOL=OFF -DZMQ_BUILD_TESTS:BOOL=OFF -DWITH_DOCS:BOOL=OFF
+            -DWITH_PERF_TOOL:BOOL=OFF -DENABLE_CPACK:BOOL=OFF
+            -DZEROMQ_CMAKECONFIG_INSTALL_DIR:STRING=lib/cmake/ZeroMQ
+        LIST_SEPARATOR |
+    )
+    if(WIN32)
+        ExternalProject_Add_Step(nuparu-zmq verify-msvc-runtime
+            COMMAND ${CMAKE_COMMAND} "-DCOMPILE_COMMANDS=<BINARY_DIR>/compile_commands.json"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/verify-zmq-msvc-runtime.cmake"
+            DEPENDEES configure DEPENDERS build ALWAYS TRUE
+        )
+    endif()
+    ExternalProject_Add_Step(nuparu-zmq install-bindings
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${NUPARU_STAGE_DIR}/zmq/share/licenses/libzmq ${NUPARU_STAGE_DIR}/zmq/share/licenses/cppzmq
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/deps/cppzmq/zmq.hpp ${CMAKE_CURRENT_SOURCE_DIR}/deps/cppzmq/zmq_addon.hpp ${NUPARU_STAGE_DIR}/zmq/include
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different <SOURCE_DIR>/LICENSE ${NUPARU_STAGE_DIR}/zmq/share/licenses/libzmq/LICENSE
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/deps/cppzmq/LICENSE ${NUPARU_STAGE_DIR}/zmq/share/licenses/cppzmq/LICENSE
+        DEPENDEES install
+    )
+    set(nuparu_zmq_dependency nuparu-zmq)
 endif()
 
 if(NUPARU_BUILD_PARTIO)
@@ -699,15 +815,38 @@ add_custom_target(nuparu-package ALL
         "-DNUPARU_INCLUDE_BOOST=${NUPARU_BUILD_BOOST}"
         "-DNUPARU_INCLUDE_PTEX=${NUPARU_BUILD_PTEX}"
         "-DNUPARU_INCLUDE_PARTIO=${NUPARU_BUILD_PARTIO}"
+        "-DNUPARU_INCLUDE_GLEW=${NUPARU_BUILD_GLEW}"
+        "-DNUPARU_INCLUDE_CPUINFO=${NUPARU_BUILD_CPUINFO}"
+        "-DNUPARU_INCLUDE_ZMQ=${NUPARU_BUILD_ZMQ}"
         "-DNUPARU_INCLUDE_BLOSC=${NUPARU_BUILD_BLOSC}"
         "-DNUPARU_INCLUDE_OPENVDB=${NUPARU_BUILD_OPENVDB}"
         "-DNUPARU_INCLUDE_OPENSUBDIV=${NUPARU_BUILD_OPENSUBDIV}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
-    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_partio_dependency} ${nuparu_osd_dependency} ${nuparu_blosc_dependency} ${nuparu_openvdb_dependency}
+    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_partio_dependency} ${nuparu_osd_dependency} ${nuparu_blosc_dependency} ${nuparu_openvdb_dependency} ${nuparu_glew_dependency} ${nuparu_cpuinfo_dependency} ${nuparu_zmq_dependency}
     VERBATIM
 )
 
 enable_testing()
+if(NUPARU_BUILD_ZMQ)
+    add_test(NAME zmq-msvc-runtime-selection
+        COMMAND ${CMAKE_COMMAND}
+            "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-zmq-msvc-runtime"
+            "-DFIXTURE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/zmq-msvc-runtime"
+            "-DTEST_GENERATOR=${CMAKE_GENERATOR}"
+            "-DHOOK=${CMAKE_CURRENT_SOURCE_DIR}/cmake/ZeroMQMSVCRuntime.cmake"
+            "-DVERIFY=${CMAKE_CURRENT_SOURCE_DIR}/cmake/verify-zmq-msvc-runtime.cmake"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/zmq-msvc-runtime.cmake")
+endif()
+if(NUPARU_BUILD_GLEW AND NUPARU_BUILD_CPUINFO AND NUPARU_BUILD_ZMQ)
+    add_test(NAME static-libraries-consumer
+        COMMAND ${CMAKE_COMMAND}
+            "-DPACKAGE_DIR=${CMAKE_INSTALL_PREFIX}"
+            "-DTEST_DIR=${CMAKE_CURRENT_BINARY_DIR}/test-static-libraries-consumer"
+            "-DTEST_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/tests/static-libraries-consumer"
+            "-DTEST_GENERATOR=${CMAKE_GENERATOR}" "-DTEST_NAME=static-libraries"
+            "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/graphics-dependency-consumer.cmake")
+endif()
 foreach(dependency ptex opensubdiv partio blosc openvdb)
     string(TOUPPER "${dependency}" dependency_upper)
     if(NUPARU_BUILD_${dependency_upper})

@@ -40,3 +40,15 @@
 [submodule "deps/openvdb"]
 	path = deps/openvdb
 	url = https://github.com/AcademySoftwareFoundation/openvdb.git
+[submodule "deps/glew"]
+	path = deps/glew
+	url = https://github.com/nigels-com/glew.git
+[submodule "deps/cpuinfo"]
+	path = deps/cpuinfo
+	url = https://github.com/pytorch/cpuinfo.git
+[submodule "deps/libzmq"]
+	path = deps/libzmq
+	url = https://github.com/zeromq/libzmq.git
+[submodule "deps/cppzmq"]
+	path = deps/cppzmq
+	url = https://github.com/zeromq/cppzmq.git
