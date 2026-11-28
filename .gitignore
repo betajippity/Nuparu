@@ -2,3 +2,5 @@
 ._*
 /build/
 /packages/
+/bin/
+/lib/

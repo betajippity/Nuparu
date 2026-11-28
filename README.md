@@ -1,81 +1,98 @@
-Nuparu
-======
+# Nuparu
 
-v0.10.25.26
+Nuparu builds and assembles the third-party dependencies used by Karl's
+graphics projects. Dependency revisions are pinned by Git submodules in
+`deps/`; the build scripts, package assembly and local patches are in
+`CMakeLists.txt` and `cmake/`. RMSD and Sobol remain as source files in this
+repository. Built packages and intermediate files are local artifacts and are
+not checked in. The top-level `src/` and `include/` contain only RMSD and Sobol;
+the remaining sources and headers are supplied by the pinned dependencies.
 
-Third Party dependencies and foundation libraries for Karl's graphics projects
+The package uses shared oneTBB and static libraries for the other compiled
+dependencies. Windows libraries use the static MSVC runtime. Packages are
+specific to their OS, architecture, compiler, configuration and GPU options.
 
-For the complete source-built package and package-only Takua configuration,
-see [FULL-PACKAGE.md](FULL-PACKAGE.md). The earlier incremental recipes are
-in [DEPENDENCY-BUILD.md](DEPENDENCY-BUILD.md); legacy prebuilt packages remain
-available during the transition. The inventory below describes those legacy
-packages and may differ from the pinned source-built versions.
+## macOS and Linux
 
-Nuparu currently consists of:
+From the Nuparu checkout, choose a distinct name for the host and compiler:
 
-* [GLM](http://glm.g-truc.net) 1.0.1 (Src)
-* [GLFW](http://www.glfw.org) 3.4 (Mac/Win/Linux)
-* [GLEW](https://github.com/nigels-com/glew) 2.2.0 (Mac/Win/Linux)
-* [Embree](https://embree.github.io) 4.4.0 (Mac/Win/Linux)
-* [jsoncpp](https://github.com/open-source-parsers/jsoncpp) 1.9.6 (Mac/Win/Linux)
-* [Imath](https://github.com/AcademySoftwareFoundation/Imath) 3.1.12 (Mac/Win/Linux)
-* [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) 3.3.4 (Mac/Win/Linux)
-* [stb_image](https://github.com/nothings/stb) 2.30 (Src)
-* [Ptex](http://ptex.us) 2.4.3 (Mac/Win/Linux)
-* [Partio](https://www.disneyanimation.com/technology/partio.html) 1.19.0 (Mac/Win/Linux)
-* [RMSD](http://boscoh.com/code/) (Src)
-* [Leonhard Gruenschloss's Sobol Generator](http://gruenschloss.org) (Src)
-* [tinyformat](https://github.com/c42f/tinyformat) 2.3.0 (Src)
-* [Zlib](https://www.zlib.net) 1.3.1 (Mac/Win/Linux)
-* [TBB](https://www.threadingbuildingblocks.org/) 2022.1.0 (Mac/Win/Linux)
-* [Boost](http://www.boost.org) 1.88.0 (Mac/Win/Linux)
-* [OpenSubdiv](http://graphics.pixar.com/opensubdiv/docs/intro.html) 3.6.1 (Mac/Win/Linux)
-* [OpenVDB](http://www.openvdb.org/) 12.0.1 (Mac/Win/Linux)
-* [NanoVDB](http://www.openvdb.org/) 12.0.1 (Src)
-* [blosc](https://github.com/Blosc) 1.21.6 (Mac/Win/Linux)
-* [cereal](https://uscilab.github.io/cereal/) 1.3.2 (Src)
-* [ispc](https://ispc.github.io) 1.18.0 (Mac/Win/Linux)
-* [dear imgui](https://github.com/ocornut/imgui) 1.92.0 with Docking (Src)
-* [imnodes](https://github.com/Nelarius/imnodes) 0.5 (Src)
-* [cpuinfo](https://github.com/pytorch/cpuinfo) e4cadd02 (Mac/Win/Linux)
-* [zmq](https://github.com/zeromq/libzmq) 4.3.5 (Mac/Win/Linux)
+```sh
+git submodule update --init --recursive
+nuparu_repo="$PWD"
+nuparu_arch=full-native-linux-gcc16
+cmake -S . -B "build/$nuparu_arch" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$nuparu_repo/packages/$nuparu_arch" \
+  -DNUPARU_BUILD_ALL=ON \
+  -DNUPARU_OPENSUBDIV_GPU=OFF
+cmake --build "build/$nuparu_arch" -j 4
+ctest --test-dir "build/$nuparu_arch" --output-on-failure
+```
 
-Notes:
+This example builds CPU-only OpenSubdiv. Omit the GPU switch to use its
+platform defaults, or choose OpenGL, Metal, and CUDA explicitly.
+For native macOS builds, add `-DCMAKE_OSX_ARCHITECTURES=arm64` (or `x86_64`)
+and a suitable `-DCMAKE_OSX_DEPLOYMENT_TARGET`. Universal Embree packages
+are not supported. Linux requires the GLFW/X11 and OpenGL development packages.
+ISPC and the GLEW release archive are downloaded and verified.
 
-* On all platforms, all binary libraries except for TBB are statically linked.
-* x86-64 builds are included for macOS, Windows, and RHEL 9.x (Linux-GCC13), and Fedora 41 (Linux-GCC14).
-* arm64 builds are included for macOS, Windows, Fedora 41 (Linux-ARM), NVIDIA L4T 32.6.1 (Linux-L4T, which is based on and should be largely compatible with Ubuntu 18.04) and Raspberry Pi OS (Linux-RPi, which is based on Debian 12).
-* macOS builds are provided as Universal Binaries incorporating arm64 and x86-64 versions into single libraries instead of separate library files per architecture.
-* Everything is built using C++14 or newer.
-* The version of TBB included uses the standard STL, not the Intel Parallel STL implementation.
-* Nuparu does not contain the entirety of Boost; instead, only a subset of Boost required for OpenVDB is included.
-* RMSD has minor modifications for C++ support.
-* On x86-64, Embree is built using ispc with support for up to SSE4.2. No AVX support is included. On arm64 for Mac/Linux, Embree is built with NEON 2X support. On arm64 for Windows, Embree is built with NEON 1X support and without ispc.
-* Embree is built with a max nested instancing depth of 16.
-* Embree currently is built without SYCL support; this will be added later.
-* The checked-in OpenEXR headers use versioned internal namespaces (for example, `Imf_3_3`); the prior note that namespaces were unversioned does not match those headers.
-* OpenSubdiv is built with Ptex, TBB, and OpenGL support on all platforms. Additionally:
-    * CUDA is supported on Windows x86-64, Fedora 41 x86-64, L4T, and RHEL 9.x
-    * Metal is supported on macOS
-    * OpenSubdiv has been modified to work with OneTBB
-* blosc is built without AVX2 support.
-* OpenVDB is built without ABI compatibility for OpenVDB 3.x.x and without explicit instantiation.
-* NanoVDB is built with CUDA support.
-* dear imgui includes the core imgui library and the GLFW3/OpenGL3 and AppKit/Metal implementation files.
-* Only a subset of boost necessary to support OpenVDB and USD is included.
-* For boost, the following versions of Python are supported:
-    * On macOS, Python 3.13 from MacPorts
-    * On Fedora 41 and RHEL, the default system Python 3.13
-    * On L4T, the default system Python 3.6
-    * Python support is not provided on Windows
-* ZMQ is built with draft API support, without Websockets, without TLS support, and without libbsd
-* macOS libraries require at minimum macOS Sequoia and macOS's Clang variant (Apple LLVM 17 or greater) with libc++.
-* Windows libraries require at minimum Windows 11 and Visual Studio 2022 with \mt.
-* Linux libraries require at minimum either Fedora 41, Red Hat Enterprise Linux (RHEL) 9.x, NVIDIA L4T 32.6.1, or Raspberry Pi OS based on Debian 12.
-    * RHEL 9.x libraries require GCC 13.x on x86-64 and are in lib/linux-gcc13
-    * Fedora 41 libraries require GCC 14.x on x86-64 and are in lib/linux-gcc14
-    * Fedora 41 libraries require GCC 14.x on ARM arm64 and are in lib/linux-arm
-    * L4T libraries require GCC 7.5.x and are in lib/linux-l4t
-    * Raspberry Pi OS libraries require GCC 12.x and are in lib/linux-rpi
-* Things with CUDA support are built using CUDA 12.9, except on L4T, in which case CUDA 10.2 is used
-* Licenses for each library are included either in each library's include/ directory, or in source files directly.
+## Windows
+
+Use the corresponding x64 or ARM64 native Visual Studio developer prompt.
+ARM64 additionally needs the Visual Studio clang-cl tools for Embree; its
+x64 ISPC executable runs under emulation. The example below selects CUDA
+13.5 and GPU architecture 75; adjust these for your toolkit and GPU. To
+build without the OpenSubdiv GPU backends, replace the GPU and CUDA options
+with `-DNUPARU_OPENSUBDIV_GPU=OFF`. From the Nuparu checkout:
+
+```bat
+set NUPARU_REPO=%CD%
+set NUPARU_ARCH=full-windows
+git submodule update --init --recursive
+cmake -S . -B "build\%NUPARU_ARCH%" -G Ninja ^
+  -DCMAKE_BUILD_TYPE=Release ^
+  -DCMAKE_INSTALL_PREFIX="%NUPARU_REPO%\packages\%NUPARU_ARCH%" ^
+  -DNUPARU_BUILD_ALL=ON ^
+  -DNUPARU_OPENSUBDIV_GPU=ON ^
+  -DCUDAToolkit_ROOT="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.5" ^
+  -DCMAKE_CUDA_COMPILER="C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.5\bin\nvcc.exe" ^
+  -DNUPARU_OPENSUBDIV_CUDA_ARCHITECTURES=75
+cmake --build "build\%NUPARU_ARCH%" -j 4
+ctest --test-dir "build\%NUPARU_ARCH%" --output-on-failure
+```
+
+Windows package libraries use the static MSVC runtime; TBB itself remains a DLL.
+
+## Versions
+
+Nuparu currently contains dependencies at the following versions:
+
+|  |  |
+|---|---:|
+| [Blosc (c-blosc)](https://github.com/Blosc) | 1.21.6 |
+| [Boost](https://github.com/boostorg/boost) | 1.92.0, selected subset |
+| [cereal](https://uscilab.github.io/cereal/) | 1.3.2, with custom compatibility patch |
+| [cppzmq](https://github.com/zeromq/cppzmq) | 4.10.0 |
+| [cpuinfo](https://github.com/pytorch/cpuinfo) | Commit e4cadd02 |
+| [Embree](https://embree.github.io/) | 4.4.0 |
+| [GLEW](https://github.com/nigels-com/glew) | 2.2.0 |
+| [GLFW](http://www.glfw.org/) | 3.4 |
+| [GLM](http://glm.g-truc.net/) | 1.0.1 |
+| [Dear ImGui](https://github.com/ocornut/imgui) | 1.92.0 docking |
+| [imnodes](https://github.com/Nelarius/imnodes) | 0.5, with custom compatibility patch |
+| [Imath](https://github.com/AcademySoftwareFoundation/Imath) | 3.1.12 |
+| [jsoncpp](https://github.com/open-source-parsers/jsoncpp) | 1.9.6 |
+| [libdeflate](https://github.com/ebiggers/libdeflate) | 1.18, embedded in OpenEXR |
+| [NanoVDB](https://github.com/AcademySoftwareFoundation/openvdb) | From OpenVDB 12.0.1; NanoVDB’s own version is 32.7.0 |
+| [oneTBB](https://github.com/uxlfoundation/onetbb) | 2022.1.0 |
+| [OpenEXR](https://github.com/AcademySoftwareFoundation/openexr) | 3.3.4 |
+| [OpenSubdiv](https://github.com/pixaranimationstudios/opensubdiv) | 3.8.0 |
+| [OpenVDB](https://github.com/AcademySoftwareFoundation/openvdb) | 12.0.1 |
+| [Partio](https://github.com/wdas/partio) | 1.19.0 |
+| [Ptex](https://github.com/wdas/ptex) | 2.4.3 |
+| [RMSD](http://boscoh.com/code/) | 1.0 |
+| [Sobol generator](http://gruenschloss.org/) | 1.0 |
+| [stb](https://github.com/nothings/stb) | Commit 013ac3b: stb_image 2.30 and stb_image_write 1.16 |
+| [tinyformat](https://github.com/c42f/tinyformat) | 2.3.0 |
+| [zlib](https://www.zlib.net/) | 1.3.1 |
+| [ZeroMQ (libzmq)](https://github.com/zeromq/libzmq) | 4.3.5 |
