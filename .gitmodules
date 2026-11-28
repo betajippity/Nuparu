@@ -64,3 +64,9 @@
 [submodule "deps/cereal"]
 	path = deps/cereal
 	url = https://github.com/USCiLab/cereal.git
+[submodule "deps/imgui"]
+	path = deps/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "deps/imnodes"]
+	path = deps/imnodes
+	url = https://github.com/Nelarius/imnodes.git

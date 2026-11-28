@@ -1,0 +1,49 @@
+--- a/imnodes/imnodes.cpp
++++ b/imnodes/imnodes.cpp
+@@ -10,7 +10,7 @@
+ #include "imnodes_internal.h"
+ 
+ #define IMGUI_DEFINE_MATH_OPERATORS
+-#include <imgui_internal.h>
++#include <imgui/imgui_internal.h>
+ 
+ // Check minimum ImGui version
+ #define MINIMUM_COMPATIBLE_IMGUI_VERSION 17400
+@@ -350,7 +350,7 @@
+         {
+             ImDrawCmd draw_cmd;
+             draw_cmd.ClipRect = draw_list->_ClipRectStack.back();
+-            draw_cmd.TextureId = draw_list->_TextureIdStack.back();
++            draw_cmd.TexRef = draw_list->_TextureStack.back();
+             channel._CmdBuffer.push_back(draw_cmd);
+         }
+     }
+--- a/imnodes/imnodes.h
++++ b/imnodes/imnodes.h
+@@ -1,7 +1,9 @@
+ #pragma once
+ 
++#define IMGUI_DEFINE_MATH_OPERATORS
++
+ #include <stddef.h>
+-#include <imgui.h>
++#include <imgui/imgui.h>
+ 
+ #ifdef IMNODES_USER_CONFIG
+ #include IMNODES_USER_CONFIG
+--- a/imnodes/imnodes_internal.h
++++ b/imnodes/imnodes_internal.h
+@@ -1,10 +1,10 @@
+ #pragma once
+ 
++#define IMGUI_DEFINE_MATH_OPERATORS
+ #include "imnodes.h"
+ 
+-#include <imgui.h>
+-#define IMGUI_DEFINE_MATH_OPERATORS
+-#include <imgui_internal.h>
++#include <imgui/imgui.h>
++#include <imgui/imgui_internal.h>
+ 
+ #include <assert.h>
+ #include <limits.h>

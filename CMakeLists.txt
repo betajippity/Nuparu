@@ -14,6 +14,7 @@ option(NUPARU_BUILD_GLEW "Build static GLEW" OFF)
 option(NUPARU_BUILD_CPUINFO "Build static cpuinfo" OFF)
 option(NUPARU_BUILD_ZMQ "Build static ZeroMQ and install cppzmq" OFF)
 option(NUPARU_BUILD_HEADERS "Package GLM, stb, tinyformat and cereal headers" OFF)
+option(NUPARU_BUILD_SOURCES "Package ImGui, imnodes, RMSD and Sobol sources" OFF)
 set(NUPARU_GLEW_ARCHIVE "" CACHE FILEPATH "Optional local GLEW 2.2.0 release archive")
 option(NUPARU_BUILD_BLOSC "Build static Blosc" OFF)
 option(NUPARU_BUILD_OPENVDB "Build OpenVDB and NanoVDB" OFF)
@@ -91,6 +92,15 @@ if(NUPARU_BUILD_HEADERS)
     foreach(header glm/glm/glm.hpp stb/stb_image.h stb/stb_image_write.h tinyformat/tinyformat.h cereal/include/cereal/cereal.hpp)
         if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/deps/${header}")
             message(FATAL_ERROR "Header dependency is missing (${header}). Run: git submodule update --init --recursive")
+        endif()
+    endforeach()
+    find_package(Git REQUIRED)
+endif()
+if(NUPARU_BUILD_SOURCES)
+    foreach(file deps/imgui/imgui.cpp deps/imgui/backends/imgui_impl_osx.mm deps/imnodes/imnodes.cpp
+                 src/rmsd/rmsd.c include/rmsd/rmsd.h src/sobol/sobol.cpp include/sobol/sobol.h)
+        if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${file}")
+            message(FATAL_ERROR "Source dependency is missing (${file}). Run: git submodule update --init --recursive")
         endif()
     endforeach()
     find_package(Git REQUIRED)
@@ -815,6 +825,15 @@ if(NUPARU_BUILD_OPENVDB)
     set(nuparu_openvdb_dependency nuparu-openvdb)
 endif()
 
+if(NUPARU_BUILD_SOURCES)
+    add_custom_target(nuparu-sources
+        COMMAND ${CMAKE_COMMAND} "-DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+            "-DSOURCE_STAGE=${NUPARU_STAGE_DIR}/sources" "-DGIT_EXECUTABLE=${GIT_EXECUTABLE}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/prepare-sources.cmake"
+        VERBATIM)
+    set(nuparu_sources_dependency nuparu-sources)
+endif()
+
 if(NUPARU_BUILD_HEADERS)
     add_custom_target(nuparu-headers
         COMMAND ${CMAKE_COMMAND} "-DSOURCE_ROOT=${CMAKE_CURRENT_SOURCE_DIR}"
@@ -837,11 +856,12 @@ add_custom_target(nuparu-package ALL
         "-DNUPARU_INCLUDE_CPUINFO=${NUPARU_BUILD_CPUINFO}"
         "-DNUPARU_INCLUDE_ZMQ=${NUPARU_BUILD_ZMQ}"
         "-DNUPARU_INCLUDE_HEADERS=${NUPARU_BUILD_HEADERS}"
+        "-DNUPARU_INCLUDE_SOURCES=${NUPARU_BUILD_SOURCES}"
         "-DNUPARU_INCLUDE_BLOSC=${NUPARU_BUILD_BLOSC}"
         "-DNUPARU_INCLUDE_OPENVDB=${NUPARU_BUILD_OPENVDB}"
         "-DNUPARU_INCLUDE_OPENSUBDIV=${NUPARU_BUILD_OPENSUBDIV}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/assemble-package.cmake"
-    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_partio_dependency} ${nuparu_osd_dependency} ${nuparu_blosc_dependency} ${nuparu_openvdb_dependency} ${nuparu_glew_dependency} ${nuparu_cpuinfo_dependency} ${nuparu_zmq_dependency} ${nuparu_headers_dependency}
+    DEPENDS nuparu-jsoncpp nuparu-glfw nuparu-zlib nuparu-Imath nuparu-openexr ${nuparu_tbb_dependency} ${nuparu_embree_dependency} ${nuparu_boost_dependency} ${nuparu_ptex_dependency} ${nuparu_partio_dependency} ${nuparu_osd_dependency} ${nuparu_blosc_dependency} ${nuparu_openvdb_dependency} ${nuparu_glew_dependency} ${nuparu_cpuinfo_dependency} ${nuparu_zmq_dependency} ${nuparu_headers_dependency} ${nuparu_sources_dependency}
     VERBATIM
 )
 
@@ -866,7 +886,7 @@ if(NUPARU_BUILD_GLEW AND NUPARU_BUILD_CPUINFO AND NUPARU_BUILD_ZMQ)
             "-DTEST_EXECUTABLE_SUFFIX=${CMAKE_EXECUTABLE_SUFFIX}"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/graphics-dependency-consumer.cmake")
 endif()
-foreach(dependency ptex opensubdiv partio blosc openvdb headers)
+foreach(dependency ptex opensubdiv partio blosc openvdb headers sources)
     string(TOUPPER "${dependency}" dependency_upper)
     if(NUPARU_BUILD_${dependency_upper})
         add_test(NAME ${dependency}-consumer
