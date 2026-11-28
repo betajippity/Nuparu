@@ -1,0 +1,41 @@
+cmake_minimum_required(VERSION 3.20)
+# This staging directory belongs exclusively to the generated header package.
+file(REMOVE_RECURSE "${HEADER_STAGE}")
+file(MAKE_DIRECTORY "${HEADER_STAGE}/include/stb_image" "${HEADER_STAGE}/include/tinyformat"
+    "${HEADER_STAGE}/lib/cmake/NuparuHeaders")
+file(COPY "${SOURCE_ROOT}/deps/glm/glm" DESTINATION "${HEADER_STAGE}/include")
+file(COPY "${SOURCE_ROOT}/deps/cereal/include/cereal" DESTINATION "${HEADER_STAGE}/include")
+file(COPY "${SOURCE_ROOT}/deps/stb/stb_image.h" "${SOURCE_ROOT}/deps/stb/stb_image_write.h"
+    DESTINATION "${HEADER_STAGE}/include/stb_image")
+file(COPY "${SOURCE_ROOT}/deps/tinyformat/tinyformat.h" DESTINATION "${HEADER_STAGE}/include/tinyformat")
+
+# Normalize the two build-local files before applying the legacy patch; source
+# submodules and the legacy prefix are never changed by this step.
+foreach(path cereal/archives/json.hpp cereal/types/memory.hpp)
+    set(file "${HEADER_STAGE}/include/${path}")
+    file(READ "${file}" contents)
+    string(REPLACE "\r\n" "\n" contents "${contents}")
+    file(WRITE "${file}" "${contents}")
+endforeach()
+file(READ "${SOURCE_ROOT}/cmake/patches/cereal-legacy.patch" patch_contents)
+string(REPLACE "\r\n" "\n" patch_contents "${patch_contents}")
+set(local_patch "${HEADER_STAGE}/cereal-legacy.patch")
+file(WRITE "${local_patch}" "${patch_contents}")
+execute_process(COMMAND "${GIT_EXECUTABLE}" apply --no-index --whitespace=nowarn "${local_patch}"
+    WORKING_DIRECTORY "${HEADER_STAGE}/include" RESULT_VARIABLE result ERROR_VARIABLE error)
+if(NOT result EQUAL 0)
+    message(FATAL_ERROR "Failed to apply the legacy cereal patch: ${error}")
+endif()
+file(REMOVE "${local_patch}")
+foreach(dependency glm stb cereal tinyformat)
+    file(MAKE_DIRECTORY "${HEADER_STAGE}/share/licenses/${dependency}")
+endforeach()
+file(COPY "${SOURCE_ROOT}/deps/glm/copying.txt" DESTINATION "${HEADER_STAGE}/share/licenses/glm")
+file(COPY "${SOURCE_ROOT}/deps/stb/LICENSE" DESTINATION "${HEADER_STAGE}/share/licenses/stb")
+file(COPY "${SOURCE_ROOT}/deps/cereal/LICENSE" DESTINATION "${HEADER_STAGE}/share/licenses/cereal")
+configure_file("${SOURCE_ROOT}/deps/cereal/include/cereal/external/rapidjson/LICENSE" "${HEADER_STAGE}/share/licenses/cereal/rapidjson-LICENSE.txt" COPYONLY)
+configure_file("${SOURCE_ROOT}/deps/cereal/include/cereal/external/rapidxml/license.txt" "${HEADER_STAGE}/share/licenses/cereal/rapidxml-LICENSE.txt" COPYONLY)
+file(STRINGS "${SOURCE_ROOT}/deps/tinyformat/tinyformat.h" license LIMIT_COUNT 26)
+string(JOIN "\n" license ${license})
+file(WRITE "${HEADER_STAGE}/share/licenses/tinyformat/LICENSE.txt" "${license}\n")
+file(COPY "${SOURCE_ROOT}/cmake/NuparuHeadersConfig.cmake" DESTINATION "${HEADER_STAGE}/lib/cmake/NuparuHeaders")

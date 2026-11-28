@@ -1,0 +1,11 @@
+get_filename_component(_nuparu_headers_prefix "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+foreach(header glm/glm.hpp stb_image/stb_image.h stb_image/stb_image_write.h tinyformat/tinyformat.h cereal/cereal.hpp)
+    if(NOT EXISTS "${_nuparu_headers_prefix}/include/${header}")
+        message(FATAL_ERROR "Nuparu header package is missing ${header}")
+    endif()
+endforeach()
+if(NOT TARGET Nuparu::headers)
+    add_library(Nuparu::headers INTERFACE IMPORTED GLOBAL)
+    set_target_properties(Nuparu::headers PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${_nuparu_headers_prefix}/include")
+endif()

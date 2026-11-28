@@ -52,3 +52,15 @@
 [submodule "deps/cppzmq"]
 	path = deps/cppzmq
 	url = https://github.com/zeromq/cppzmq.git
+[submodule "deps/glm"]
+	path = deps/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "deps/stb"]
+	path = deps/stb
+	url = https://github.com/nothings/stb.git
+[submodule "deps/tinyformat"]
+	path = deps/tinyformat
+	url = https://github.com/c42f/tinyformat.git
+[submodule "deps/cereal"]
+	path = deps/cereal
+	url = https://github.com/USCiLab/cereal.git
