@@ -5,7 +5,11 @@ v0.10.25.26
 
 Third Party dependencies and foundation libraries for Karl's graphics projects
 
-For the experimental source-build recipe and combined dependency package pilot, see [DEPENDENCY-BUILD.md](DEPENDENCY-BUILD.md). The existing prebuilt packages remain the standard dependency set.
+For the complete source-built package and package-only Takua configuration,
+see [FULL-PACKAGE.md](FULL-PACKAGE.md). The earlier incremental recipes are
+in [DEPENDENCY-BUILD.md](DEPENDENCY-BUILD.md); legacy prebuilt packages remain
+available during the transition. The inventory below describes those legacy
+packages and may differ from the pinned source-built versions.
 
 Nuparu currently consists of:
 
